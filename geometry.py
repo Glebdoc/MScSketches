@@ -1,4 +1,6 @@
 import numpy as np
+import pyvista as pv
+from bemUtils import*
 
 class Point:
     def __init__(self, x, y, z):
@@ -8,7 +10,7 @@ class Point:
 
 class Vortex(Point):
     def __init__(self, point1, point2, Gamma):
-        self.x1 = point1.x
+        self.x1 = point1.x      
         self.y1 = point1.y
         self.z1 = point1.z
         self.x2 = point2.x
@@ -76,3 +78,84 @@ class HorseShoe(Vortex):
             vort3 += self.rightset[i].velocity(point)
         vort2 = self.centre.velocity(point)
         return vort1 + vort2 + vort3
+    
+    def get_plot_data(self, start_index=0):
+
+        points = []
+        lines = []
+        index = start_index
+
+        # Add left vortices
+        for vortex in self.leftset:
+            points.append([vortex.x1, vortex.y1, vortex.z1])
+            points.append([vortex.x2, vortex.y2, vortex.z2])
+            lines.append([2, index, index + 1])
+            index += 2
+
+        # Add central vortex
+        points.append([self.centre.x1, self.centre.y1, self.centre.z1])
+        points.append([self.centre.x2, self.centre.y2, self.centre.z2])
+        lines.append([2, index, index + 1])
+        index += 2
+
+        # Add right vortices
+        for vortex in self.rightset:
+            points.append([vortex.x1, vortex.y1, vortex.z1])
+            points.append([vortex.x2, vortex.y2, vortex.z2])
+            lines.append([2, index, index + 1])
+            index += 2
+
+        return np.array(points), np.array(lines).flatten()
+    
+
+class Propeller():
+    def __init__(self, position, hub, diameter, NB, pitch, RPM, chord, n):
+        self.diameter = diameter
+        self.NB = NB
+        self.pitch = pitch
+        self.RPM = RPM
+        self.n = n
+        self.chord = chord
+        self.r = np.linspace(hub, 1 , n)
+        self.assemble()
+    
+    def assemble(self):
+        # left vortex
+        horseShoes = []
+        for j in range(self.NB):
+            for i in range(self.n - 1):
+                # assemble left vortex 
+                leftVortex = (Vortex( Point(self.chord, self.r[i], 0), Point(0, self.r[i], 0), 0))
+                rightVortex = (Vortex(Point(0, self.r[i+1], 0), Point(self.chord, self.r[i+1], 0), 0))
+                centralVortex = (Vortex(Point(0, self.r[i], 0), Point(0, self.r[i+1], 0), 0))
+                horseShoe = HorseShoe([leftVortex], centralVortex, [rightVortex])
+                horseShoes.append(horseShoe)
+        self.horseShoes = horseShoes
+
+    def display(self):
+
+        all_points = []
+        all_lines = []
+        start_index = 0
+
+        for i in self.horseShoes:
+            points, lines = i.get_plot_data(start_index)
+            all_points.extend(points)
+            all_lines.extend(lines)
+            start_index += len(points)
+
+        plotter = pv.Plotter()
+        poly_data = pv.PolyData(np.array(all_points))
+        poly_data.lines = np.array(all_lines)
+        plotter.add_mesh(poly_data, color="blue", line_width=2)
+
+        axis_origins, axis_directions, axis_colors = get_axis_vectors()
+        for i in range(3):
+            plotter.add_arrows(
+                np.array([axis_origins[i]]), 
+                np.array([axis_directions[i]]), 
+                color=axis_colors[i], 
+                mag=0.1
+        )
+
+        plotter.show()
