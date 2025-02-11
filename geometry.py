@@ -18,7 +18,7 @@ class Point:
         self.x, self.y, self.z = new_coords
 
 class Vortex(Point):
-    def __init__(self, point1, point2, Gamma):
+    def __init__(self, point1, point2, Gamma=1):
         self.p1 = point1
         self.p2 = point2 
         self.x1 = point1.x      
@@ -143,7 +143,10 @@ class HorseShoe(Vortex):
             vortex.translate(translation)
         for vortex in self.rightset:
             vortex.translate(translation)
+
         self.centre.translate(translation)
+
+        
 
     def rotate(self, R):
         for vortex in self.leftset:
@@ -164,7 +167,9 @@ class Propeller():
         self.U = U
         self.wake_length = wake_length
         self.chord = chord
-        self.r = np.linspace(hub, 1 , n)*diameter/2
+        self.r = np.linspace(hub, 1 , n)*diameter*0.5
+        self.azimuth = np.array([0, 0, 1])
+        self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
         self.assemble()
         self.rotate(*self.angles)
         self.translate(position)
@@ -174,14 +179,18 @@ class Propeller():
     def assemble(self):
         # wake
         delta = self.diameter/self.U
-        dt = np.arange(0, self.wake_length*self.diameter/self.U, delta/100)
+        dt = np.arange(0, self.wake_length*self.diameter/self.U, delta/50)
         omega = 2*np.pi*self.RPM/60
         zw = -self.U*dt # + angle etc
         
         # left vortex
         horseShoes = []
+
         for j in range(self.NB):
             shift = j*2*np.pi/self.NB
+            if j != 0:
+                R = rotation_matrix(0, 0, shift)
+                self.collocationPoints.extend(R @ self.collocationPoints[0:self.n-1])
             for i in range(self.n - 1):
                 xwl = self.r[i]*np.sin(omega*dt) + self.chord 
                 xwr = self.r[i+1]*np.sin(omega*dt) + self.chord
@@ -206,23 +215,32 @@ class Propeller():
 
                 centralVortex = (Vortex(Point(0, self.r[i], 0), Point(0, self.r[i+1], 0), 0))
                 horseShoe = HorseShoe(leftVortex, centralVortex, rightVortex)
-
                 if j != 0:
-                    R = rotation_matrix(0, 0, shift)
                     horseShoe.rotate(R)
                 horseShoes.append(horseShoe)
-                self.horseShoes = horseShoes
+        self.horseShoes = horseShoes
                 
     def translate(self, translation):
+        translation_array = np.array([translation.x, translation.y, translation.z]).reshape(3, 1)
+
         for horseShoe in self.horseShoes:
             horseShoe.translate(translation)
+
+        for i in range(self.NB):
+            self.collocationPoints[i] += translation_array
                 
 
     def rotate(self, delta_x=0, delta_y=0, delta_z=0):
         self.angles = np.array([delta_x, delta_y, delta_z])
         R = rotation_matrix(*self.angles)
+
         for horseShoe in self.horseShoes:
             horseShoe.rotate(R)
+
+        for i in range(self.NB):
+            self.collocationPoints[i] = R @ self.collocationPoints[i]
+
+        self.azimuth = R @ self.azimuth
 
 
     def display(self, color):
@@ -253,44 +271,65 @@ class Propeller():
 
         plotter.show()
 
+# drone = Drone(main_position, main_angles, main_hub, main_diameter, main_NB, main_pitch, main_RPM, main_chord, main_n,
+#               small_props_angles, small_props_diameter, small_props_NB,
+#               small_props_RPM, small_props_chord, small_props_n)
+
 class Drone:
-    def __init__(self, main_position, main_angles, main_hub, main_diameter, main_NB, main_pitch, main_RPM, main_chord, main_n, 
-                 small_props_angles, small_props_diameters, small_props_NB, 
-                 small_props_RPM, small_props_chord, small_props_n):
+    def __init__(self, main_position, main_angles, main_hub, main_diameter,
+                 main_NB, main_pitch, main_RPM, main_chord, main_n, 
+                 small_props_angles, small_props_diameter, small_props_NB, 
+                 small_props_RPM, small_props_chord, small_props_n,
+                 mainWakeLength, smallWakeLength):
         # Main propeller
-        self.main_prop = Propeller(main_position, main_angles, main_hub, main_diameter, main_NB, main_pitch, main_RPM, 
-                                   main_chord, main_n)
+        self.main_prop = Propeller(main_position, 
+                                   main_angles,
+                                   main_hub,
+                                   main_diameter,
+                                   main_NB, 
+                                   main_pitch, 
+                                   main_RPM, 
+                                   main_chord, 
+                                   main_n,
+                                   U=2,
+                                   wake_length=mainWakeLength)
         
         # Small propellers
         self.small_props = []
         main_NB = self.main_prop.NB
+        small_prop_pitch = 0
         main_R = self.main_prop.diameter/2
         for i in range(main_NB):
             shift = i*2*np.pi/main_NB
             position = Point(main_R*np.sin(shift), main_R*np.cos(shift), 0)
-            angles = (0,np.radians(90),shift)
-            small_prop = Propeller(position, small_props_angles[i], 0, small_props_diameters[i], 
-                                   small_props_NB[i], small_props_RPM[i], small_props_chord[i], 
-                                   small_props_n[i])
+            angles = (-shift, -np.radians(90),0)
+            small_prop = Propeller(position, 
+                                   angles, 
+                                   0, 
+                                   small_props_diameter, 
+                                   small_props_NB,
+                                   small_prop_pitch, 
+                                   small_props_RPM, 
+                                   small_props_chord, 
+                                   small_props_n,
+                                   U=4,
+                                   wake_length=smallWakeLength)
+            
             self.small_props.append(small_prop)
 
     def translate(self, translation):
-        # Translate both main and small props
         self.main_prop.translate(translation)
         for small_prop in self.small_props:
             small_prop.translate(translation)
     
     def rotate(self, delta_x=0, delta_y=0, delta_z=0):
-        # Rotate both main and small props
         self.main_prop.rotate(delta_x, delta_y, delta_z)
         for small_prop in self.small_props:
             small_prop.rotate(delta_x, delta_y, delta_z)
 
-    def display(self, color_main='blue', color_small='green'):
-        # Display main propeller and small propellers
-        self.main_prop.display(color_main)
-        
-        for small_prop in self.small_props:
-            small_prop.display(color_small)
+    def display(self, color_main='blue', color_small='green', extra_points=None):
+        bodies = [self.main_prop] + self.small_props
+        colors = [color_main] + [color_small]*len(self.small_props)
+        scene(bodies, colors, extra_points=extra_points)
 
 

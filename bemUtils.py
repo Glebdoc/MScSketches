@@ -40,12 +40,26 @@ def rotation_matrix(angle_x=0, angle_y=0, angle_z=0):
 
         return Rz @ Ry @ Rx 
 
-def scene(bodies, colors):
+def scene(bodies, colors, extra_points=None, extra_lines=None):
         plotter = pv.Plotter()
+        plotter.set_background("black") 
+
+        if extra_points is not None:
+            for i, points in enumerate(extra_points):
+                poly_data = pv.PolyData(np.array(points))
+                plotter.add_mesh(poly_data, color="white", point_size=5)
+
+
         for j, body in enumerate(bodies):
             all_points = []
             all_lines = []
+            coll_points = []
             start_index = 0
+
+            for c in range(len(body.collocationPoints)):
+                coll_points.extend(body.collocationPoints[c].T)
+                 
+
             for i in body.horseShoes:
                 points, lines = i.get_plot_data(start_index)
                 all_points.extend(points)
@@ -56,6 +70,8 @@ def scene(bodies, colors):
             poly_data = pv.PolyData(np.array(all_points))
             poly_data.lines = np.array(all_lines)
             plotter.add_mesh(poly_data, color=colors[j], line_width=2)
+            poly_data = pv.PolyData(np.array(coll_points))
+            plotter.add_mesh(poly_data, color="red")
 
         axis_origins, axis_directions, axis_colors = get_axis_vectors()
         for i in range(3):
