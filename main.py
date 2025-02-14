@@ -22,43 +22,69 @@ def plot(all_points, all_lines):
         )
     plotter.show()
 
-# bigPropPos = Point(0,0,0)
-# smallPropPos = Point(0,0.5,0)
-
-# bigProp = Propeller(bigPropPos, angles=(0,0,0), hub=0.1, diameter=1, NB=3, pitch=12, RPM=100, chord=0.1, n=10, U=2, wake_length=1)
-# smallProp = Propeller(smallPropPos, angles=(0, -np.radians(90),0), hub=0.1, diameter=0.2, NB=3, pitch=12, RPM=1000, chord=0.03, n=10, U=4, wake_length=4)
-# bigPropShoes = bigProp.horseShoes
-
-# scene([bigProp, smallProp], ["blue", "red"])
-
 # Main propeller parameters
 main_position = Point(0, 0, 0)
 main_angles = (0, 0, 0)  # Initial rotation angles (e.g., Euler angles)
-main_hub = 0.1
-main_diameter = 2.0
+main_hub = 0.3
+main_diameter = 3.
 main_NB = 3  # Number of blades
 main_pitch = 0.2
-main_RPM = 100
-main_chord = 0.1
-main_n = 4
+main_RPM = 350
+main_chord = 0.3
+main_n = 25
 
 # Small propeller parameters (e.g., 4 small propellers)
 small_props_angles = (0, 0, 0)  # Initial rotation angles (e.g., Euler angles)
-small_props_diameter = 0.2
+small_props_diameter = 0.3
 small_props_NB = 3
-small_props_RPM = 1000
-small_props_chord = 0.03
-small_props_n = 3
+small_props_RPM = 10000
+small_props_chord = 0.05
+small_props_n = 10
 
 # Create the drone
-drone = Drone(main_position, main_angles, main_hub, main_diameter, 
-              main_NB, main_pitch, main_RPM, main_chord, main_n,
-              small_props_angles, small_props_diameter, small_props_NB,
-              small_props_RPM, small_props_chord, small_props_n,
-              mainWakeLength=1, smallWakeLength=4)
+
+err = 1.0
+iter = 0
+max_iter = 100
+weight = 0.5
+main_U = 5.11
+small_U = 61.69
+
+runWhole = True
 
 
+if runWhole:
+    while (err > 1e-1 and iter<max_iter):
+        
 
-extra= solve(drone)
+        drone = Drone(main_position, main_angles, main_hub, main_diameter, 
+                    main_NB, main_pitch, main_RPM, main_chord, main_n,
+                    small_props_angles, small_props_diameter, small_props_NB,
+                    small_props_RPM, small_props_chord, small_props_n,
+                    mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform')
 
-drone.display(color_main='blue', color_small='green', extra_points=extra)
+        old_main_U = main_U
+        old_small_U = small_U
+
+        main_U, small_U, _,_= solve(drone)
+
+        main_U = weight*main_U + (1-weight)*old_main_U
+        small_U = weight*small_U + (1-weight)*old_small_U
+
+        err = np.abs(main_U - old_main_U) + np.abs(small_U - old_small_U)
+        if err < 1e-1:
+            main_U, small_U, horses, Gammas = solve(drone,plotting=False, updateConfig=True)
+        iter += 1
+        print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}, Small U: {small_U}')
+
+    drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
+    u, v, w = computeVelocityField(horses, Gammas)
+
+else:
+    drone = Drone(main_position, main_angles, main_hub, main_diameter, 
+                    main_NB, main_pitch, main_RPM, main_chord, main_n,
+                    small_props_angles, small_props_diameter, small_props_NB,
+                    small_props_RPM, small_props_chord, small_props_n,
+                    mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform')
+    main_U, small_U = solve(drone,plotting=True, updateConfig=True)
+    drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)

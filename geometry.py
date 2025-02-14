@@ -1,6 +1,8 @@
 import numpy as np
 import pyvista as pv
 from bemUtils import*
+import timeit
+
 
 class Point:
     def __init__(self, x, y, z):
@@ -40,7 +42,8 @@ class Vortex(Point):
     
     def crossMag(self, x, y, z):
         return np.sqrt(self.crossX(x, y, z)**2 + self.crossY(x, y, z)**2 + self.crossZ(x, y, z)**2)
-    
+
+
     def dot1(self, x, y, z):
         return (self.x2 - self.x1)*(x - self.x1) + (self.y2 - self.y1)*(y - self.y1) + (self.z2 - self.z1)*(z - self.z1)
     
@@ -52,28 +55,67 @@ class Vortex(Point):
     
     def r2(self, x, y, z): 
         return np.sqrt((x - self.x2)**2 + (y - self.y2)**2 + (z - self.z2)**2)
+    
 
     def length(self):
         return np.sqrt((self.x2 - self.x1)**2 + (self.y2 - self.y1)**2)
     
     def velocity(self, point):
-        x = point.x
-        y = point.y
-        z = point.z
+        """Optimized velocity function maintaining correctness."""
+        x, y, z = point.x, point.y, point.z
 
-        crossMag = self.crossMag(x, y, z)
+        cross_vec = np.array([self.crossX(x, y, z), self.crossY(x, y, z), self.crossZ(x, y, z)])
+
+        # Compute cross magnitude
+        #crossMag = self.crossMag(x, y, z)
+        crossMag =np.linalg.norm(cross_vec, axis=0)
         if crossMag < 1e-6:
-            return np.array([0, 0, 0])
-        r1 = self.r1(x, y, z)
-        if r1 < 1e-6:
-            return np.array([0, 0, 0])
-        r2 = self.r2(x, y, z)
-        if r2 < 1e-6:
-            return np.array([0, 0, 0])
+            return np.zeros(3)
+
+        # Compute r1 and r2
+        r1, r2 = self.r1(x, y, z), self.r2(x, y, z)
+        if r1 < 1e-6 or r2 < 1e-6:
+            return np.zeros(3)
+
+        # Compute dot products
+        dot1, dot2 = self.dot1(x, y, z), self.dot2(x, y, z)
+
+        # Compute K factor
+        K = (self.Gamma / (4 * np.pi * crossMag**2)) * (dot1 / r1 - dot2 / r2)
+
+        # Compute cross product result
         
-        K = (self.Gamma/(4*np.pi*crossMag*crossMag)) * (self.dot1(x, y, z)/r1 - self.dot2(x, y, z)/r2)
-        return K*np.array([self.crossX(x, y, z), self.crossY(x, y, z), self.crossZ(x, y, z)])
-    
+
+        return K * cross_vec
+
+    def velocity_vectorized(self, points):
+        x, y, z = points[:, 0], points[:, 1], points[:, 2]
+
+        cross_vec = np.array([self.crossX(x, y, z), self.crossY(x, y, z), self.crossZ(x, y, z)]).T
+
+        # Compute cross magnitude
+        #crossMag = self.crossMag(x, y, z)
+        crossMag = np.linalg.norm(cross_vec, axis=1)
+
+        mask = crossMag < 1e-6
+        crossMag[mask] = 1
+        # Compute r1 and r2
+        r1, r2 = self.r1(x, y, z), self.r2(x, y, z)
+        r1[r1 < 1e-6] = 1e-5
+        r2[r2 < 1e-6] = 1e-5
+
+        # Compute dot products
+        dot1, dot2 = self.dot1(x, y, z), self.dot2(x, y, z)
+
+        # Compute K factor
+        K = (self.Gamma / (4 * np.pi * crossMag**2)) * (dot1 / r1 - dot2 / r2)
+        K[mask] = 0
+
+        # Compute cross product result
+        
+
+        return K[:, np.newaxis] * cross_vec
+
     def translate(self, translation):
         self.x1 += translation.x
         self.y1 += translation.y
@@ -100,13 +142,20 @@ class HorseShoe(Vortex):
         self.rightset = right
         
 
-    def velocity(self, point):
+    def velocity(self, point, vectorized=False):
         vort1 = 0
         vort3 = 0
         for i in range(len(self.leftset)):
-            vort1 += self.leftset[i].velocity(point)
-            vort3 += self.rightset[i].velocity(point)
-        vort2 = self.centre.velocity(point)
+            if vectorized:
+                vort1 += self.leftset[i].velocity_vectorized(point)
+                vort3 += self.rightset[i].velocity_vectorized(point)
+            else:
+                vort1 += self.leftset[i].velocity(point)
+                vort3 += self.rightset[i].velocity(point)
+        if vectorized:
+            vort2 = self.centre.velocity_vectorized(point)
+        else:
+            vort2 = self.centre.velocity(point)
         return vort1 + vort2 + vort3
 
     
@@ -157,7 +206,7 @@ class HorseShoe(Vortex):
 
 
 class Propeller():
-    def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5):
+    def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='uniform'):
         self.diameter = diameter
         self.angles = np.array(angles)
         self.NB = NB
@@ -167,8 +216,12 @@ class Propeller():
         self.U = U
         self.wake_length = wake_length
         self.chord = chord
-        self.r = np.linspace(hub, 1 , n)*diameter*0.5
+        if distribution == 'cosine':
+            self.r = np.linspace(hub, 1 , n)*diameter*0.5*np.cos(np.linspace(0, np.pi, n))
+        else:
+            self.r = np.linspace(hub, 1 , n)*diameter*0.5
         self.azimuth = np.array([0, 0, 1])
+        self.origin = position
         self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
         self.assemble()
         self.rotate(*self.angles)
@@ -178,9 +231,19 @@ class Propeller():
     
     def assemble(self):
         # wake
-        delta = self.diameter/self.U
-        dt = np.arange(0, self.wake_length*self.diameter/self.U, delta/50)
+        # I want to have D number of points per revolution of the propeller
+        # I call them points per rev (ppr)
+        ppr = 30 
         omega = 2*np.pi*self.RPM/60
+        length = self.diameter*self.wake_length
+        total_time = length/self.U
+        # how much time does 1 rev take?
+        # or rather how many revs can I fit in the wake?
+        nrevs = total_time*omega/(2*np.pi)
+        total_steps = int(nrevs*ppr)
+
+
+        dt = np.linspace(0, total_time, total_steps)
         zw = -self.U*dt # + angle etc
         
         # left vortex
@@ -280,7 +343,7 @@ class Drone:
                  main_NB, main_pitch, main_RPM, main_chord, main_n, 
                  small_props_angles, small_props_diameter, small_props_NB, 
                  small_props_RPM, small_props_chord, small_props_n,
-                 mainWakeLength, smallWakeLength):
+                 mainWakeLength, smallWakeLength, main_U, small_U, main_distribution='uniform', small_distribution='uniform'):
         # Main propeller
         self.main_prop = Propeller(main_position, 
                                    main_angles,
@@ -291,8 +354,9 @@ class Drone:
                                    main_RPM, 
                                    main_chord, 
                                    main_n,
-                                   U=2,
-                                   wake_length=mainWakeLength)
+                                   U=main_U,
+                                   wake_length=mainWakeLength,
+                                   distribution=main_distribution)
         
         # Small propellers
         self.small_props = []
@@ -312,8 +376,9 @@ class Drone:
                                    small_props_RPM, 
                                    small_props_chord, 
                                    small_props_n,
-                                   U=4,
-                                   wake_length=smallWakeLength)
+                                   U=small_U,
+                                   wake_length=smallWakeLength,
+                                   distribution=small_distribution)
             
             self.small_props.append(small_prop)
 
@@ -327,9 +392,35 @@ class Drone:
         for small_prop in self.small_props:
             small_prop.rotate(delta_x, delta_y, delta_z)
 
-    def display(self, color_main='blue', color_small='green', extra_points=None):
+    def display(self, color_main='blue', color_small='green', extra_points=None, extra_lines=None):
         bodies = [self.main_prop] + self.small_props
         colors = [color_main] + [color_small]*len(self.small_props)
-        scene(bodies, colors, extra_points=extra_points)
+        scene(bodies, colors, extra_points=extra_points, extra_lines=extra_lines)
 
 
+# test vectorization of velocity function
+def test_vectorization():
+    # Create a vortex
+    vortex = Vortex(Point(0, 0, 0), Point(1, 0, 0), 1)
+
+    # Create a set of points
+    points = np.random.rand(1000, 3)
+
+    # Compute the velocity at each point
+    start = timeit.default_timer()
+    velocities = vortex.velocity_vectorized(points)
+    end = timeit.default_timer()
+    print("Time taken for vectorized velocity computation:", end - start)
+
+    # Compute the velocity at each point
+    start = timeit.default_timer()
+    velocities = np.array([vortex.velocity(Point(*point)) for point in points])
+    end = timeit.default_timer()
+    print("Time taken for non-vectorized velocity computation:", end - start)
+
+    # Check if the results are the same
+    velocities_vectorized = vortex.velocity_vectorized(points)
+    velocities_non_vectorized = np.array([vortex.velocity(Point(*point)) for point in points])
+    assert np.allclose(velocities_vectorized, velocities_non_vectorized)
+
+    print("Results are consistent.")

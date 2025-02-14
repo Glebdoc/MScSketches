@@ -45,9 +45,9 @@ def scene(bodies, colors, extra_points=None, extra_lines=None):
         plotter.set_background("black") 
 
         if extra_points is not None:
-            for i, points in enumerate(extra_points):
-                poly_data = pv.PolyData(np.array(points))
-                plotter.add_mesh(poly_data, color="white", point_size=5)
+            poly_data = pv.PolyData(np.array(extra_points))
+            poly_data.lines = np.array(extra_lines)
+            plotter.add_mesh(poly_data, color="white", line_width=2)
 
 
         for j, body in enumerate(bodies):
