@@ -360,6 +360,9 @@ class Drone:
         
         # Small propellers
         self.small_props = []
+        self.total_velocity_vectors = None
+        self.total_collocation_points = None
+
         main_NB = self.main_prop.NB
         small_prop_pitch = 0
         main_R = self.main_prop.diameter/2
@@ -395,32 +398,4 @@ class Drone:
     def display(self, color_main='blue', color_small='green', extra_points=None, extra_lines=None):
         bodies = [self.main_prop] + self.small_props
         colors = [color_main] + [color_small]*len(self.small_props)
-        scene(bodies, colors, extra_points=extra_points, extra_lines=extra_lines)
-
-
-# test vectorization of velocity function
-def test_vectorization():
-    # Create a vortex
-    vortex = Vortex(Point(0, 0, 0), Point(1, 0, 0), 1)
-
-    # Create a set of points
-    points = np.random.rand(1000, 3)
-
-    # Compute the velocity at each point
-    start = timeit.default_timer()
-    velocities = vortex.velocity_vectorized(points)
-    end = timeit.default_timer()
-    print("Time taken for vectorized velocity computation:", end - start)
-
-    # Compute the velocity at each point
-    start = timeit.default_timer()
-    velocities = np.array([vortex.velocity(Point(*point)) for point in points])
-    end = timeit.default_timer()
-    print("Time taken for non-vectorized velocity computation:", end - start)
-
-    # Check if the results are the same
-    velocities_vectorized = vortex.velocity_vectorized(points)
-    velocities_non_vectorized = np.array([vortex.velocity(Point(*point)) for point in points])
-    assert np.allclose(velocities_vectorized, velocities_non_vectorized)
-
-    print("Results are consistent.")
+        scene(bodies, colors, collocation_points = self.total_collocation_points, velocity_vectors=self.total_velocity_vectors, extra_points=extra_points, extra_lines=extra_lines)

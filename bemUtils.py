@@ -40,9 +40,20 @@ def rotation_matrix(angle_x=0, angle_y=0, angle_z=0):
 
         return Rz @ Ry @ Rx 
 
-def scene(bodies, colors, extra_points=None, extra_lines=None):
+def scene(bodies, colors, collocation_points, velocity_vectors, extra_points=None, extra_lines=None):
         plotter = pv.Plotter()
         plotter.set_background("black") 
+
+        if velocity_vectors is not None:
+            print("Plotting velocity vectors")
+            print('velocity_vectors.shape',velocity_vectors.shape)
+            print('collocation_points.shape',collocation_points.shape)
+            poly_data = pv.PolyData(collocation_points)
+            poly_data['vectors'] = velocity_vectors
+            magnitude = np.linalg.norm(velocity_vectors, axis=1)
+            poly_data['magnitude'] = magnitude
+            glyphs = poly_data.glyph(orient='vectors', scale='magnitude', factor=0.003)
+            plotter.add_mesh(glyphs, color="white")
 
         if extra_points is not None:
             poly_data = pv.PolyData(np.array(extra_points))

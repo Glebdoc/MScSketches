@@ -39,7 +39,7 @@ small_props_diameter = 0.3
 small_props_NB = 3
 small_props_RPM = 10000
 small_props_chord = 0.05
-small_props_n = 10
+small_props_n = 7
 
 # Create the drone
 
@@ -50,8 +50,7 @@ weight = 0.5
 main_U = 5.11
 small_U = 61.69
 
-runWhole = True
-
+runWhole = False
 
 if runWhole:
     while (err > 1e-1 and iter<max_iter):
@@ -78,7 +77,7 @@ if runWhole:
         print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}, Small U: {small_U}')
 
     drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
-    u, v, w = computeVelocityField(horses, Gammas)
+    #u, v, w = computeVelocityField(horses, Gammas)
 
 else:
     drone = Drone(main_position, main_angles, main_hub, main_diameter, 
@@ -86,5 +85,5 @@ else:
                     small_props_angles, small_props_diameter, small_props_NB,
                     small_props_RPM, small_props_chord, small_props_n,
                     mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform')
-    main_U, small_U = solve(drone,plotting=True, updateConfig=True)
+    main_U, small_U, _, _ = solve(drone,plotting=True, updateConfig=True)
     drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)

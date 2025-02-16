@@ -137,25 +137,6 @@ def solve(drone, plotting=False, updateConfig=True):
         u_influences = np.loadtxt('u_influences.txt')
         v_influences = np.loadtxt('v_influences.txt')
         w_influences = np.loadtxt('w_influences.txt')
-
-    # u_influences2 = np.zeros((collocN, collocN))
-    # v_influences2 = np.zeros((collocN, collocN))
-    # w_influences2 = np.zeros((collocN, collocN))
-
-    # if updateConfig:
-    #     for i, colloc in tqdm(enumerate(total_colloc_points), total=len(total_colloc_points), desc="Influence calculation"):
-    #         for j, horse in enumerate(total_horses):
-    #             x = colloc[0]
-    #             y = colloc[1]
-    #             z = colloc[2]
-    #             u_vector = horse.velocity(Point(x, y, z))
-    #             u_influences2[i, j] = u_vector[0]
-    #             v_influences2[i, j] = u_vector[1]
-    #             w_influences2[i, j] = u_vector[2]
-    #     np.savetxt('u_influences2.txt', u_influences2)
-    #     np.savetxt('v_influences2.txt', v_influences2)
-    #     np.savetxt('w_influences2.txt', w_influences2)
-    # else:
     
 
     v_axial = np.zeros((collocN, 1))
@@ -166,7 +147,8 @@ def solve(drone, plotting=False, updateConfig=True):
     v_rotational_main = np.zeros((main_NB* (main_n - 1), 3))
     azimuthVector = drone.main_prop.azimuth
     for i in range(main_NB* (main_n - 1)):
-        v_rotational_main[i] = np.cross(azimuthVector*main_Omega, total_colloc_points[i])  
+        v_rotational_main[i] = np.cross(azimuthVector*main_Omega, total_colloc_points[i])  # SWITCH THE ORDER, IT IS WRONG
+        #v_rotational_main[i] = np.cross(total_colloc_points[i], azimuthVector*main_Omega)  # SWITCH THE ORDER, IT IS WRONG
 
 
     v_rotational_small = np.zeros((main_NB*small_NB* (small_n - 1), 3))
@@ -190,7 +172,7 @@ def solve(drone, plotting=False, updateConfig=True):
         n_origin[main_NB*(main_n-1)+i] = origin
         Omega = drone.small_props[count].RPM * 2 * np.pi / 60
         # due to its own rotation
-        v_rotational_small[i] = np.cross(azimuthVector*(-Omega), total_colloc_points[(main_NB*(main_n-1))+i] - origin) + total_colloc_points[(main_NB*(main_n-1))+i] # removed - sign from Omega
+        v_rotational_small[i] = np.cross(azimuthVector*(Omega), total_colloc_points[(main_NB*(main_n-1))+i] - origin) + total_colloc_points[(main_NB*(main_n-1))+i] # removed - sign from Omega
         # due to main rotor rotation
         v_rotational_small[i] -= np.cross(drone.main_prop.azimuth*main_Omega, total_colloc_points[(main_NB*(main_n-1))+i]) #perhpas -origin
     v_rotational = np.concatenate((v_rotational_main, v_rotational_small))
@@ -198,6 +180,8 @@ def solve(drone, plotting=False, updateConfig=True):
 
 
     #due to main rotor rotation 
+
+    vel_total_output = np.zeros((collocN, 3))
 
     weight = 0.2
     err = 1.0
@@ -214,8 +198,9 @@ def solve(drone, plotting=False, updateConfig=True):
                 v_rotational[i][1] + v[i], 
                 v_rotational[i][2] + w[i]
             ])
+            vel_total_output[i] = vel_total.flatten()
 
-            v_axial[i] = -np.dot(n_azimuth[i], vel_total.flatten())
+            v_axial[i, :] = -np.dot(n_azimuth[i], vel_total.flatten())
 
             r_vector = total_colloc_points[i] - n_origin[i]
 
@@ -264,6 +249,7 @@ def solve(drone, plotting=False, updateConfig=True):
 
     print("Main Blade Thrust", Thrust)
     print("Main Blade Torque", Torque.sum())
+
         
     if plotting:
         r_small = drone.small_props[0].r
@@ -306,5 +292,6 @@ def solve(drone, plotting=False, updateConfig=True):
 
         plt.tight_layout()
         plt.show()
-
+    drone.total_collocation_points = total_colloc_points
+    drone.total_velocity_vectors = vel_total_output
     return mean_axial_main, mean_axial_small, total_horses, Gammas
