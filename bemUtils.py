@@ -40,20 +40,75 @@ def rotation_matrix(angle_x=0, angle_y=0, angle_z=0):
 
         return Rz @ Ry @ Rx 
 
-def scene(bodies, colors, collocation_points, velocity_vectors, extra_points=None, extra_lines=None):
+def endurance(power_required, battery_capacity, battery_config='2P6S', battery_efficiency=1):
+    """
+    Calculate the endurance of a battery-powered system.
+
+    Parameters
+    ----------
+    power_required : [whatt]
+    battery_capacity : [mAh]
+
+    Returns
+    -------
+    float
+        The endurance of the system in hours.
+    """
+    if battery_config == '2P6S':
+        #convert to Ah
+        battery_capacity = battery_capacity / 1000
+        capacity = battery_capacity * 2 #[Ah]
+        voltage = 3.7 * 6
+        energy = capacity * voltage * battery_efficiency#[Wh]
+        time = energy / power_required #[h]
+        #convert to minutes
+        time = time * 60
+        return time
+    
+    if battery_config == '1P6S':
+        #convert to Ah
+        battery_capacity = battery_capacity / 1000
+        capacity = battery_capacity
+        voltage = 3.7 * 6
+        energy = capacity * voltage * battery_efficiency
+        time = energy / power_required #[h]
+        #convert to minutes
+        time = time * 60
+        return time
+    else:
+        raise ValueError('Invalid battery configuration')     
+
+ 
+def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velocity_vectors, tangential_velocity_vectors, extra_points=None, extra_lines=None):
         plotter = pv.Plotter()
         plotter.set_background("black") 
 
-        if velocity_vectors is not None:
-            print("Plotting velocity vectors")
-            print('velocity_vectors.shape',velocity_vectors.shape)
-            print('collocation_points.shape',collocation_points.shape)
+        if total_velocity_vectors is not None:
             poly_data = pv.PolyData(collocation_points)
-            poly_data['vectors'] = velocity_vectors
-            magnitude = np.linalg.norm(velocity_vectors, axis=1)
+            poly_data['vectors'] = total_velocity_vectors
+            magnitude = np.linalg.norm(total_velocity_vectors, axis=1)
             poly_data['magnitude'] = magnitude
-            glyphs = poly_data.glyph(orient='vectors', scale='magnitude', factor=0.003)
+            glyphs = poly_data.glyph(orient='vectors', scale='magnitude', factor=0.004)
             plotter.add_mesh(glyphs, color="white")
+
+        if axial_velocity_vectors is not None:
+            poly_data = pv.PolyData(collocation_points) 
+            poly_data['vectors'] = axial_velocity_vectors
+            magnitude = np.linalg.norm(axial_velocity_vectors, axis=1)
+            poly_data['magnitude'] = magnitude
+            glyphs = poly_data.glyph(orient='vectors', scale='magnitude', factor=0.004)
+            plotter.add_mesh(glyphs, color="yellow")
+
+        if tangential_velocity_vectors is not None:
+            poly_data = pv.PolyData(collocation_points) 
+            poly_data['vectors'] = tangential_velocity_vectors
+            magnitude = np.linalg.norm(tangential_velocity_vectors, axis=1)
+            poly_data['magnitude'] = magnitude
+            glyphs = poly_data.glyph(orient='vectors', scale='magnitude', factor=0.004)
+            plotter.add_mesh(glyphs, color="red")
+
+        
+
 
         if extra_points is not None:
             poly_data = pv.PolyData(np.array(extra_points))

@@ -1,0 +1,1 @@
+{"main_propeller": {"position": [0, 0, 0], "angles": [0, 0, 0], "hub": 0.2, "diameter": 3, "number_of_blades": 3, "pitch": 0.2, "rpm": 350, "chord": 0.3, "n": 40}, "small_propellers": {"angle": 75, "diameter": 0.3, "number_of_blades": 3, "rpm": 10000, "chord": 0.05, "n": 10}}

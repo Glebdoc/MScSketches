@@ -1,28 +1,33 @@
-import ctypes
 import numpy as np
+import matplotlib.pyplot as plt
 
-# Load the shared library
-vector_lib = ctypes.CDLL("./myVelocity.dll")
+# Initialize x-coordinates
+x = np.linspace(0, 1, 10)
+
+# Initialize y-coordinates with variation
+y = np.zeros(10)  
+random_variation = 0.1 * np.random.rand(10)  
+y += random_variation  
+y[0] = 0
 
 
-# Define function argument types and return type
-vector_lib.compute_3D_vector.argtypes = (ctypes.c_double, ctypes.c_double, ctypes.c_double, 
-                                         ctypes.c_double, ctypes.c_double, ctypes.c_double,
-                                         ctypes.POINTER(ctypes.c_double))
 
-def compute_3D_vector(x1, y1, z1, x2, y2, z2):
-    # Prepare an array for the result (3 elements)
-    result = (ctypes.c_double * 3)()
+R = 1  # Target radius
 
-    # Call the C function
-    vector_lib.compute_3D_vector(x1, y1, z1, x2, y2, z2, result)
+plt.plot(x, y, label="Original Line")  # Plot original line
 
-    # Convert to NumPy array
-    return np.array([result[0], result[1], result[2]])
+for i in range(1, 10):  
+    r_to_point = np.sqrt(x[i]**2 + y[i]**2)  # Compute original radius
+    theta = np.arctan(x[i]/1)
+    r_to_axis = np.sqrt(R**2 + x[i]**2)  # Compute radius to axis
+    deltaR = r_to_point - r_to_axis
+    r_new = R + deltaR  # Compute new radius
 
-# Example usage
-point1 = np.array([1.0, 2.0, 3.0])
-point2 = np.array([4.0, 5.0, 6.0])
+    # Convert back to Cartesian coordinates
+    x[i] = r_new * np.sin(theta)
+    y[i] = r_new * np.cos(theta)
 
-result = compute_3D_vector(*point1, *point2)
-print("Result from C function:", result)  # Expected: [3. 3. 3.]
+plt.plot(x, y, label="Transformed Curve")  # Plot transformed line
+plt.legend()
+plt.axis("equal")  # Keep aspect ratio correct
+plt.show()
