@@ -111,7 +111,7 @@ if multipleConfigs:
             max_iter = 100
 
 # Drone parameters 
-MTOW = 70 #[N]
+MTOW = 30 #[N]
 
 def twistGen(in_hub, in_tip, r, AoA):
     in_hub = in_hub + AoA
@@ -148,9 +148,9 @@ main_n = 25
 main_position = Point(0, 0, 0)
 main_angles = (0, 0, 0)  # Initial rotation angles (e.g., Euler angles)
 main_hub = 0.1
-main_diameter = 1.4
+main_diameter = 1.5
 main_NB = 3  # Number of blades
-main_RPM = 425
+main_RPM = 373
 main_chord = np.linspace(0.12, 0.1, main_n-1)
 main_chord = np.concatenate([main_chord]*main_NB)
 
@@ -199,63 +199,12 @@ wind = np.array([wind_speed*np.cos(wind_angle*np.pi/180),
 
 
 
-def objective(x):
+def objective(x_norm):
     err = 1.0
     iter = 0
     global main_U, small_U
-    main_RPM, small_props_RPM = x
+    main_RPM, small_props_RPM, main_diameter, small_props_diameter = denormalize(x_norm, bounds)
     while (err > err_desired and iter<max_iter):
-        drone = Drone(main_position, main_angles, main_hub, main_diameter, 
-                    main_NB, main_pitch, main_RPM, main_chord, main_n,
-                    small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
-                    small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
-                    mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform')
-
-        old_main_U = main_U
-        old_small_U = small_U
-        main_U, small_U, _,_,_, created_moment, Torque, Thrust= solve(drone, case=f' ', plotting=False, updateConfig=True, wind=wind)
-                
-        main_U = weight*main_U + (1-weight)*old_main_U 
-        small_U = weight*small_U + (1-weight)*old_small_U
-        err = np.abs(main_U - old_main_U) + np.abs(small_U - old_small_U)
-        # if err < err_desired:
-        #     main_U, small_U, horses, Gammas, fm, created_moment, Torque, Thrust = solve(drone,plotting=True, updateConfig=False, wind=wind)
-        iter += 1
-
-        print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}, Small U: {small_U}')
-
-    thrust_error = (Thrust - MTOW)**2 
-    moment_error = (created_moment - Torque)**2
-    #drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
-    print(':::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
-    print(f'Thrust Error: {thrust_error}, Moment Error: {moment_error}')
-    print(f'Main RPM: {main_RPM}, Small Props RPM: {small_props_RPM}')
-    print(':::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
-    return thrust_error + moment_error
-
-
-
-
-############################################
-OPTIMIZATION = False
-############################################
-if OPTIMIZATION:
-    x0 = [main_RPM, small_props_RPM]
-    bounds = [(350, 550), (15000, 20000)]
-    res = minimize(objective, x0, bounds=bounds, method='Powell', tol=0.1)
-
-    optimal_main_RPM, optimal_small_RPM = res.x
-
-    print(f'Optimized Main RPM: {optimal_main_RPM}')
-    print(f'Optimized Small Props RPM: {optimal_small_RPM}')
-else:
-    main_RPM = 450
-    small_props_RPM = 15500
-
-err = 1.0
-iter = 0
-print(':::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
-while (err > err_desired and iter<max_iter):
         drone = Drone(main_position, main_angles, main_hub, main_diameter, 
                     main_NB, main_pitch, main_RPM, main_chord, main_n,
                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
@@ -269,57 +218,90 @@ while (err > err_desired and iter<max_iter):
         main_U = weight*main_U + (1-weight)*old_main_U 
         small_U = weight*small_U + (1-weight)*old_small_U
         err = np.abs(main_U - old_main_U) + np.abs(small_U - old_small_U)
-        if err < err_desired:
-            main_U, small_U, horses, Gammas, fm, created_moment, Torque, Thrust, power_required = solve(drone,plotting=True, updateConfig=False, wind=wind)
+        # if err < err_desired:
+        #     main_U, small_U, horses, Gammas, fm, created_moment, Torque, Thrust = solve(drone,plotting=True, updateConfig=False, wind=wind)
         iter += 1
 
         print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}, Small U: {small_U}')
-endurance_1 = endurance(power_required, 5000, battery_config='2P6S', battery_efficiency=0.9)
-endurance_2 = endurance(power_required, 5000, battery_config='1P6S', battery_efficiency=0.9)
-print(f'Endurance 2P6S: {endurance_1} minutes')
-print(f'Endurance 1P6S: {endurance_2} minutes')
-drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
+    endurance_1 = endurance(power_required, 5000, battery_config='2P6S', battery_efficiency=0.9)
+    thrust_error = (Thrust - MTOW)**2 
+    endurance_error = (endurance_1 - 60)**2
+    moment_error = (created_moment - Torque)**2
+    #drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
+    print(':::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
+    print(f'Thrust Error: {thrust_error}, Moment Error: {moment_error}, Endurance Error: {endurance_error}')
+    print(f'Endurance: {endurance_1}')
+    print(f'Main RPM: {main_RPM}, Small Props RPM: {small_props_RPM}', f'Main Diameter: {main_diameter}, Small Props Diameter: {small_props_diameter}')
+    print(':::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
+    return thrust_error + moment_error + endurance_error
 
-# plt.ioff()  # Disable interactive mode when done
-# plt.show()  # Keep the final plot visible
-# plt.close()
-# plt.plot(RPM, FM)
-# plt.show()
-# drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
-# helicopter.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
 
-# Initialize the convergence plot
-# plt.ion()  # Enable interactive mode
-# fig, ax = plt.subplots()
-# x_data, y_data = [], []  # Store iteration and error values
-# line, = ax.plot([], [], 'b--', label='Convergence', marker='o')  # Initial empty plot
-# ax.set_xlabel('Iteration')
-# ax.set_ylabel('Error')
-# ax.set_title('Real-Time Convergence Plot')
-# ax.legend()
-# ax.grid(True)
 
-# drone = Drone(main_position, main_angles, main_hub, main_diameter, 
-#                 main_NB, main_pitch, main_RPM, main_chord, main_n,
-#                 small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
-#                 small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
-#                 mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform')
-# helicopter = Drone(main_position, main_angles, main_hub, main_diameter, 
-#                 main_NB, main_pitch, main_RPM, main_chord, main_n,
-#                 small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
-#                 small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
-#                 mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform', helicopter=True)
 
-# RPM = np.linspace(300, 600, 10)
-# FM = []
-# for i in range(len(RPM)):
-#     main_RPM = RPM[i]
+############################################
+OPTIMIZATION = False
+############################################
+def normalize(x, bounds):
+    return [(x[i] - bounds[i][0]) / (bounds[i][1] - bounds[i][0]) for i in range(len(x))]
 
-    # x_data.append(iter)
-    # y_data.append(err)
-    # line.set_xdata(x_data)
-    # line.set_ydata(y_data)
-    # ax.relim()
-    # ax.autoscale_view()
-    # plt.draw()
-    # plt.pause(0.01)
+def denormalize(x, bounds):
+    return [x[i] * (bounds[i][1] - bounds[i][0]) + bounds[i][0] for i in range(len(x))]
+
+if OPTIMIZATION:
+    bounds = [(350, 550), (15000, 20000), (0.8, 1.4), (0.08, 0.12)]
+    x0 = normalize([main_RPM, small_props_RPM, main_diameter, small_props_diameter], bounds)
+   
+    res = minimize(objective, x0, bounds=[(0,1)]*len(x0), method='Powell', tol=0.1)
+    optimal_x = denormalize(res.x, bounds)
+    optimal_main_RPM, optimal_small_RPM, optimal_main_diameter, optimal_small_diameter = optimal_x
+
+    print(f'Optimized Main RPM: {optimal_main_RPM}')
+    print(f'Optimized Small Props RPM: {optimal_small_RPM}')
+    print(f'Optimized Main Diameter: {optimal_main_diameter}')
+    print(f'Optimized Small Props Diameter: {optimal_small_diameter}')
+else:
+    main_RPM = 373
+    small_props_RPM = 13000
+
+    RPM = np.linspace(350, 550, 10)
+    induced_powers = []
+    parasitic_powers = []
+
+    for rpm in RPM:
+        main_RPM = rpm
+        err = 1.0
+        iter = 0
+        print(':::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
+        while (err > err_desired and iter<max_iter):
+                drone = Drone(main_position, main_angles, main_hub, main_diameter, 
+                            main_NB, main_pitch, main_RPM, main_chord, main_n,
+                            small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
+                            small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
+                            mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform')
+
+                old_main_U = main_U
+                old_small_U = small_U
+                main_U, small_U, _,_,_, created_moment, Torque, Thrust, power_required, _,_= solve(drone, case=f' ', plotting=False, updateConfig=True, wind=wind)
+                        
+                main_U = weight*main_U + (1-weight)*old_main_U 
+                small_U = weight*small_U + (1-weight)*old_small_U
+                err = np.abs(main_U - old_main_U) + np.abs(small_U - old_small_U)
+                if err < err_desired:
+                    main_U, small_U, horses, Gammas, fm, created_moment, Torque, Thrust, power_required, induced_power, parasitic_power= solve(drone,plotting=False, updateConfig=False, wind=wind)
+                    induced_powers.append(induced_power)
+                    parasitic_powers.append(parasitic_power)
+                iter += 1
+
+                print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}, Small U: {small_U}')
+    plt.plot(RPM, induced_powers, label='Induced Power')
+    plt.plot(RPM, parasitic_powers, label='Parasitic Power')
+    plt.plot(RPM, np.array(induced_powers) + np.array(parasitic_powers), label='Total Power')
+    plt.xlabel('RPM')
+    plt.ylabel('Power [W]')
+    plt.legend()
+    plt.show()
+    # endurance_1 = endurance(power_required, 5000, battery_config='2P6S', battery_efficiency=0.9)
+    # endurance_2 = endurance(power_required, 5000, battery_config='1P6S', battery_efficiency=0.9)
+    # print(f'Endurance 2P6S: {endurance_1} minutes')
+    # print(f'Endurance 1P6S: {endurance_2} minutes')
+    # drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
