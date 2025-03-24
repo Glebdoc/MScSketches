@@ -456,7 +456,7 @@ class Drone:
             for i in range(main_NB):
                 shift = i*(2*np.pi/main_NB)
                 position = Point(main_R*np.sin(shift), main_R*np.cos(shift), 0)
-
+                print('Im here')
                 angles = np.array([0,-small_props_angle*np.pi/180,-shift])
                 small_prop = Propeller(position, 
                                     angles, 

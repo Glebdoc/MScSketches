@@ -11,12 +11,12 @@ from solver import*
 
 
 err = 1.0
-err_desired = 1e-1
+err_desired = 1e-3
 iter = 0
 max_iter = 100
 weight = 0.5
 main_U = 4.2
-small_U = 62
+
 
 runWhole = True
 multipleConfigs = False
@@ -144,50 +144,27 @@ def find_parabola(points):
     return a, b, c
 
 # Main propeller parameters
-main_n = 25
+main_n = 80
 main_position = Point(0, 0, 0)
 main_angles = (0, 0, 0)  # Initial rotation angles (e.g., Euler angles)
 main_hub = 0.1
-main_diameter = 1.5
+main_diameter = 1.4*2
 main_NB = 3  # Number of blades
-main_RPM = 373
-main_chord = np.linspace(0.12, 0.1, main_n-1)
+main_RPM = 350
+main_chord = np.linspace(0.13, 0.09, main_n-1)
 main_chord = np.concatenate([main_chord]*main_NB)
 
 main_r = np.linspace(main_hub, main_diameter/2, main_n-1)
 #main_pitch = twistGen(22, 7, main_r, 5)
-main_pitch = np.linspace(19, 11, main_n-1) + 2
+main_pitch = np.linspace(15, 15, main_n-1) 
 main_pitch = np.concatenate([main_pitch]*main_NB)
 
 
-# Small propeller parameters (e.g., 4 small propellers)
-small_props_angle = 90  # Initial rotation angles (e.g., Euler angles)
-small_props_diameter = 0.1
-small_props_NB = 2
-small_props_hub = 0.01
-small_props_RPM = 18710
-
-small_props_n = 15
-small_props_chord = np.linspace(0.02, 0.01, small_props_n)
-#small_props_chord = np.concatenate([small_props_chord]*small_props_NB)
-small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
-
-# points = [(small_r[0], 86), (0.055, 28), (small_r[-1], 20)]
-# a, b, c = find_parabola(points)
-# AoA = 5
-# parabola = lambda x: a*x**2 + b*x + c - AoA
-# small_props_pitch = parabola(small_r)
-small_props_pitch = twistGen(88, 20, small_r, 9)
-
-print(small_props_pitch)
-
 # Create the drone
-
 
 max_iter = 100
 weight = 0.5
-main_U = 2.16
-small_U = 31.69
+main_U = 5.16
 
 # Wind conditions 
 wind_speed = 0
@@ -260,46 +237,36 @@ if OPTIMIZATION:
     print(f'Optimized Main Diameter: {optimal_main_diameter}')
     print(f'Optimized Small Props Diameter: {optimal_small_diameter}')
 else:
-    main_RPM = 373
-    small_props_RPM = 13000
+    main_RPM = 350
 
     RPM = np.linspace(350, 550, 10)
     induced_powers = []
     parasitic_powers = []
 
-    for rpm in RPM:
-        main_RPM = rpm
-        err = 1.0
-        iter = 0
-        print(':::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
-        while (err > err_desired and iter<max_iter):
-                drone = Drone(main_position, main_angles, main_hub, main_diameter, 
-                            main_NB, main_pitch, main_RPM, main_chord, main_n,
-                            small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
-                            small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
-                            mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform')
+    err = 1.0
+    iter = 0
+    print(':::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
+    while (err > err_desired and iter<max_iter):
+            drone = Drone(main_position, main_angles, main_hub, main_diameter, 
+                        main_NB, main_pitch, main_RPM, main_chord, main_n,
+                        small_props_angle=None, small_props_diameter=None, small_props_NB=None, small_props_hub=None,
+                        small_props_RPM=None, small_props_chord=None, small_props_n=None, small_props_pitch=None,
+                        mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = None, main_distribution='uniform', small_distribution='uniform', helicopter=True)
 
-                old_main_U = main_U
-                old_small_U = small_U
-                main_U, small_U, _,_,_, created_moment, Torque, Thrust, power_required, _,_= solve(drone, case=f' ', plotting=False, updateConfig=True, wind=wind)
-                        
-                main_U = weight*main_U + (1-weight)*old_main_U 
-                small_U = weight*small_U + (1-weight)*old_small_U
-                err = np.abs(main_U - old_main_U) + np.abs(small_U - old_small_U)
-                if err < err_desired:
-                    main_U, small_U, horses, Gammas, fm, created_moment, Torque, Thrust, power_required, induced_power, parasitic_power= solve(drone,plotting=False, updateConfig=False, wind=wind)
-                    induced_powers.append(induced_power)
-                    parasitic_powers.append(parasitic_power)
-                iter += 1
+            old_main_U = main_U
+            # abs(mean_axial_main), total_horses, Gammas, FM, Torque, Thrust, induced_power, profile_power
+            main_U, _,_,_, Torque, Thrust, _,_= solve(drone, case=f' ', plotting=False, updateConfig=True, wind=wind)
+                    
+            main_U = weight*main_U + (1-weight)*old_main_U 
 
-                print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}, Small U: {small_U}')
-    plt.plot(RPM, induced_powers, label='Induced Power')
-    plt.plot(RPM, parasitic_powers, label='Parasitic Power')
-    plt.plot(RPM, np.array(induced_powers) + np.array(parasitic_powers), label='Total Power')
-    plt.xlabel('RPM')
-    plt.ylabel('Power [W]')
-    plt.legend()
-    plt.show()
+            err = np.abs(main_U - old_main_U) 
+            if err < err_desired:
+                main_U, horses, Gammas, fm, Torque, Thrust, induced_power, parasitic_power= solve(drone,plotting=True, updateConfig=False, wind=wind)
+                induced_powers.append(induced_power)
+                parasitic_powers.append(parasitic_power)
+            iter += 1
+
+            print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}')
     # endurance_1 = endurance(power_required, 5000, battery_config='2P6S', battery_efficiency=0.9)
     # endurance_2 = endurance(power_required, 5000, battery_config='1P6S', battery_efficiency=0.9)
     # print(f'Endurance 2P6S: {endurance_1} minutes')

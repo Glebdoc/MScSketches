@@ -106,11 +106,9 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
 
 
     main_NB = drone.main_prop.NB
-    small_NB = drone.small_props[0].NB
     main_n = drone.main_prop.n
-    small_n = drone.small_props[0].n
     
-    collocN = (main_NB * (main_n - 1) + main_NB * small_NB * (small_n - 1))
+    collocN = (main_NB * (main_n - 1))
 
     u_influences = np.zeros((collocN, collocN))
     v_influences = np.zeros((collocN, collocN))
@@ -119,20 +117,14 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     Gammas = np.ones((collocN, 1))
 
     mainCollocPoints = np.zeros((main_NB * (main_n - 1), 3))
-    smallCollocPoints = np.zeros((main_NB * small_NB * (small_n - 1), 3))
 
     main_colloc = np.array(drone.main_prop.collocationPoints)
   
     for i in range(main_NB):
         mainCollocPoints[i * (main_n - 1):(i + 1) * (main_n - 1)] = main_colloc[i].T
 
-    for i in range(main_NB):
-        small_colloc = np.array(drone.small_props[i].collocationPoints)
-        for j in range(small_NB):
-            smallCollocPoints[i * small_NB * (small_n - 1) + j * (small_n - 1): i * small_NB * (small_n - 1) + (j + 1) * (small_n - 1)] = small_colloc[j].T
-
-    total_colloc_points = np.concatenate((mainCollocPoints, smallCollocPoints))
-    total_horses = drone.main_prop.horseShoes + [horse for prop in drone.small_props for horse in prop.horseShoes]
+    total_colloc_points = mainCollocPoints
+    total_horses = drone.main_prop.horseShoes
     start_time = time.time()
     
     if updateConfig:
@@ -163,36 +155,14 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     for i in range(main_NB* (main_n - 1)):
         v_rotational_main[i] = np.cross(total_colloc_points[i], azimuthVector*main_Omega)
 
-    v_rotational_small = np.zeros((main_NB*small_NB* (small_n - 1), 3))
     n_azimuth = np.zeros((collocN, 3))
     n_azimuth[:main_NB* (main_n - 1)] = azimuthVector
     n_origin = np.zeros((collocN, 3))
     n_origin[:main_NB* (main_n - 1)] = np.array([drone.main_prop.origin.x, drone.main_prop.origin.y, drone.main_prop.origin.z])
 
     count = 0
-
-    chords_small = drone.small_props[0].chord
-    chords_small = 0.5*(chords_small[1:] + chords_small[:-1])
-    for i in range(main_NB*small_NB):
-        twist[main_NB*(main_n-1)+i*(small_n-1): main_NB*(main_n-1)+i*(small_n-1) + small_n-1, 0] = drone.small_props[count].pitch
-        chords[main_NB*(main_n-1)+i*(small_n-1): main_NB*(main_n-1)+i*(small_n-1) + small_n-1, 0] = chords_small
-
-    for i in range(main_NB*small_NB* (small_n - 1)):
-        if i == 0:
-            origin = np.array([drone.small_props[count].origin.x, drone.small_props[count].origin.y, drone.small_props[count].origin.z])
-        if i % (small_NB*(small_n - 1)) == 0 and i != 0:
-            count += 1
-            origin = np.array([drone.small_props[count].origin.x, drone.small_props[count].origin.y, drone.small_props[count].origin.z])
-        azimuthVector = drone.small_props[count].azimuth
-        #chords[main_NB*(main_n-1)+i] = drone.small_props[count].chord
-        n_azimuth[main_NB*(main_n-1)+i] = azimuthVector
-        n_origin[main_NB*(main_n-1)+i] = origin
-        Omega = drone.small_props[count].RPM * 2 * np.pi / 60
-        # due to its own rotation
-        v_rotational_small[i] = np.cross(total_colloc_points[(main_NB*(main_n-1))+i] - origin, azimuthVector*(Omega)) + total_colloc_points[(main_NB*(main_n-1))+i] # Switched order
-        # due to main rotor rotation
-        v_rotational_small[i] -= np.cross(drone.main_prop.azimuth*main_Omega, total_colloc_points[(main_NB*(main_n-1))+i]) #perhpas -origin
-    v_rotational = np.concatenate((v_rotational_main, v_rotational_small))
+    
+    v_rotational = v_rotational_main
     
     vel_total_output = np.zeros((collocN, 3))
     vel_axial_output = np.zeros((collocN, 3))
@@ -240,12 +210,9 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
 
 
     mean_axial_main = v_axial[:main_NB*(main_n-1)].mean()
-    mean_axial_small = v_axial[main_NB*(main_n-1):].mean()
 
     r_main =  drone.main_prop.r
-    r_small = drone.small_props[0].r
     r_steps = (r_main[1:] - r_main[:-1])
-    r_small_steps = (r_small[1:] - r_small[:-1])
 
     Cd = np.interp(alpha, alphaPolar, cdPolar)
 
@@ -271,29 +238,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     print('----------------------------------')
     p_ideal = Thrust * np.sqrt(Thrust/(2*(drone.main_prop.diameter**2)*np.pi*1.225/4))
     FM = p_ideal/computed_power
-
-    # Compute small propeller thrust and torque
-
-    start = main_NB*(main_n-1)
-    stop = main_NB*(main_n-1) + (small_n-1)
-    lift = 0.5 * 1.225 * Cl[start:stop].flatten() * (v_mag[start:stop].flatten()**2) * chords[start:stop].flatten() * r_small_steps.flatten()
-    drag = 0.5 * 1.225 * Cd[start:stop].flatten() * (v_mag[start:stop].flatten()**2) * chords[start:stop].flatten() * r_small_steps.flatten()
-
-    Faxial_small = lift * np.cos(inflowangle[start:stop].flatten()) - drag * np.sin(inflowangle[start:stop].flatten())
-    Ftan_small = lift * np.sin(inflowangle[start:stop].flatten()) + drag * np.cos(inflowangle[start:stop].flatten())
-
-    r_small = (r_small[1:] + r_small[:-1]) * 0.5
-    Torque_small = np.sum(Ftan_small * r_small)*small_NB
-    Thrust_small = Faxial_small.sum() * small_NB
-
-    #print("Small Blade Thrust", Thrust_small, "Combined: ", main_NB*Thrust_small)
-
-    created_moment = main_NB*Thrust_small*drone.main_prop.diameter/2
-    print("Small Blade Torque", Torque_small.sum(), "Combined torque (to create moment): ", created_moment)  
-    power_required = main_NB*Torque_small.sum()*drone.small_props[0].RPM*2*np.pi/60
-    print("Small Blade Power", Torque_small.sum()*drone.small_props[0].RPM*2*np.pi/60, "Power required: ", power_required)
-
-    
+    print("Figure of Merit", FM)
 
     # Compute the induced power for the main rotor
     induced_power = main_NB*(abs(v_axial[:main_n-1].flatten()) * Faxial.flatten()).sum()
@@ -330,13 +275,11 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
                                misc))
     header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, misc"
 
-    np.savetxt(f'./results/results_{case}.csv', results, delimiter=',', header=header, comments='')
+    np.savetxt(f'./results/results_helicopter{case}.csv', results, delimiter=',', header=header, comments='')
 
         
     if plotting:
-        r_small = drone.small_props[0].r
         r_plotting = (r_main[:-1] + r_main[1:])*0.5
-        r_plotting_small = (r_small[:-1] + r_small[1:])*0.5
 
         fig, axs = plt.subplots(2, 3, figsize=(10, 15))
 
@@ -344,7 +287,6 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
         axs[0, 0].plot(r_plotting, np.rad2deg(inflowangle[:main_n-1]))
         axs[0, 0].set_xlabel('Collocation Points')
         axs[0, 0].set_ylabel('Inflow Angle (degrees)')
-        axs[0, 0].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), np.rad2deg(inflowangle[start:stop]), label='small')
         axs[0, 0].legend()
 
         # # Plot axial vel30ocity
@@ -354,7 +296,6 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
 
         # Plort alpha 
         axs[0, 1].plot(r_plotting, alpha[:main_n-1])
-        axs[0, 1].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), alpha[start:stop], label='small')
         axs[0, 1].set_xlabel('Collocation Points')
         axs[0, 1].set_ylabel('Alpha (degrees)')
         axs[0, 1].set_title('Alpha')
@@ -373,7 +314,6 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
 
         # Plot circulation (Gamma)
         axs[1, 1].plot(r_plotting, Gammas[:main_n-1])
-        axs[1, 1].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), Gammas[start:stop], label='small')
         axs[1, 1].set_xlabel('Collocation Points')
         axs[1, 1].set_ylabel('Circulation (Gamma)')
         axs[1, 1].legend()
@@ -390,4 +330,4 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     drone.total_velocity_vectors = vel_total_output
     drone.axial_velocity = vel_axial_output  
     drone.tangential_velocity = vel_tangential_output
-    return abs(mean_axial_main), abs(mean_axial_small), total_horses, Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power
+    return abs(mean_axial_main), total_horses, Gammas, FM, Torque, Thrust, induced_power, profile_power
