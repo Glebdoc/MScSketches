@@ -21,7 +21,8 @@ OPTIMIZATION = False
 #############################
 
 # _______ INPUTS _______
-config_files = ['contractionOn.json', 'contractionOff.json']
+config_files = ['reOffcontOn.json', 'reOffcontOff.json', 'reOncontOn.json', 'reOncontOff.json']
+output_title = 'reInfluence_contractionInfluence'
 
 # _______ Solver _______
 err_desired = 1e-1
@@ -57,4 +58,4 @@ for config in config_files:
 if PLOT_RESULTS:
     for i in range(len(config_files)):
         config_files[i] = config_files[i].replace('.json', '')
-    myPlt.plot(config_files, show = False, title='contraction effect')
+    myPlt.plot(config_files, show = False, title=output_title)

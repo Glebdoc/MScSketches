@@ -441,7 +441,9 @@ class Drone:
                  main_NB, main_pitch, main_RPM, main_chord, main_n, 
                  small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                  small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
-                 mainWakeLength, smallWakeLength, main_U, small_U, main_distribution='uniform', small_distribution='uniform', helicopter=False, contraction=True, wind=None):
+                 mainWakeLength, smallWakeLength, main_U, small_U, main_distribution='uniform', 
+                 small_distribution='uniform', 
+                 helicopter=False, contraction=True, wind=None, reynolds=False):
         # Main propeller
         self.main_prop = Propeller(main_position, 
                                    main_angles,
@@ -454,11 +456,14 @@ class Drone:
                                    main_n,
                                    U=main_U,
                                    wake_length=mainWakeLength,
-                                   distribution=main_distribution, contraction=contraction)
+                                   distribution=main_distribution, 
+                                   contraction=contraction
+                                   )
         
         # Small propellers
         self.small_props = []
         self.wind = wind
+        self.reynolds = reynolds
         self.total_velocity_vectors = None
         self.total_collocation_points = None
         self.axial_velocity = None
@@ -558,6 +563,8 @@ def defineDrone(filename, main_U=None, small_U=None):
         wind = np.array([wind_speed*np.cos(wind_angle*np.pi/180),
                         0,
                         wind_speed*np.sin(wind_angle*np.pi/180)])
+        
+        reynolds = config['settings']['reynolds']
 
         if main_U is None:
             main_U = config['main_propeller']['uWake']
@@ -568,6 +575,8 @@ def defineDrone(filename, main_U=None, small_U=None):
                                     main_NB, main_pitch, main_RPM, main_chord, main_n,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
-                                    mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform', contraction=contraction, wind=wind)
+                                    mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, 
+                                    main_distribution='uniform', small_distribution='uniform', 
+                                    contraction=contraction, wind=wind, reynolds=reynolds)
 
         return drone

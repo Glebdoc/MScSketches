@@ -48,7 +48,7 @@
         "uWake": 30},
     
 "settings": {
-    "contraction": false,
+    "contraction": true,
     "reynolds": true,
     "wind_speed": 0,
     "wind_angle": 0}}

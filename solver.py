@@ -100,7 +100,8 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50)
 def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     # Polar data
     updateReynolds = False  
-
+    ReInfluence = drone.reynolds
+    wind = drone.wind
     main_NB = drone.main_prop.NB
     small_NB = drone.small_props[0].NB
     main_n = drone.main_prop.n
@@ -247,6 +248,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
         if updateReynolds:
             Re = 1.225*v_mag.flatten()*chords.flatten()/1.81e-5
             np.savetxt('./Reynolds.txt', Re)
+            print('Reynolds.txt updated')
             updateReynolds = False
         inflowangle = np.arctan(v_axial/v_tangential)
         twist[main_NB*(main_n-1):] = inflowangle[main_NB*(main_n-1):]*180/np.pi + 5

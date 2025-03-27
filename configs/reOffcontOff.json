@@ -49,6 +49,6 @@
     
 "settings": {
     "contraction": false,
-    "reynolds": true,
+    "reynolds": false,
     "wind_speed": 0,
     "wind_angle": 0}}
