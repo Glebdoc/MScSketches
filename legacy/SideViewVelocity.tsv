@@ -1,0 +1,3 @@
+
+name	field	filled?	boundary-values?	contour-lines?	node-values?	surfaces-list	range-option	coloring	color-map	draw-mesh?	mesh-object	display-state-name	physics	geometry	surfaces	deformation?	deformation-scale
+"contour-6"	"velocity-magnitude"	#t	#t	#f	#t	(plane-20)	(auto-range-off (clip-to-range? . #t) (minimum . 0.) (maximum . 10.))	(banded)	((visible? . #t) (size . 100) (color . "field-velocity") (log-scale? . #f) (format . "%0.2e") (user-skip . 9) (show-all . #t) (position . 1) (font-name . "Helvetica") (font-automatic . #t) (font-size . 0.032) (length . 0.54) (width . 6.) (bground-transparent? . #t) (bground-color . "#CCD3E2") (title-elements . "Variable and Object Name"))	#f	""	"None"	()	()	()	#f	1.

@@ -1,7 +1,8 @@
 import numpy as np
 import pyvista as pv
-from bemUtils import*
+import bemUtils as bu
 import timeit
+import json
 
 
 class Point:
@@ -209,7 +210,7 @@ class HorseShoe(Vortex):
 
 
 class Propeller():
-    def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='uniform', bodyIndex=0, small=False, main_rotor=None):
+    def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='uniform', bodyIndex=0, small=False, main_rotor=None, contraction=True):
         self.diameter = diameter
         self.small = small
         self.angles = np.array(angles)
@@ -230,7 +231,7 @@ class Propeller():
         self.vortexTABLE = []
         self.horseShoes = None
         self.bodyIndex = bodyIndex
-        self.assemble(main_rotor=None)
+        self.assemble(main_rotor=None, contraction=contraction)
         if self.small:
             self.bendSmallWake()
         self.rotate(*self.angles)
@@ -303,7 +304,7 @@ class Propeller():
 
 
 
-    def assemble(self, main_rotor=None):
+    def assemble(self, main_rotor=None, contraction=True):
         # wake
         # I want to have D number of points per revolution of the propeller
         # I call them points per rev (ppr)
@@ -323,10 +324,16 @@ class Propeller():
         # left vortex
         horseShoes = []
 
+        if contraction:
+            mult = bu.contraction_sigmoid(zw, contraction=0.55)
+        else:
+            mult = np.ones(len(zw))
+        
+
         for j in range(self.NB):
             shift = j*2*np.pi/self.NB
             if j != 0:
-                R = rotation_matrix(0, 0, shift)
+                R = bu.rotation_matrix(0, 0, shift)
                 self.collocationPoints.extend(R @ self.collocationPoints[0:self.n-1])
 
 
@@ -341,20 +348,27 @@ class Propeller():
                 self.vortexTABLE.append([0, self.r[i+1], 0, self.chord[i+1], self.r[i+1], 0, self.bodyIndex*(self.n*self.NB) + j*self.n + i])
                 wakeLeft = []
                 wakeRight = []
-
+                
                 for k in range(len(xwl)-1):
+
+                    
+
                     
     
-                    aLeft = Point(xwl[k+1], ywl[k+1], zw[k+1])
-                    bLeft = Point(xwl[k], ywl[k], zw[k])
+                    #aLeft = Point(xwl[k+1], ywl[k+1], zw[k+1])
+                    aLeft = Point(xwl[k+1], ywl[k+1]*mult[k], zw[k+1])
+                    #bLeft = Point(xwl[k], ywl[k], zw[k])
+                    bLeft = Point(xwl[k], ywl[k]*mult[k], zw[k])
 
-                    aRight = Point(xwr[k], ywr[k], zw[k])
-                    bRight = Point(xwr[k+1], ywr[k+1], zw[k+1])
+                    #aRight = Point(xwr[k], ywr[k], zw[k])
+                    aRight = Point(xwr[k], ywr[k]*mult[k], zw[k])
+                    #bRight = Point(xwr[k+1], ywr[k+1], zw[k+1])
+                    bRight = Point(xwr[k+1], ywr[k+1]*mult[k], zw[k+1])
 
                     wakeLeft.append(Vortex(aLeft, bLeft, 1))
-                    self.vortexTABLE.append([xwl[k+1], ywl[k+1], zw[k+1], xwl[k], ywl[k], zw[k], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
+                    #self.vortexTABLE.append([xwl[k+1], ywl[k+1], zw[k+1], xwl[k], ywl[k], zw[k], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
                     wakeRight.append(Vortex(aRight, bRight, 1))
-                    self.vortexTABLE.append([xwr[k], ywr[k], zw[k], xwr[k+1], ywr[k+1], zw[k+1], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
+                    #self.vortexTABLE.append([xwr[k], ywr[k], zw[k], xwr[k+1], ywr[k+1], zw[k+1], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
 
                 leftVortex = leftVortex + wakeLeft
                 rightVortex = rightVortex + wakeRight
@@ -379,7 +393,7 @@ class Propeller():
 
     def rotate(self, delta_x=0, delta_y=0, delta_z=0):
         self.angles = np.array([delta_x, delta_y, delta_z])
-        R = rotation_matrix(*self.angles)
+        R = bu.rotation_matrix(*self.angles)
 
         for horseShoe in self.horseShoes:
             horseShoe.rotate(R)
@@ -427,7 +441,7 @@ class Drone:
                  main_NB, main_pitch, main_RPM, main_chord, main_n, 
                  small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                  small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
-                 mainWakeLength, smallWakeLength, main_U, small_U, main_distribution='uniform', small_distribution='uniform', helicopter=False):
+                 mainWakeLength, smallWakeLength, main_U, small_U, main_distribution='uniform', small_distribution='uniform', helicopter=False, contraction=True, wind=None):
         # Main propeller
         self.main_prop = Propeller(main_position, 
                                    main_angles,
@@ -440,10 +454,11 @@ class Drone:
                                    main_n,
                                    U=main_U,
                                    wake_length=mainWakeLength,
-                                   distribution=main_distribution)
+                                   distribution=main_distribution, contraction=contraction)
         
         # Small propellers
         self.small_props = []
+        self.wind = wind
         self.total_velocity_vectors = None
         self.total_collocation_points = None
         self.axial_velocity = None
@@ -471,7 +486,7 @@ class Drone:
                                     wake_length=smallWakeLength,
                                     distribution=small_distribution,
                                     bodyIndex=i+1,
-                                    small=True, main_rotor=self.main_prop)
+                                    small=True, main_rotor=self.main_prop, contraction=contraction)
                 self.small_props.append(small_prop)
                 self.vortexTABLE.extend(small_prop.vortexTABLE)
     def translate(self, translation):
@@ -487,8 +502,72 @@ class Drone:
     def display(self, color_main='blue', color_small='green', extra_points=None, extra_lines=None):
         bodies = [self.main_prop] + self.small_props
         colors = [color_main] + [color_small]*len(self.small_props)
-        scene(bodies, colors, collocation_points = self.total_collocation_points, 
+        bu.scene(bodies, colors, collocation_points = self.total_collocation_points, 
               total_velocity_vectors=self.total_velocity_vectors,
               axial_velocity_vectors=self.axial_velocity, 
               tangential_velocity_vectors=self.tangential_velocity, 
               extra_points=extra_points, extra_lines=extra_lines)
+        
+
+def defineDrone(filename, main_U=None, small_U=None):
+    with open(f'./configs/{filename}', 'r') as f:
+        config = json.load(f)
+        main_position = Point(*config['main_propeller']['position'])
+        main_angles = config['main_propeller']['angles']
+        main_hub = config['main_propeller']['hub']
+        main_diameter = config['main_propeller']['diameter']
+        main_NB = config['main_propeller']['NB']
+        main_RPM = config['main_propeller']['rpm']
+        main_chord = config['main_propeller']['chord']
+        main_n = config['main_propeller']['n']
+        main_chord_root = config['main_propeller']['chord_root']
+        main_chord_tip = config['main_propeller']['chord_tip']
+        main_pitch_root = config['main_propeller']['pitch_root']
+        main_pitch_tip = config['main_propeller']['pitch_tip']
+
+        main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) + 2
+        main_pitch = np.concatenate([main_pitch]*main_NB)
+
+        main_chord = np.linspace(main_chord_root, main_chord_tip, main_n-1)
+        main_chord = np.concatenate([main_chord]*main_NB)
+
+
+
+        small_props_angle = config['small_propellers']['angle']
+        small_props_diameter = config['small_propellers']['diameter']
+        small_props_NB = config['small_propellers']['NB']
+        small_props_RPM = config['small_propellers']['rpm']
+        small_chord_root = config['small_propellers']['chord_root']
+        small_chord_tip = config['small_propellers']['chord_tip']
+        small_props_n = config['small_propellers']['n']
+        small_props_hub = config['small_propellers']['hub']
+        
+        small_pitch_root = config['small_propellers']['pitch_root']
+        small_pitch_tip = config['small_propellers']['pitch_tip']
+        small_AoA = config['small_propellers']['AoA']
+
+        small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
+
+        small_props_pitch = bu.twistGen(small_pitch_root, small_pitch_tip, small_r, small_AoA)
+        small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
+
+        contraction = config['settings']['contraction']
+        wind_speed = config['settings']['wind_speed']
+        wind_angle = config['settings']['wind_angle']
+
+        wind = np.array([wind_speed*np.cos(wind_angle*np.pi/180),
+                        0,
+                        wind_speed*np.sin(wind_angle*np.pi/180)])
+
+        if main_U is None:
+            main_U = config['main_propeller']['uWake']
+        if small_U is None:
+            small_U = config['small_propellers']['uWake']
+
+        drone = Drone(main_position, main_angles, main_hub, main_diameter, 
+                                    main_NB, main_pitch, main_RPM, main_chord, main_n,
+                                    small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
+                                    small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
+                                    mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, main_distribution='uniform', small_distribution='uniform', contraction=contraction, wind=wind)
+
+        return drone

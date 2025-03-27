@@ -96,8 +96,9 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50)
 
 
 
-def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([0,0,0])):
+def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     # Polar data
+    wind = drone.wind
     data = np.loadtxt('./A18.txt', skiprows=12)
 
     alphaPolar = data[:, 0]
@@ -133,7 +134,6 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
 
     total_colloc_points = np.concatenate((mainCollocPoints, smallCollocPoints))
     total_horses = drone.main_prop.horseShoes + [horse for prop in drone.small_props for horse in prop.horseShoes]
-    start_time = time.time()
     
     if updateConfig:
         for i, horse in tqdm(enumerate(total_horses), total=len(total_horses), desc="Influence calculation"):
@@ -302,7 +302,6 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     # Compute the profile power for the main rotor
     cd0 = 0.02
     solidity = drone.main_prop.NB * drone.main_prop.chord[:main_n-1].flatten() / (np.pi*drone.main_prop.diameter/2)
-    print("Solidity", solidity)
     omega = drone.main_prop.RPM * 2 * np.pi / 60
     R = drone.main_prop.diameter/2
     coefs = solidity*cd0/(4*np.pi)
@@ -316,21 +315,22 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
 
 
     # save results to csv 
-    misc  = np.zeros((main_n-1))
-    misc[0] = Thrust
-    misc[1] = Torque
-    misc[2] = LD
-    results = np.column_stack((r, 
-                               v_axial[:main_n-1].flatten(), 
-                               v_tangential[:main_n-1].flatten(), 
-                               inflowangle[:main_n-1].flatten(), 
-                               alpha[:main_n-1].flatten(),
-                               Faxial.flatten(), 
-                               Ftan.flatten(),
-                               misc))
-    header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, misc"
-
-    np.savetxt(f'./results/results_{case}.csv', results, delimiter=',', header=header, comments='')
+    if save:
+        misc  = np.zeros((main_n-1))
+        misc[0] = Thrust
+        misc[1] = Torque
+        misc[2] = LD
+        results = np.column_stack((r, 
+                                v_axial[:main_n-1].flatten(), 
+                                v_tangential[:main_n-1].flatten(), 
+                                inflowangle[:main_n-1].flatten(), 
+                                alpha[:main_n-1].flatten(),
+                                Faxial.flatten(), 
+                                Ftan.flatten(),
+                                misc))
+        header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, misc"
+        case = case.replace('.json', '')
+        np.savetxt(f'./results/{case}_res.csv', results, delimiter=',', header=header, comments='')
 
         
     if plotting:
