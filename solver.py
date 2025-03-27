@@ -52,7 +52,6 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50)
     magnitude = np.sqrt(u**2 + v**2 + w**2)
     magnitude[magnitude > 25] = 25  # Cap the magnitude at 25 m/s
     magnitude = magnitude.reshape((discretization, discretization))
-    print(magnitude.shape)
 
     # Save the magnitude to a file
     np.savetxt('magnitude.txt', magnitude)
@@ -67,7 +66,6 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50)
     # Set bounds for colormap
     min_mag = 0
     max_mag = 25
-    print(f"Colormap bounds: {min_mag} to {max_mag}")
 
     # Plot the velocity magnitude using PyVista
     plotter = pv.Plotter()
@@ -99,7 +97,7 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50)
 
 
 
-def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([0,0,0]), ReInfluence=False):
+def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     # Polar data
     updateReynolds = False  
 
@@ -150,7 +148,6 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
 
     total_colloc_points = np.concatenate((mainCollocPoints, smallCollocPoints))
     total_horses = drone.main_prop.horseShoes + [horse for prop in drone.small_props for horse in prop.horseShoes]
-    start_time = time.time()
     
     if updateConfig:
         for i, horse in tqdm(enumerate(total_horses), total=len(total_horses), desc="Influence calculation"):
@@ -294,16 +291,19 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     r = (r_main[1:] + r_main[:-1]) * 0.5
     Torque = np.sum(Ftan * r)*main_NB
     Thrust = Faxial.sum() * main_NB
-
+    print('----------------------------------')
     print("Main Blade Thrust", Thrust)
     print("Main Blade Torque", Torque.sum())
-    print('Tip thrust required:', Torque.sum()/(drone.main_prop.diameter/2)/main_NB)
+    # print('Tip thrust required:', (Torque.sum()/(drone.main_prop.diameter/2))/main_NB, 'N')
+    # print('Tip thrust required:', (Torque.sum()/(drone.main_prop.diameter/2))/main_NB*1000/9.81, 'g')
     computed_power = Torque.sum()*drone.main_prop.RPM*2*np.pi/60
     print("Main Blade Power", computed_power)
+    print('----------------------------------')
     p_ideal = Thrust * np.sqrt(Thrust/(2*(drone.main_prop.diameter**2)*np.pi*1.225/4))
     FM = p_ideal/computed_power
 
     # Compute small propeller thrust and torque
+
     start = main_NB*(main_n-1)
     stop = main_NB*(main_n-1) + (small_n-1)
     lift = 0.5 * 1.225 * Cl[start:stop].flatten() * (v_mag[start:stop].flatten()**2) * chords[start:stop].flatten() * r_small_steps.flatten()
@@ -317,6 +317,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     Thrust_small = Faxial_small.sum() * small_NB
 
     #print("Small Blade Thrust", Thrust_small, "Combined: ", main_NB*Thrust_small)
+
     created_moment = main_NB*Thrust_small*drone.main_prop.diameter/2
     print("Small Blade Torque", Torque_small.sum(), "Combined torque (to create moment): ", created_moment)  
     power_required = main_NB*Torque_small.sum()*drone.small_props[0].RPM*2*np.pi/60
@@ -326,27 +327,40 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
 
     # Compute the induced power for the main rotor
     induced_power = main_NB*(abs(v_axial[:main_n-1].flatten()) * Faxial.flatten()).sum()
-    #print("Induced power main rotor", induced_power)    
+    print("Induced power main rotor", induced_power)    
+
+    # Compute the profile power for the main rotor
+    cd0 = 0.02
+    solidity = drone.main_prop.NB * drone.main_prop.chord[:main_n-1].flatten() / (np.pi*drone.main_prop.diameter/2)
+    omega = drone.main_prop.RPM * 2 * np.pi / 60
+    R = drone.main_prop.diameter/2
+    coefs = solidity*cd0/(4*np.pi)
+
+    profile_power_coefs = coefs*((v_mag[:main_n-1].flatten()*r/(omega*R))**3)
+    profile_power = profile_power_coefs*1.225*np.pi*(drone.main_prop.diameter/2)**2*(omega*R)**3
+    profile_power = profile_power.sum()
+    print("Profile power main rotor", profile_power)
+    
 
 
 
     # save results to csv 
-    misc  = np.zeros((main_n-1))
-    misc[0] = Thrust
-    misc[1] = Torque
-    misc[2] = LD
-    results = np.column_stack((r, 
-                               v_axial[:main_n-1].flatten(), 
-                               v_tangential[:main_n-1].flatten(), 
-                               inflowangle[:main_n-1].flatten(), 
-                               alpha[:main_n-1].flatten(),
-                               Faxial.flatten(), 
-                               Ftan.flatten(),
-                               misc))
-    header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, misc"
-
-    #np.savetxt(f'./results/results_{case}.csv', results, delimiter=',', header=header, comments='')
-    np.savetxt(f'./results/withBend.csv', results, delimiter=',', header=header, comments='')
+    if save:
+        misc  = np.zeros((main_n-1))
+        misc[0] = Thrust
+        misc[1] = Torque
+        misc[2] = LD
+        results = np.column_stack((r, 
+                                v_axial[:main_n-1].flatten(), 
+                                v_tangential[:main_n-1].flatten(), 
+                                inflowangle[:main_n-1].flatten(), 
+                                alpha[:main_n-1].flatten(),
+                                Faxial.flatten(), 
+                                Ftan.flatten(),
+                                misc))
+        header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, misc"
+        case = case.replace('.json', '')
+        np.savetxt(f'./results/{case}_res.csv', results, delimiter=',', header=header, comments='')
 
         
     if plotting:
@@ -406,4 +420,4 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     drone.total_velocity_vectors = vel_total_output
     drone.axial_velocity = vel_axial_output  
     drone.tangential_velocity = vel_tangential_output
-    return abs(mean_axial_main), abs(mean_axial_small), total_horses, Gammas, FM, created_moment, Torque, Thrust, power_required
+    return abs(mean_axial_main), abs(mean_axial_small), total_horses, Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power
