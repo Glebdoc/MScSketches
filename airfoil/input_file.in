@@ -1,0 +1,13 @@
+LOAD ./dat_files/c5e.dat
+c5e
+PANE
+OPER
+Visc 100000
+PACC
+./data/polar_filec5e.txt
+
+ITER 150
+ASeq 0 15 0.5
+
+
+quit

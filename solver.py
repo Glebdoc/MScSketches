@@ -4,6 +4,7 @@ import time
 from geometry import Point
 import matplotlib.pyplot as plt
 import pyvista as pv
+import xfoilUtil as xf
 
 # I believe this whole function is wrong.
 def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50):
@@ -98,14 +99,9 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50)
 
 
 
-def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([0,0,0])):
+def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([0,0,0]), ReInfluence=False):
     # Polar data
-    data = np.loadtxt('./A18.txt', skiprows=12)
-
-    alphaPolar = data[:, 0]
-    clPolar = data[:, 1]
-    cdPolar = data[:, 2]    
-
+    updateReynolds = False  
 
     main_NB = drone.main_prop.NB
     small_NB = drone.small_props[0].NB
@@ -113,6 +109,25 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     small_n = drone.small_props[0].n
     
     collocN = (main_NB * (main_n - 1) + main_NB * small_NB * (small_n - 1))
+
+    if ReInfluence:
+        polars =[]
+        try: 
+            re_estimate = np.genfromtxt('./Reynolds.txt')
+            if len(re_estimate) != collocN:
+                updateReynolds = True
+                ReInfluence = False
+                print('Reynolds.txt needs to be updated for current n_small and n_main')
+            for i in range(collocN):
+                polars.append(xf.getClosestRePolar(re_estimate[i], 'a18sm'))
+        except:
+            print('Reynolds.txt not found')
+    else:
+        data = np.loadtxt('./A18.txt', skiprows=12)
+        alphaPolar = data[:, 0]
+        clPolar = data[:, 1]
+        cdPolar = data[:, 2]  
+
 
     u_influences = np.zeros((collocN, collocN))
     v_influences = np.zeros((collocN, collocN))
@@ -230,11 +245,22 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
             v_tangential[i] = np.dot(vel_total.flatten(), tangential_direction)
             vel_tangential_output[i] = v_tangential[i]*tangential_direction.flatten()
 
+        
         v_mag = np.sqrt(v_axial**2 + v_tangential**2)
+        if updateReynolds:
+            Re = 1.225*v_mag.flatten()*chords.flatten()/1.81e-5
+            np.savetxt('./Reynolds.txt', Re)
+            updateReynolds = False
         inflowangle = np.arctan(v_axial/v_tangential)
         twist[main_NB*(main_n-1):] = inflowangle[main_NB*(main_n-1):]*180/np.pi + 5
         alpha = twist -  inflowangle*180/np.pi
-        Cl = np.interp(alpha, alphaPolar, clPolar)
+        #Cl = np.interp(alpha, alphaPolar, clPolar)
+        if ReInfluence:
+            Cl = np.zeros((collocN,1))
+            for i in range(collocN):
+                Cl[i] = np.interp(alpha[i], polars[i]["alpha"], polars[i]["CL"])
+        else:
+            Cl = np.interp(alpha, alphaPolar, clPolar)
         Gammas_old = Gammas
         Gammas  = weight * Cl * 0.5 * chords* v_mag + (1-weight)*Gammas_old
 
@@ -249,7 +275,12 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
     r_steps = (r_main[1:] - r_main[:-1])
     r_small_steps = (r_small[1:] - r_small[:-1])
 
-    Cd = np.interp(alpha, alphaPolar, cdPolar)
+    if ReInfluence:
+        Cd = np.zeros((collocN,1))
+        for i in range(collocN):
+            Cd[i] = np.interp(alpha[i], polars[i]["alpha"], polars[i]["CD"])
+    else:
+        Cd = np.interp(alpha, alphaPolar, cdPolar)
 
 
     Lift = 0.5 * 1.225 * Cl[:main_n-1].flatten() * (v_mag[:main_n-1].flatten()**2) * chords[:main_n-1].flatten() * r_steps.flatten()
@@ -314,7 +345,8 @@ def solve(drone, plotting=False, updateConfig=True, case='main', wind=np.array([
                                misc))
     header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, misc"
 
-    np.savetxt(f'./results/results_{case}.csv', results, delimiter=',', header=header, comments='')
+    #np.savetxt(f'./results/results_{case}.csv', results, delimiter=',', header=header, comments='')
+    np.savetxt(f'./results/withBend.csv', results, delimiter=',', header=header, comments='')
 
         
     if plotting:

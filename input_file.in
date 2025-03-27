@@ -1,0 +1,13 @@
+LOAD ./airfoil/dat_files/NACA 0012.dat
+NACA 0012
+PANE
+OPER
+Visc 129473.68421052632
+PACC
+./airfoil/data/NACA 0012Re129473.68421052632.txt
+
+ITER 150
+ASeq 0 15 0.5
+
+
+quit
