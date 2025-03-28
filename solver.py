@@ -102,6 +102,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     updateReynolds = False  
     ReInfluence = drone.reynolds
     wind = drone.wind
+    main_airfoil = drone.main_prop.airfoil
     main_NB = drone.main_prop.NB
     small_NB = drone.small_props[0].NB
     main_n = drone.main_prop.n
@@ -118,7 +119,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
                 ReInfluence = False
                 print('Reynolds.txt needs to be updated for current n_small and n_main')
             for i in range(collocN):
-                polars.append(xf.getClosestRePolar(re_estimate[i], 'a18sm'))
+                polars.append(xf.getClosestRePolar(re_estimate[i], main_airfoil))
         except:
             print('Reynolds.txt not found')
     else:
@@ -294,12 +295,11 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     Torque = np.sum(Ftan * r)*main_NB
     Thrust = Faxial.sum() * main_NB
     print('----------------------------------')
-    print("Main Blade Thrust", Thrust)
-    print("Main Blade Torque", Torque.sum())
+    
     # print('Tip thrust required:', (Torque.sum()/(drone.main_prop.diameter/2))/main_NB, 'N')
     # print('Tip thrust required:', (Torque.sum()/(drone.main_prop.diameter/2))/main_NB*1000/9.81, 'g')
     computed_power = Torque.sum()*drone.main_prop.RPM*2*np.pi/60
-    print("Main Blade Power", computed_power)
+    print("Main Blade Thrust", Thrust, "Main Blade Torque", Torque.sum(), "Main Blade Power", computed_power, 'T/Q:', Thrust/Torque.sum())
     print('----------------------------------')
     p_ideal = Thrust * np.sqrt(Thrust/(2*(drone.main_prop.diameter**2)*np.pi*1.225/4))
     FM = p_ideal/computed_power
@@ -321,15 +321,15 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     #print("Small Blade Thrust", Thrust_small, "Combined: ", main_NB*Thrust_small)
 
     created_moment = main_NB*Thrust_small*drone.main_prop.diameter/2
-    print("Small Blade Torque", Torque_small.sum(), "Combined torque (to create moment): ", created_moment)  
+    #print("Small Blade Torque", Torque_small.sum(), "Combined torque (to create moment): ", created_moment)  
     power_required = main_NB*Torque_small.sum()*drone.small_props[0].RPM*2*np.pi/60
-    print("Small Blade Power", Torque_small.sum()*drone.small_props[0].RPM*2*np.pi/60, "Power required: ", power_required)
+    #print("Small Blade Power", Torque_small.sum()*drone.small_props[0].RPM*2*np.pi/60, "Power required: ", power_required)
 
     
 
     # Compute the induced power for the main rotor
     induced_power = main_NB*(abs(v_axial[:main_n-1].flatten()) * Faxial.flatten()).sum()
-    print("Induced power main rotor", induced_power)    
+    #print("Induced power main rotor", induced_power)    
 
     # Compute the profile power for the main rotor
     cd0 = 0.02
@@ -341,7 +341,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     profile_power_coefs = coefs*((v_mag[:main_n-1].flatten()*r/(omega*R))**3)
     profile_power = profile_power_coefs*1.225*np.pi*(drone.main_prop.diameter/2)**2*(omega*R)**3
     profile_power = profile_power.sum()
-    print("Profile power main rotor", profile_power)
+    #print("Profile power main rotor", profile_power)
     
 
 

@@ -3,6 +3,7 @@ import pyvista as pv
 import bemUtils as bu
 import timeit
 import json
+import xfoilUtil as xfu
 
 
 class Point:
@@ -336,7 +337,6 @@ class Propeller():
                 R = bu.rotation_matrix(0, 0, shift)
                 self.collocationPoints.extend(R @ self.collocationPoints[0:self.n-1])
 
-
             for i in range(self.n - 1):
                 xwl = self.r[i]*np.sin(omega*dt) + self.chord[i]
                 xwr = self.r[i+1]*np.sin(omega*dt) + self.chord[i+1]
@@ -350,19 +350,9 @@ class Propeller():
                 wakeRight = []
                 
                 for k in range(len(xwl)-1):
-
-                    
-
-                    
-    
-                    #aLeft = Point(xwl[k+1], ywl[k+1], zw[k+1])
                     aLeft = Point(xwl[k+1], ywl[k+1]*mult[k], zw[k+1])
-                    #bLeft = Point(xwl[k], ywl[k], zw[k])
                     bLeft = Point(xwl[k], ywl[k]*mult[k], zw[k])
-
-                    #aRight = Point(xwr[k], ywr[k], zw[k])
                     aRight = Point(xwr[k], ywr[k]*mult[k], zw[k])
-                    #bRight = Point(xwr[k+1], ywr[k+1], zw[k+1])
                     bRight = Point(xwr[k+1], ywr[k+1]*mult[k], zw[k+1])
 
                     wakeLeft.append(Vortex(aLeft, bLeft, 1))
@@ -438,7 +428,7 @@ class Propeller():
 
 class Drone:
     def __init__(self, main_position, main_angles, main_hub, main_diameter,
-                 main_NB, main_pitch, main_RPM, main_chord, main_n, 
+                 main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                  small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                  small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
                  mainWakeLength, smallWakeLength, main_U, small_U, main_distribution='uniform', 
@@ -461,6 +451,7 @@ class Drone:
                                    )
         
         # Small propellers
+        self.main_prop.airfoil = main_airfoil
         self.small_props = []
         self.wind = wind
         self.reynolds = reynolds
@@ -529,8 +520,12 @@ def defineDrone(filename, main_U=None, small_U=None):
         main_chord_tip = config['main_propeller']['chord_tip']
         main_pitch_root = config['main_propeller']['pitch_root']
         main_pitch_tip = config['main_propeller']['pitch_tip']
+        main_airfoil = config['main_propeller']['airfoil']
 
-        main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) + 2
+        Re_avg = 1.225*main_RPM*0.7*0.5*main_diameter * 2*np.pi/60 * main_chord/1.81e-5
+        main_optimal_AoA = xfu.optimalAoA(main_airfoil, Re_avg)
+
+        main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) + main_optimal_AoA
         main_pitch = np.concatenate([main_pitch]*main_NB)
 
         main_chord = np.linspace(main_chord_root, main_chord_tip, main_n-1)
@@ -572,11 +567,16 @@ def defineDrone(filename, main_U=None, small_U=None):
             small_U = config['small_propellers']['uWake']
 
         drone = Drone(main_position, main_angles, main_hub, main_diameter, 
-                                    main_NB, main_pitch, main_RPM, main_chord, main_n,
+                                    main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
                                     mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, 
                                     main_distribution='uniform', small_distribution='uniform', 
                                     contraction=contraction, wind=wind, reynolds=reynolds)
+
+        # write optimal AoA to config file
+        config['main_propeller']['optimal_AoA'] = main_optimal_AoA
+        with open(f'./configs/{filename}', 'w') as f:
+            json.dump(config, f, indent=4)
 
         return drone

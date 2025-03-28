@@ -54,14 +54,24 @@ def genDataBase(airfoil_name, Re, max_runtime):
             except Exception as e:
                 print(f"XFOIL run for {airfoil} at Re = {re} failed.")
 
-def optimalAoA():
+def optimalAoA(airfoil_name, Re):
+    airfoil_polars = []
     for polar in os.listdir("./airfoil/data"):
-        df = pd.read_csv(f"./airfoil/data/{polar}", sep='\s+', skiprows=12, header=None)
-        df.columns = ["alpha", "CL", "CD", "CDp", "CM", "Top_Xtr", "Bot_Xtr"]
-        df["CL/CD"] = df["CL"] / df["CD"]
-        max_cl_cd = df["CL/CD"].max()
-        max_cl_cd_aoa = df[df["CL/CD"] == max_cl_cd]["alpha"].values[0]
-        print(f"Optimal AoA for {polar} is {max_cl_cd_aoa} degrees with CL/CD = {max_cl_cd}")
+        if airfoil_name in polar:
+            airfoil_polars.append(float(polar.split("Re")[1].split(".txt")[0]))
+    airfoil_polars = np.array(airfoil_polars)
+    airfoil_polars.sort()
+    closestRe = airfoil_polars[np.argmin(np.abs(airfoil_polars - Re) )]
+    df = pd.read_csv(f"./airfoil/data/{airfoil_name}Re{closestRe}.txt", sep='\s+', skiprows=12, header=None)
+    df.columns = ["alpha", "CL", "CD", "CDp", "CM", "Top_Xtr", "Bot_Xtr"]
+    CL_CD = df["CL"] / df["CD"]
+    CL_CD = CL_CD.to_numpy()
+    # find the index of the maximum value in CL/CD
+    max_index = np.argmax(CL_CD)
+    # find the corresponding alpha value
+    alpha_optimal = df["alpha"][max_index]
+    return alpha_optimal
+
 def plotAirfoilPolars(airfoilName):
     for polar in os.listdir("./airfoil/data"):
         if airfoilName in polar:

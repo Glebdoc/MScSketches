@@ -5,13 +5,14 @@
         "angles": [0, 0, 0], 
 
     "GEOMETRY": "__",
+        "airfoil": "NACA0012",
         "hub": 0.1, 
-        "diameter": 1.5, 
+        "diameter": 1.6, 
         "NB": 3, 
-        "chord_root": 0.12,
-        "chord_tip": 0.1,
-        "pitch_root": 19,
-        "pitch_tip": 11, 
+        "chord_root": 0.13,
+        "chord_tip": 0.09,
+        "pitch_root": 15,
+        "pitch_tip": 15, 
         "chord": 0.3, 
 
     "OPERATION": "__",
@@ -49,6 +50,11 @@
     
 "settings": {
     "contraction": false,
-    "reynolds": true,
+    "reynolds": false,
     "wind_speed": 0,
-    "wind_angle": 0}}
+    "wind_angle": 0},
+    
+"results":{
+    "Thrust":0,
+    "Torque":0
+}}
