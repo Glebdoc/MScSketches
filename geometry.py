@@ -4,6 +4,8 @@ import bemUtils as bu
 import timeit
 import json
 import xfoilUtil as xfu
+import jax 
+import jax.numpy as jnp
 
 
 class Point:
@@ -505,7 +507,7 @@ class Drone:
               extra_points=extra_points, extra_lines=extra_lines)
         
 
-def defineDrone(filename, main_U=None, small_U=None):
+def defineDrone(filename, main_U=None, small_U=None, small_RPM=None):
     with open(f'./configs/{filename}', 'r') as f:
         config = json.load(f)
         main_position = Point(*config['main_propeller']['position'])
@@ -536,7 +538,7 @@ def defineDrone(filename, main_U=None, small_U=None):
         small_props_angle = config['small_propellers']['angle']
         small_props_diameter = config['small_propellers']['diameter']
         small_props_NB = config['small_propellers']['NB']
-        small_props_RPM = config['small_propellers']['rpm']
+        
         small_chord_root = config['small_propellers']['chord_root']
         small_chord_tip = config['small_propellers']['chord_tip']
         small_props_n = config['small_propellers']['n']
@@ -565,11 +567,14 @@ def defineDrone(filename, main_U=None, small_U=None):
             main_U = config['main_propeller']['uWake']
         if small_U is None:
             small_U = config['small_propellers']['uWake']
+        if small_RPM is None:
+            small_RPM = config['small_propellers']['rpm']
+
 
         drone = Drone(main_position, main_angles, main_hub, main_diameter, 
                                     main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
-                                    small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
+                                    small_RPM, small_props_chord, small_props_n, small_props_pitch,
                                     mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, 
                                     main_distribution='uniform', small_distribution='uniform', 
                                     contraction=contraction, wind=wind, reynolds=reynolds)

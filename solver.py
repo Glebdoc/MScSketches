@@ -5,6 +5,8 @@ from geometry import Point
 import matplotlib.pyplot as plt
 import pyvista as pv
 import xfoilUtil as xf
+import jax 
+import jax.numpy as jnp
 
 # I believe this whole function is wrong.
 def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50):
