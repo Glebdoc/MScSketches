@@ -7,16 +7,17 @@ import pyvista as pv
 import xfoilUtil as xf
 import jax 
 import jax.numpy as jnp
+from matplotlib.colors import ListedColormap, BoundaryNorm
 
 # I believe this whole function is wrong.
-def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50):
+def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50, plotting=False):
     # Update horses with the new Gammas
     for horse, gamma in zip(horses, Gammas):
         horse.Gamma = gamma
 
     # Define the plane dimensions
     if plane == 'YZ':
-        y_range = np.linspace(-2.5, 2.5, discretization)
+        y_range = np.linspace(-1.5, 1.5, discretization)
         z_range = np.linspace(-5, .5, discretization)
 
         Y, Z = np.meshgrid(y_range, z_range)
@@ -32,8 +33,8 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50)
         points = np.column_stack((X.flatten(), np.ones(N_points)*shift, Z.flatten()))
 
     elif plane == 'XY':
-        x_range = np.linspace(-2.5, 2.5, discretization)
-        y_range = np.linspace(-2.5, 2.5, discretization)
+        x_range = np.linspace(-1., 1., discretization)
+        y_range = np.linspace(-1., 1., discretization)
 
         X, Y = np.meshgrid(x_range, y_range)
         N_points = len(X.flatten())
@@ -73,25 +74,57 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50)
     plotter = pv.Plotter()
     boring_cmap = plt.get_cmap("plasma", 15)
 
-    vectors = np.c_[u, v, w]
+    #vectors = np.c_[u, v, w]
 
-    mesh['vectors'] = vectors
-    glyphs = mesh.glyph(orient='vectors', scale='magnitude', factor=0.05)
+    #mesh['vectors'] = vectors
+    #glyphs = mesh.glyph(orient='vectors', scale='magnitude', factor=0.05)
+    # Define the number of bands
+    n_bands = 64  
 
-    plotter.add_mesh(glyphs, scalars='magnitude', cmap=boring_cmap, show_edges=False, clim=[min_mag, max_mag])
+    # Define the colormap
+    cmap = plt.get_cmap("jet", n_bands)  # Creates discrete colors
 
 
-    # plotter.add_mesh(mesh, scalars='v', cmap=boring_cmap, show_edges=False, clim=[min_mag, max_mag])
+    # dargs = dict(
+    # scalars="Nodal Displacement",
+    # cmap="jet",
+    # show_scalar_bar=True)
+    grid = pv.StructuredGrid()
+    grid.points = points  # Keep it (N,3), do NOT reshape!
+    grid.dimensions = [discretization, discretization, 1]  # Needed for 2D slices
+    grid["magnitude"] = magnitude.flatten()
+    grid['u'] = mesh['u']
+    grid['v'] = mesh['v']
+    grid['w'] = mesh['w']
 
-    # # Add scalar bar for the magnitude with customized levels
-    # plotter.add_scalar_bar(title="Velocity Magnitude", n_labels=5)
+        # Get the scalar range
+    min_val, max_val = grid["magnitude"].min(), grid["magnitude"].max()
+    if max_val > 25:
+        max_val = 25
 
-    # Optional: Add axes to the plot for better context
-    plotter.add_axes()
-    plotter.show_grid()
+    # Create discrete bins for the colors
+    levels = np.linspace(min_val, max_val, n_bands + 1)  # n+1 to define edges
+    norm = BoundaryNorm(levels, cmap.N)  # Define discrete color boundaries
+    discrete_cmap = ListedColormap(cmap(np.linspace(0, 1, n_bands)))  # Apply discrete colors
 
-    # Show the plot
-    plotter.show()
+    if plotting:
+        pl = pv.Plotter(shape=(2, 2))
+        pl.subplot(0, 0)
+        pl.add_mesh(grid, scalars='u', cmap='jet')
+        pl.add_text("u", color='k')
+        pl.subplot(0, 1)
+        pl.add_mesh(grid.copy(),  scalars='v', cmap='jet')
+        pl.add_text("v", color='k')
+        pl.subplot(1, 0)
+        pl.add_mesh(grid.copy(),  scalars='w', cmap='jet')
+        pl.add_text("w", color='k')
+        pl.subplot(1, 1)
+        pl.add_mesh(grid.copy(),  scalars='magnitude', cmap=discrete_cmap, clim=[min_mag, max_mag], show_scalar_bar=True)
+        pl.add_text("magnitude", color='k')
+        pl.link_views()
+        pl.camera_position = 'iso'
+        pl.background_color = 'white'
+        pl.show()
 
     # Return the velocity components
     return u, v, w
@@ -301,10 +334,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     # print('Tip thrust required:', (Torque.sum()/(drone.main_prop.diameter/2))/main_NB, 'N')
     # print('Tip thrust required:', (Torque.sum()/(drone.main_prop.diameter/2))/main_NB*1000/9.81, 'g')
     computed_power = Torque.sum()*drone.main_prop.RPM*2*np.pi/60
-    print("Main Blade Thrust", Thrust, "Main Blade Torque", Torque.sum(), "Main Blade Power", computed_power, 'T/Q:', Thrust/Torque.sum())
-    print('----------------------------------')
-    p_ideal = Thrust * np.sqrt(Thrust/(2*(drone.main_prop.diameter**2)*np.pi*1.225/4))
-    FM = p_ideal/computed_power
+    
 
     # Compute small propeller thrust and torque
 
@@ -331,7 +361,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
 
     # Compute the induced power for the main rotor
     induced_power = main_NB*(abs(v_axial[:main_n-1].flatten()) * Faxial.flatten()).sum()
-    #print("Induced power main rotor", induced_power)    
+    print("Induced power main rotor", induced_power)    
 
     # Compute the profile power for the main rotor
     cd0 = 0.02
@@ -343,7 +373,14 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     profile_power_coefs = coefs*((v_mag[:main_n-1].flatten()*r/(omega*R))**3)
     profile_power = profile_power_coefs*1.225*np.pi*(drone.main_prop.diameter/2)**2*(omega*R)**3
     profile_power = profile_power.sum()
-    #print("Profile power main rotor", profile_power)
+    print("Profile power main rotor", profile_power)
+    total_power = induced_power + profile_power
+
+    p_ideal = Thrust * np.sqrt(Thrust/(2*(drone.main_prop.diameter**2)*np.pi*1.225/4))
+    FM = p_ideal/total_power
+
+    print(f"Main Blade Thrust {Thrust:.2f} Main Blade Torque {Torque.sum():.2f} Main Blade Power {computed_power:.2f} T/Q: {Thrust/Torque.sum():.2f} FM:{FM:.2f} Preq/Protor: {power_required/total_power:.2f}")
+    print('----------------------------------')
     
 
 

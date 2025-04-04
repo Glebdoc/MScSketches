@@ -9,7 +9,7 @@ import pandas as pd
 # airfoil polars for Various Re numbers
 ###
 
-airfoil_name = ["NACA 0012", "a18sm", "NACA 0010", "NACA 2224"]
+airfoil_name = ["NACA 0012", "a18sm", "NACA 0010", "NACA 2224", "NACA 4412", "NACA 2412", "NACA 4410", "NACA 3412" ]
 directory = "./airfoil/dat_files"
 
 alpha_i = 0

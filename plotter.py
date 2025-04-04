@@ -8,14 +8,14 @@ def plot(files, show = True, title=False):
     fig, axs = plt.subplots(2, 3, figsize=(15, 10)) 
 
     # read CFD data 
-    cfd = np.genfromtxt('./results/cumulativeLift.txt', delimiter=None, skip_header=5)
-    r = cfd[:, 0]
-    lift_cumulative = cfd[:, 1]
-    # now we need to take a derivative of the cumulative lift to get the lift
-    step = r[1] - r[0]
-    lift = (lift_cumulative[1:] - lift_cumulative[:-1])
+    # cfd = np.genfromtxt('./results/cumulativeLift.txt', delimiter=None, skip_header=5)
+    # r = cfd[:, 0]
+    # lift_cumulative = cfd[:, 1]
+    # # now we need to take a derivative of the cumulative lift to get the lift
+    # step = r[1] - r[0]
+    # lift = (lift_cumulative[1:] - lift_cumulative[:-1])
 
-    axs[1, 1].plot(r[:-1], lift, label='CFD', marker='o')
+    # axs[1, 1].plot(r[:-1], lift, label='CFD', marker='o')
 
     for file in files:
         data = np.genfromtxt(f'./results/{file}_res.csv', delimiter=',', skip_header=1)

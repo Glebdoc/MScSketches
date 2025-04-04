@@ -119,7 +119,6 @@ class Vortex(Point):
         K[mask] = 0
 
         # Compute cross product result
-        
 
         return K[:, np.newaxis] * cross_vec
 
@@ -241,7 +240,7 @@ class Propeller():
         self.translate(position)
         
     def bendSmallWake(self):
-        ppr = 30 
+        ppr = 16 
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
         total_time = length/self.U
@@ -311,7 +310,7 @@ class Propeller():
         # wake
         # I want to have D number of points per revolution of the propeller
         # I call them points per rev (ppr)
-        ppr = 30 
+        ppr = 16 
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
         total_time = length/self.U
@@ -340,10 +339,10 @@ class Propeller():
                 self.collocationPoints.extend(R @ self.collocationPoints[0:self.n-1])
 
             for i in range(self.n - 1):
-                xwl = self.r[i]*np.sin(omega*dt) + self.chord[i]
-                xwr = self.r[i+1]*np.sin(omega*dt) + self.chord[i+1]
-                ywl = self.r[i]*np.cos(omega*dt) # + angle etc
-                ywr = self.r[i+1]*np.cos(omega*dt) # + angle etc
+                xwl = self.r[i]*np.sin(omega*dt)*mult + self.chord[i]
+                xwr = self.r[i+1]*np.sin(omega*dt)*mult + self.chord[i+1]
+                ywl = self.r[i]*np.cos(omega*dt)*mult # + angle etc
+                ywr = self.r[i+1]*np.cos(omega*dt)*mult # + angle etc
                 leftVortex = [(Vortex( Point(self.chord[i], self.r[i], 0), Point(0, self.r[i], 0), 0))]
                 self.vortexTABLE.append([self.chord[i], self.r[i], 0, 0, self.r[i], 0, self.bodyIndex*(self.n*self.NB) + j*self.n + i])
                 rightVortex = [(Vortex(Point(0, self.r[i+1], 0), Point(self.chord[i+1], self.r[i+1], 0), 0))]
@@ -352,10 +351,16 @@ class Propeller():
                 wakeRight = []
                 
                 for k in range(len(xwl)-1):
-                    aLeft = Point(xwl[k+1], ywl[k+1]*mult[k], zw[k+1])
-                    bLeft = Point(xwl[k], ywl[k]*mult[k], zw[k])
-                    aRight = Point(xwr[k], ywr[k]*mult[k], zw[k])
-                    bRight = Point(xwr[k+1], ywr[k+1]*mult[k], zw[k+1])
+                    # aLeft = Point(xwl[k+1], ywl[k+1]*mult[k], zw[k+1])
+                    # bLeft = Point(xwl[k], ywl[k]*mult[k], zw[k])
+                    # aRight = Point(xwr[k], ywr[k]*mult[k], zw[k])
+                    # bRight = Point(xwr[k+1], ywr[k+1]*mult[k], zw[k+1])
+
+                    # playing with contraction 
+                    aLeft = Point(xwl[k+1], ywl[k+1], zw[k+1])
+                    bLeft = Point(xwl[k], ywl[k], zw[k])
+                    aRight = Point(xwr[k], ywr[k], zw[k])
+                    bRight = Point(xwr[k+1], ywr[k+1], zw[k+1])
 
                     wakeLeft.append(Vortex(aLeft, bLeft, 1))
                     #self.vortexTABLE.append([xwl[k+1], ywl[k+1], zw[k+1], xwl[k], ywl[k], zw[k], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
@@ -507,7 +512,7 @@ class Drone:
               extra_points=extra_points, extra_lines=extra_lines)
         
 
-def defineDrone(filename, main_U=None, small_U=None, small_RPM=None):
+def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=None):
     with open(f'./configs/{filename}', 'r') as f:
         config = json.load(f)
         main_position = Point(*config['main_propeller']['position'])
@@ -515,8 +520,6 @@ def defineDrone(filename, main_U=None, small_U=None, small_RPM=None):
         main_hub = config['main_propeller']['hub']
         main_diameter = config['main_propeller']['diameter']
         main_NB = config['main_propeller']['NB']
-        main_RPM = config['main_propeller']['rpm']
-        main_chord = config['main_propeller']['chord']
         main_n = config['main_propeller']['n']
         main_chord_root = config['main_propeller']['chord_root']
         main_chord_tip = config['main_propeller']['chord_tip']
@@ -524,7 +527,16 @@ def defineDrone(filename, main_U=None, small_U=None, small_RPM=None):
         main_pitch_tip = config['main_propeller']['pitch_tip']
         main_airfoil = config['main_propeller']['airfoil']
 
-        Re_avg = 1.225*main_RPM*0.7*0.5*main_diameter * 2*np.pi/60 * main_chord/1.81e-5
+        if main_U is None:
+            main_U = config['main_propeller']['uWake']
+        if small_U is None:
+            small_U = config['small_propellers']['uWake']
+        if main_RPM is None:
+            main_RPM = config['main_propeller']['rpm']
+        if small_RPM is None:
+            small_RPM = config['small_propellers']['rpm']
+
+        Re_avg = 1.225*main_RPM*0.7*0.5*main_diameter * 2*np.pi/60 * 0.5*(main_chord_tip+main_chord_root)/1.81e-5
         main_optimal_AoA = xfu.optimalAoA(main_airfoil, Re_avg)
 
         main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) + main_optimal_AoA
@@ -563,19 +575,14 @@ def defineDrone(filename, main_U=None, small_U=None, small_RPM=None):
         
         reynolds = config['settings']['reynolds']
 
-        if main_U is None:
-            main_U = config['main_propeller']['uWake']
-        if small_U is None:
-            small_U = config['small_propellers']['uWake']
-        if small_RPM is None:
-            small_RPM = config['small_propellers']['rpm']
+        
 
 
         drone = Drone(main_position, main_angles, main_hub, main_diameter, 
                                     main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
-                                    mainWakeLength=1, smallWakeLength=6, main_U=main_U, small_U = small_U, 
+                                    mainWakeLength=3, smallWakeLength=6, main_U=main_U, small_U = small_U, 
                                     main_distribution='uniform', small_distribution='uniform', 
                                     contraction=contraction, wind=wind, reynolds=reynolds)
 
