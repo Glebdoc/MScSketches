@@ -238,6 +238,19 @@ class Propeller():
             self.bendSmallWake()
         self.rotate(*self.angles)
         self.translate(position)
+        self.fillVotexTable()
+
+    def fillVotexTable(self):
+        for i in range(len(self.horseShoes)):
+            horse = self.horseShoes[i]
+            for j in range(len(horse.leftset)):
+                local_vortex = horse.leftset[j] 
+                self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+                local_vortex = horse.rightset[j]
+                self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+            local_vortex = horse.centre
+            self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+        self.vortexTABLE = np.array(self.vortexTABLE)
         
     def bendSmallWake(self):
         ppr = 16 
@@ -256,7 +269,7 @@ class Propeller():
                 if j==0:
                     continue
 
-                #Update left vortex
+                #Update left vortex                              !!!!!!!!!!!!!!!!!!!!!!!!!!!!! PERHAPS I NEED TO DO THIS FOR THE RIGHT SIDE AS WELL>>>
                 vortex = horse.leftset[j]
 
                 vortex.p1.y += tempR
@@ -344,18 +357,11 @@ class Propeller():
                 ywl = self.r[i]*np.cos(omega*dt)*mult # + angle etc
                 ywr = self.r[i+1]*np.cos(omega*dt)*mult # + angle etc
                 leftVortex = [(Vortex( Point(self.chord[i], self.r[i], 0), Point(0, self.r[i], 0), 0))]
-                self.vortexTABLE.append([self.chord[i], self.r[i], 0, 0, self.r[i], 0, self.bodyIndex*(self.n*self.NB) + j*self.n + i])
                 rightVortex = [(Vortex(Point(0, self.r[i+1], 0), Point(self.chord[i+1], self.r[i+1], 0), 0))]
-                self.vortexTABLE.append([0, self.r[i+1], 0, self.chord[i+1], self.r[i+1], 0, self.bodyIndex*(self.n*self.NB) + j*self.n + i])
                 wakeLeft = []
                 wakeRight = []
                 
                 for k in range(len(xwl)-1):
-                    # aLeft = Point(xwl[k+1], ywl[k+1]*mult[k], zw[k+1])
-                    # bLeft = Point(xwl[k], ywl[k]*mult[k], zw[k])
-                    # aRight = Point(xwr[k], ywr[k]*mult[k], zw[k])
-                    # bRight = Point(xwr[k+1], ywr[k+1]*mult[k], zw[k+1])
-
                     # playing with contraction 
                     aLeft = Point(xwl[k+1], ywl[k+1], zw[k+1])
                     bLeft = Point(xwl[k], ywl[k], zw[k])
@@ -363,15 +369,12 @@ class Propeller():
                     bRight = Point(xwr[k+1], ywr[k+1], zw[k+1])
 
                     wakeLeft.append(Vortex(aLeft, bLeft, 1))
-                    #self.vortexTABLE.append([xwl[k+1], ywl[k+1], zw[k+1], xwl[k], ywl[k], zw[k], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
                     wakeRight.append(Vortex(aRight, bRight, 1))
-                    #self.vortexTABLE.append([xwr[k], ywr[k], zw[k], xwr[k+1], ywr[k+1], zw[k+1], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
 
                 leftVortex = leftVortex + wakeLeft
                 rightVortex = rightVortex + wakeRight
 
                 centralVortex = (Vortex(Point(0, self.r[i], 0), Point(0, self.r[i+1], 0), 0))
-                self.vortexTABLE.append([0, self.r[i], 0, 0, self.r[i+1], 0, self.bodyIndex*(self.n*self.NB) + j*self.n + i])
                 horseShoe = HorseShoe(leftVortex, centralVortex, rightVortex)
                 if j != 0:
                     horseShoe.rotate(R)
@@ -490,8 +493,12 @@ class Drone:
                                     distribution=small_distribution,
                                     bodyIndex=i+1,
                                     small=True, main_rotor=self.main_prop, contraction=contraction)
+                table = small_prop.vortexTABLE
+                table[:,-1]+=self.vortexTABLE[-1,-1]
+                self.vortexTABLE = np.concatenate((self.vortexTABLE, table), axis=0)
                 self.small_props.append(small_prop)
-                self.vortexTABLE.extend(small_prop.vortexTABLE)
+                
+                
     def translate(self, translation):
         self.main_prop.translate(translation)
         for small_prop in self.small_props:

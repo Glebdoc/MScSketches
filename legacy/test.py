@@ -1,33 +1,46 @@
+import ctypes
 import numpy as np
-import matplotlib.pyplot as plt
+from geometry import*
 
-# Initialize x-coordinates
-x = np.linspace(0, 1, 10)
-
-# Initialize y-coordinates with variation
-y = np.zeros(10)  
-random_variation = 0.1 * np.random.rand(10)  
-y += random_variation  
-y[0] = 0
+# Setting up the test data 
 
 
+# Load the shared library
+mylib = ctypes.CDLL("./mylib.dll")  # Use "mylib.dll" on Windows
 
-R = 1  # Target radius
+collocationPoints = np.array([
+    [0.1, 0.2, 0.3], 
+    [0.4, 0.5, 0.6], 
+    [0.7, 0.8, 0.9]
+], dtype=np.float64)
 
-plt.plot(x, y, label="Original Line")  # Plot original line
+N = len(collocationPoints)  # Number of collocation points
+# Define the influence matrices
+uInfluence = np.zeros((N,N), dtype=np.float64)
+vInfluence = np.zeros((N,N), dtype=np.float64)
+wInfluence = np.zeros((N,N), dtype=np.float64)
 
-for i in range(1, 10):  
-    r_to_point = np.sqrt(x[i]**2 + y[i]**2)  # Compute original radius
-    theta = np.arctan(x[i]/1)
-    r_to_axis = np.sqrt(R**2 + x[i]**2)  # Compute radius to axis
-    deltaR = r_to_point - r_to_axis
-    r_new = R + deltaR  # Compute new radius
+vortexTable = np.array([
+    [1, 1, 1, 2, 2, 2, 0, 1],
+    [3, 3, 3, 4, 4, 4, 0, 1],
+    [5, 5, 5, 6, 6, 6, 1, 1]
+], dtype=np.float64)
 
-    # Convert back to Cartesian coordinates
-    x[i] = r_new * np.sin(theta)
-    y[i] = r_new * np.cos(theta)
+T = vortexTable.shape[0]  # Number of vortices
+# Call the function
 
-plt.plot(x, y, label="Transformed Curve")  # Plot transformed line
-plt.legend()
-plt.axis("equal")  # Keep aspect ratio correct
-plt.show()
+
+collocationPoints_ptr = collocationPoints.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+vortexTable_ptr = vortexTable.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+uInfluence_ptr = uInfluence.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+vInfluence_ptr = vInfluence.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+wInfluence_ptr = wInfluence.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+
+
+
+res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, 
+                                     uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
+print("C function returned:", res)
+print("uInfluence:", uInfluence)
+print("vInfluence:", vInfluence)
+print("wInfluence:", wInfluence)

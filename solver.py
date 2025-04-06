@@ -1,6 +1,7 @@
 from tqdm import tqdm
 import numpy as np
 import time
+import ctypes
 from geometry import Point
 import matplotlib.pyplot as plt
 import pyvista as pv
@@ -129,9 +130,6 @@ def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50,
     # Return the velocity components
     return u, v, w
 
-
-
-
 def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     # Polar data
     updateReynolds = False  
@@ -168,6 +166,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     v_influences = np.zeros((collocN, collocN))
     w_influences = np.zeros((collocN, collocN))
 
+
     Gammas = np.ones((collocN, 1))
 
     mainCollocPoints = np.zeros((main_NB * (main_n - 1), 3))
@@ -177,29 +176,60 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
   
     for i in range(main_NB):
         mainCollocPoints[i * (main_n - 1):(i + 1) * (main_n - 1)] = main_colloc[i].T
-
     for i in range(main_NB):
         small_colloc = np.array(drone.small_props[i].collocationPoints)
         for j in range(small_NB):
             smallCollocPoints[i * small_NB * (small_n - 1) + j * (small_n - 1): i * small_NB * (small_n - 1) + (j + 1) * (small_n - 1)] = small_colloc[j].T
 
+    table = np.array(drone.vortexTABLE)
+
+    np.savetxt('vortexTable.txt', table)
     total_colloc_points = np.concatenate((mainCollocPoints, smallCollocPoints))
-    total_horses = drone.main_prop.horseShoes + [horse for prop in drone.small_props for horse in prop.horseShoes]
+   
+   ############################################
+    # total_horses = drone.main_prop.horseShoes + [horse for prop in drone.small_props for horse in prop.horseShoes]
+    # print("Number of horses:", len(total_horses))
+    # if updateConfig:
+    #     for i, horse in tqdm(enumerate(total_horses), total=len(total_horses), desc="Influence calculation"):
+    #         u_vector = horse.velocity(total_colloc_points, vectorized=True)
+    #         u_influences[:, i] = u_vector[:, 0]
+    #         v_influences[:, i] = u_vector[:, 1]
+    #         w_influences[:, i] = u_vector[:, 2]
+    #     np.savetxt('u_influences.txt', u_influences)
+    #     np.savetxt('v_influences.txt', v_influences)
+    #     np.savetxt('w_influences.txt', w_influences)
+    # else:
+    #     u_influences = np.loadtxt('u_influences.txt')
+    #     v_influences = np.loadtxt('v_influences.txt')
+    #     w_influences = np.loadtxt('w_influences.txt')
+    ############################################
+    u_influences = np.zeros((collocN, collocN))
+    v_influences = np.zeros((collocN, collocN))
+    w_influences = np.zeros((collocN, collocN))
+
+    start = time.time()
+    mylib = ctypes.CDLL("./mylib.dll")  
+    N = len(total_colloc_points)  # Number of collocation points
+    T = len(table)  # Number of vortices
+
+    collocationPoints_ptr = total_colloc_points.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    vortexTable_ptr = table.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    uInfluence_ptr = u_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    vInfluence_ptr = v_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    wInfluence_ptr = w_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     
-    if updateConfig:
-        for i, horse in tqdm(enumerate(total_horses), total=len(total_horses), desc="Influence calculation"):
-            u_vector = horse.velocity(total_colloc_points, vectorized=True)
-            u_influences[:, i] = u_vector[:, 0]
-            v_influences[:, i] = u_vector[:, 1]
-            w_influences[:, i] = u_vector[:, 2]
-        np.savetxt('u_influences.txt', u_influences)
-        np.savetxt('v_influences.txt', v_influences)
-        np.savetxt('w_influences.txt', w_influences)
-    else:
-        u_influences = np.loadtxt('u_influences.txt')
-        v_influences = np.loadtxt('v_influences.txt')
-        w_influences = np.loadtxt('w_influences.txt')
-    
+
+
+    # Call the function
+    res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
+    time2 = time.time() - start
+    print("C function execution time:", time2, "seconds")
+    #np.savetxt('u_influencesC.txt', u_influencesC)
+
+        #compare influences 
+    # assert np.allclose(u_influences, u_influencesC), "u_influences do not match"
+    # assert np.allclose(v_influences, v_influencesC), "v_influences do not match"
+    # assert np.allclose(w_influences, w_influencesC), "w_influences do not match"
 
     v_axial = np.zeros((collocN, 1))
     v_tangential = np.zeros((collocN, 1))
@@ -251,10 +281,10 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
 
 
 
-    weight = 0.3
+    weight = 0.25
     err = 1.0
     iter = 0
-    while (err > 1e-6 and iter<500):
+    while (err > 1e-8 and iter<500):
         iter+=1
         u = u_influences@Gammas
         v = v_influences@Gammas

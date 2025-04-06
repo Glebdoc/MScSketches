@@ -21,16 +21,16 @@ OPTIMIZATION = False
 #############################
 
 # _______ INPUTS _______
-config_files = ['vladIscrazy.json' ]
-output_title = 'vladIscrazy'
+config_files = ['optimized.json' ]
+output_title = 'optimized'
 
 # _______ Solver _______
 err_desired = 1e-1
 max_iter = 50
 RPM_small = 10_000
-RPM_main = 1700
-small_U = 107
-main_U = 5.6
+RPM_main = 350
+small_U = 30
+main_U = 2.6
 weight = 0.5
 
 for config in config_files:
@@ -79,7 +79,7 @@ for config in config_files:
     if SAVE_RESULTS:
         drone = defineDrone(config, main_U, small_U, RPM_main, RPM_small)
         main_U, small_U, horses, Gammas, FM, created_moment, Torque, Thrust, power_required, _,_= solve(drone, case=f'{config}', plotting=False, updateConfig=False, save=True)
-        u, v , w = computeVelocityField(horses, Gammas, plane='XY', shift=-2, discretization=300, plotting=True)
+        #u, v , w = computeVelocityField(horses, Gammas, plane='XY', shift=-2, discretization=300, plotting=True)
         with open(f'configs/{config}', 'r') as f:
             config_data = json.load(f)
         
