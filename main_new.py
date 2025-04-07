@@ -21,8 +21,8 @@ OPTIMIZATION = False
 #############################
 
 # _______ INPUTS _______
-config_files = ['optimized.json' ]
-output_title = 'optimized'
+config_files = ['opt_a18sm.json' ]
+output_title = 'a18'
 
 # _______ Solver _______
 err_desired = 1e-1

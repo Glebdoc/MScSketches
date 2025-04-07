@@ -4,8 +4,6 @@ import bemUtils as bu
 import timeit
 import json
 import xfoilUtil as xfu
-import jax 
-import jax.numpy as jnp
 
 
 class Point:
@@ -85,6 +83,7 @@ class Vortex(Point):
         dot1, dot2 = self.dot1(x, y, z), self.dot2(x, y, z)
 
         # Compute K factor
+        print('Gamma', self.Gamma)
         K = (self.Gamma / (4 * np.pi * crossMag**2)) * (dot1 / r1 - dot2 / r2)
 
         
@@ -113,12 +112,14 @@ class Vortex(Point):
         # Compute dot products
         dot1, dot2 = self.dot1(x, y, z), self.dot2(x, y, z)
 
+        # if self.Gamma != 1:
+        #     print('Gamma is not 1', self.Gamma)
+
         # Compute K factor
+        print('Gamma', self.Gamma)
         K = (self.Gamma / (4 * np.pi * crossMag**2)) * (dot1 / r1 - dot2 / r2)
 
         K[mask] = 0
-
-        # Compute cross product result
 
         return K[:, np.newaxis] * cross_vec
 
@@ -148,21 +149,32 @@ class HorseShoe(Vortex):
         self.rightset = right
         
 
-    def velocity(self, point, vectorized=False):
+    def velocity(self, point, vectorized=False, hsN=0):
+        tablePython = []
         vort1 = 0
         vort3 = 0
         for i in range(len(self.leftset)):
             if vectorized:
                 vort1 += self.leftset[i].velocity_vectorized(point)
+                local_vortex = self.leftset[i]
+                tablePython.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, hsN])
                 vort3 += self.rightset[i].velocity_vectorized(point)
+                local_vortex = self.rightset[i]
+                tablePython.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, hsN])
+
             else:
+                print('not vectorized')
                 vort1 += self.leftset[i].velocity(point)
                 vort3 += self.rightset[i].velocity(point)
         if vectorized:
             vort2 = self.centre.velocity_vectorized(point)
+            local_vortex = self.centre
+            tablePython.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, hsN])
         else:
             vort2 = self.centre.velocity(point)
-        return vort1 + vort2 + vort3
+            print('not vectorized')
+        tablePython = np.array(tablePython)
+        return vort1 + vort2 + vort3, tablePython
 
     
     def get_plot_data(self, start_index=0):
@@ -245,15 +257,18 @@ class Propeller():
             horse = self.horseShoes[i]
             for j in range(len(horse.leftset)):
                 local_vortex = horse.leftset[j] 
-                self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+                #self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+                self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i])
                 local_vortex = horse.rightset[j]
-                self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+                #self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+                self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i])
             local_vortex = horse.centre
-            self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+            #self.vortexTABLE.append([local_vortex.p1.x, local_vortex.p1.y, local_vortex.p1.z, local_vortex.p2.x, local_vortex.p2.y, local_vortex.p2.z, i])
+            self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i])
         self.vortexTABLE = np.array(self.vortexTABLE)
         
     def bendSmallWake(self):
-        ppr = 16 
+        ppr = 30 
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
         total_time = length/self.U
@@ -323,7 +338,7 @@ class Propeller():
         # wake
         # I want to have D number of points per revolution of the propeller
         # I call them points per rev (ppr)
-        ppr = 16 
+        ppr = 30 
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
         total_time = length/self.U
@@ -356,7 +371,7 @@ class Propeller():
                 xwr = self.r[i+1]*np.sin(omega*dt)*mult + self.chord[i+1]
                 ywl = self.r[i]*np.cos(omega*dt)*mult # + angle etc
                 ywr = self.r[i+1]*np.cos(omega*dt)*mult # + angle etc
-                leftVortex = [(Vortex( Point(self.chord[i], self.r[i], 0), Point(0, self.r[i], 0), 0))]
+                leftVortex = [(Vortex( Point(self.chord[i], self.r[i], 0), Point(0, self.r[i], 0), 0 ))]      # 
                 rightVortex = [(Vortex(Point(0, self.r[i+1], 0), Point(self.chord[i+1], self.r[i+1], 0), 0))]
                 wakeLeft = []
                 wakeRight = []
@@ -494,7 +509,8 @@ class Drone:
                                     bodyIndex=i+1,
                                     small=True, main_rotor=self.main_prop, contraction=contraction)
                 table = small_prop.vortexTABLE
-                table[:,-1]+=self.vortexTABLE[-1,-1]
+                table[:,-1]+=(self.vortexTABLE[-1,-1] + 1) 
+
                 self.vortexTABLE = np.concatenate((self.vortexTABLE, table), axis=0)
                 self.small_props.append(small_prop)
                 
@@ -589,7 +605,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
                                     main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
-                                    mainWakeLength=3, smallWakeLength=6, main_U=main_U, small_U = small_U, 
+                                    mainWakeLength=4, smallWakeLength=6, main_U=main_U, small_U = small_U, 
                                     main_distribution='uniform', small_distribution='uniform', 
                                     contraction=contraction, wind=wind, reynolds=reynolds)
 

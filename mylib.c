@@ -49,7 +49,7 @@ int computeInfluenceMatrices(
     double (*wInfluence)[N] = (double (*)[N]) wInfluence_flat;
 
     // Print table 
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for (int i = 0; i < N; i++) {
         for (int j = 0; j<T; j++) {
             double x1 = table[j][0];
@@ -58,8 +58,9 @@ int computeInfluenceMatrices(
             double x2 = table[j][3];
             double y2 = table[j][4];
             double z2 = table[j][5];
-
+            int flagK = 0; 
             double gamma = 1.0;
+            double K;
 
             double x = points[i][0];
             double y = points[i][1];
@@ -69,11 +70,10 @@ int computeInfluenceMatrices(
             double crossY = (z - z1)*(x - x2) - (x - x1)*(z - z2);
             double crossZ = (x - x1)*(y - y2) - (y - y1)*(x - x2);
 
-            double crossVector[3] = {crossX, crossY, crossZ};
-
             double crossMag = sqrt(crossX*crossX + crossY*crossY + crossZ*crossZ);
             if (crossMag < 1e-6){
-                crossMag = 1e-6; 
+                crossMag = 1; 
+                flagK = 1;
             }
 
             double dot1  = (x2 - x1)*(x - x1) + (y2 - y1)*(y - y1) + (z2 - z1)*(z - z1);
@@ -81,15 +81,20 @@ int computeInfluenceMatrices(
 
             double r1 = sqrt((x - x1)*(x - x1) + (y - y1)*(y - y1) + (z - z1)*(z - z1));
             if (r1 < 1e-6){
-                r1 = 1e-6; 
+                r1 = 1e-5; 
             }
             double r2 = sqrt((x - x2)*(x - x2) + (y - y2)*(y - y2) + (z - z2)*(z - z2));
             if (r2 < 1e-6){
-                r2 = 1e-6; 
+                r2 = 1e-5; 
             }
 
             double coef = gamma/(4*PI*crossMag*crossMag);
-            double K = coef*(dot1/r1 - dot2/r2);
+            if (flagK == 1){
+                 K = 0;
+            }
+            else{
+                 K = coef*(dot1/r1 - dot2/r2);
+            }
 
             double u_induced = crossX*K;
             double v_induced = crossY*K;
@@ -97,9 +102,18 @@ int computeInfluenceMatrices(
 
 
             int horse_index =(int)table[j][6];
+            if (horse_index < 0 || horse_index >= N) {
+                printf("Invalid horse_index: %d at j=%d\n", horse_index, j);
+                continue;
+            }
+
             uInfluence[i][horse_index] += u_induced;
             vInfluence[i][horse_index] += v_induced;
             wInfluence[i][horse_index] += w_induced;
+
+            // uInfluence[horse_index][i] += u_induced;
+            // vInfluence[horse_index][i] += v_induced;
+            // wInfluence[horse_index][i] += w_induced;
         }
     }
     

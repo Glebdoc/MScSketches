@@ -1,0 +1,30 @@
+    start = time.time()
+    mylib = ctypes.CDLL("./mylib.so")  
+    N = len(total_colloc_points)  # Number of collocation points
+    T = len(table)  # Number of vortices
+
+    collocationPoints_ptr = total_colloc_points.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    vortexTable_ptr = table.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    # uInfluence_ptr = u_influencesC.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    # vInfluence_ptr = v_influencesC.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    # wInfluence_ptr = w_influencesC.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    
+    uInfluence_ptr = u_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    vInfluence_ptr = v_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    wInfluence_ptr = w_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    
+    #influnceLib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
+    
+    #Call the function
+    
+    if updateConfig:
+        res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
+        time2 = time.time() - start
+        print("C function execution time:", time2, "seconds")
+        np.savetxt('u_influencesC.txt', u_influences)
+        np.savetxt('v_influencesC.txt', v_influences)
+        np.savetxt('w_influencesC.txt', w_influences)
+    else:
+        u_influences = np.loadtxt('u_influencesC.txt')
+        v_influences = np.loadtxt('v_influencesC.txt')
+        w_influences = np.loadtxt('w_influencesC.txt')

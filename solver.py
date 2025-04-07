@@ -6,8 +6,6 @@ from geometry import Point
 import matplotlib.pyplot as plt
 import pyvista as pv
 import xfoilUtil as xf
-import jax 
-import jax.numpy as jnp
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
 # I believe this whole function is wrong.
@@ -183,15 +181,17 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
 
     table = np.array(drone.vortexTABLE)
 
-    np.savetxt('vortexTable.txt', table)
     total_colloc_points = np.concatenate((mainCollocPoints, smallCollocPoints))
-   
-   ############################################
-    # total_horses = drone.main_prop.horseShoes + [horse for prop in drone.small_props for horse in prop.horseShoes]
+
+   ###########################################
+    total_horses = drone.main_prop.horseShoes + [horse for prop in drone.small_props for horse in prop.horseShoes]
     # print("Number of horses:", len(total_horses))
+    # print("Number of collocation points:", collocN)
+    # tablePython_old = np.zeros((1,7))
     # if updateConfig:
     #     for i, horse in tqdm(enumerate(total_horses), total=len(total_horses), desc="Influence calculation"):
-    #         u_vector = horse.velocity(total_colloc_points, vectorized=True)
+    #         u_vector, tablePython = horse.velocity(total_colloc_points, vectorized=True, hsN=i)
+    #         tablePython_old = np.vstack((tablePython_old, tablePython))
     #         u_influences[:, i] = u_vector[:, 0]
     #         v_influences[:, i] = u_vector[:, 1]
     #         w_influences[:, i] = u_vector[:, 2]
@@ -202,34 +202,83 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     #     u_influences = np.loadtxt('u_influences.txt')
     #     v_influences = np.loadtxt('v_influences.txt')
     #     w_influences = np.loadtxt('w_influences.txt')
-    ############################################
-    u_influences = np.zeros((collocN, collocN))
-    v_influences = np.zeros((collocN, collocN))
-    w_influences = np.zeros((collocN, collocN))
+    ##########################################
+    # np.savetxt('tablePython.txt', tablePython_old)
+    # u_influencesC = np.zeros((collocN, collocN))
+    # v_influencesC  = np.zeros((collocN, collocN))
+    # w_influencesC  = np.zeros((collocN, collocN))
+
+    # #compare tables 
+    # tables_diff = np.abs(table[:, :] - tablePython_old[1:,:])
+    # print("Max abs diff:", np.max(tables_diff))
+    # plt.imshow(tables_diff, cmap='hot', interpolation='nearest')
+    # plt.show()
 
     start = time.time()
-    mylib = ctypes.CDLL("./mylib.dll")  
+    mylib = ctypes.CDLL("./mylib.so")  
     N = len(total_colloc_points)  # Number of collocation points
     T = len(table)  # Number of vortices
 
     collocationPoints_ptr = total_colloc_points.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     vortexTable_ptr = table.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    # uInfluence_ptr = u_influencesC.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    # vInfluence_ptr = v_influencesC.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    # wInfluence_ptr = w_influencesC.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    
     uInfluence_ptr = u_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     vInfluence_ptr = v_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     wInfluence_ptr = w_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     
+    #influnceLib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
+    
+    #Call the function
+    
+    if updateConfig:
+        res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
+        time2 = time.time() - start
+        print("C function execution time:", time2, "seconds")
+        np.savetxt('u_influencesC.txt', u_influences)
+        np.savetxt('v_influencesC.txt', v_influences)
+        np.savetxt('w_influencesC.txt', w_influences)
+    else:
+        u_influences = np.loadtxt('u_influencesC.txt')
+        v_influences = np.loadtxt('v_influencesC.txt')
+        w_influences = np.loadtxt('w_influencesC.txt')
+    # print("C function execution time:", time2, "seconds")
+    # np.savetxt('u_influencesC.txt', u_influencesC)
+
+    # print(u_influences.shape, u_influencesC.shape)
+    # print(u_influences.dtype, u_influencesC.dtype)
+
+    # diff = np.abs(u_influences - u_influencesC)
+    # print("Max abs diff:", np.max(diff))
+    # print("Mean abs diff:", np.mean(diff))
+
+    # i, j = np.unravel_index(np.argmax(diff), diff.shape)
+    # print(f"Max diff at index ({i}, {j}) with value {diff[i, j]}")
+
+    # diffU = np.abs(u_influences - u_influencesC)
+    # diffV = np.abs(v_influences - v_influencesC)
+    # diffW = np.abs(w_influences - w_influencesC)
+    # print("Max abs diff u:", np.max(diffU))
+    # print("Max abs diff v:", np.max(diffV))
+    # print("Max abs diff w:", np.max(diffW))
+    # fig, axs = plt.subplots(2, 2, figsize=(10, 15))
+    # cax = axs[0,0].imshow(u_influences - u_influencesC, cmap='hot', interpolation='nearest')
+    # axs[0,0].set_title('u_influences')
+    # fig.colorbar(cax, ax=axs[0, 0])
+    # axs[0,1].imshow(v_influences - v_influencesC, cmap='hot', interpolation='nearest')
+    # axs[1,0].imshow(w_influences - w_influencesC, cmap='hot', interpolation='nearest')
+    # plt.show()
 
 
-    # Call the function
-    res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
-    time2 = time.time() - start
-    print("C function execution time:", time2, "seconds")
-    #np.savetxt('u_influencesC.txt', u_influencesC)
 
-        #compare influences 
     # assert np.allclose(u_influences, u_influencesC), "u_influences do not match"
     # assert np.allclose(v_influences, v_influencesC), "v_influences do not match"
     # assert np.allclose(w_influences, w_influencesC), "w_influences do not match"
+
+
+    # exit()
 
     v_axial = np.zeros((collocN, 1))
     v_tangential = np.zeros((collocN, 1))
@@ -281,10 +330,10 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
 
 
 
-    weight = 0.25
+    weight = 0.3
     err = 1.0
     iter = 0
-    while (err > 1e-8 and iter<500):
+    while (err > 1e-6 and iter<500):
         iter+=1
         u = u_influences@Gammas
         v = v_influences@Gammas
@@ -434,59 +483,6 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
         np.savetxt(f'./results/{case}_res.csv', results, delimiter=',', header=header, comments='')
 
         
-    if plotting:
-        r_small = drone.small_props[0].r
-        r_plotting = (r_main[:-1] + r_main[1:])*0.5
-        r_plotting_small = (r_small[:-1] + r_small[1:])*0.5
-
-        fig, axs = plt.subplots(2, 3, figsize=(10, 15))
-
-        # Plot inflow angle
-        axs[0, 0].plot(r_plotting, np.rad2deg(inflowangle[:main_n-1]))
-        axs[0, 0].set_xlabel('Collocation Points')
-        axs[0, 0].set_ylabel('Inflow Angle (degrees)')
-        axs[0, 0].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), np.rad2deg(inflowangle[start:stop]), label='small')
-        axs[0, 0].legend()
-
-        # # Plot axial vel30ocity
-        # axs[0, 1].plot(r_plotting, v_axial[:main_n-1])
-        # axs[0, 1].set_xlabel('Collocation Points')
-        # axs[0, 1].set_ylabel('Axial Velocity (m/s)')
-
-        # Plort alpha 
-        axs[0, 1].plot(r_plotting, alpha[:main_n-1])
-        axs[0, 1].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), alpha[start:stop], label='small')
-        axs[0, 1].set_xlabel('Collocation Points')
-        axs[0, 1].set_ylabel('Alpha (degrees)')
-        axs[0, 1].set_title('Alpha')
-        axs[0, 1].legend()
-
-        # Plot Faxial 
-        axs[0, 2].plot(r_plotting, Faxial)
-        axs[0, 2].set_xlabel('Collocation Points')
-        axs[0, 2].set_ylabel('Axial Force (N)')
-
-
-        # Plot tangential velocity
-        axs[1, 0].plot(r_plotting, -v_tangential[:main_n-1])
-        axs[1, 0].set_xlabel('Collocation Points')
-        axs[1, 0].set_ylabel('Tangential Velocity (m/s)')
-
-        # Plot circulation (Gamma)
-        axs[1, 1].plot(r_plotting, Gammas[:main_n-1])
-        axs[1, 1].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), Gammas[start:stop], label='small')
-        axs[1, 1].set_xlabel('Collocation Points')
-        axs[1, 1].set_ylabel('Circulation (Gamma)')
-        axs[1, 1].legend()
-
-        # Plot Ftan
-        axs[1, 2].plot(r_plotting, Ftan)
-        axs[1, 2].set_xlabel('Collocation Points')
-        axs[1, 2].set_ylabel('Tangential Force (N)')
-
-
-        plt.tight_layout()
-        plt.show()
     drone.total_collocation_points = total_colloc_points
     drone.total_velocity_vectors = vel_total_output
     drone.axial_velocity = vel_axial_output  

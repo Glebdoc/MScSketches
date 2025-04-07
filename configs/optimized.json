@@ -15,7 +15,7 @@
         "airfoil": "NACA 4412",
         "hub": 0.15,
         "diameter": 2.0,
-        "NB": 3,
+        "NB": 2,
         "chord_root": 0.16,
         "chord_tip": 0.1,
         "pitch_root": 12,
@@ -23,7 +23,7 @@
         "OPERATION": "__",
         "rpm": 370,
         "REFINEMENT": "__",
-        "n": 50,
+        "n": 30,
         "INITIAL": "__",
         "uWake": 2,
         "optimal_AoA": 7.5
@@ -32,8 +32,8 @@
         "POSITIONING": "__",
         "angle": 90,
         "GEOMETRY": "__",
-        "diameter": 0.15,
-        "NB": 3,
+        "diameter": 0.3,
+        "NB": 2,
         "chord_root": 0.02,
         "chord_tip": 0.005,
         "hub": 0.03,
@@ -43,7 +43,7 @@
         "OPERATION": "__",
         "rpm": 10000,
         "REFINEMENT": "__",
-        "n": 20,
+        "n": 15,
         "INITIAL": "__",
         "uWake": 30
     },
@@ -54,8 +54,8 @@
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 111.14351488496582,
-        "Torque": 11.323375935563128,
-        "FM": 0.6525987628123756
+        "Thrust": 75.9853637725068,
+        "Torque": 7.149190299676536,
+        "FM": 0.5540457772449363
     }
 }
