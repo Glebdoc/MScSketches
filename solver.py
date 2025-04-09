@@ -5,135 +5,11 @@ from geometry import Point
 import matplotlib.pyplot as plt
 import pyvista as pv
 import xfoilUtil as xf
-import jax 
-import jax.numpy as jnp
-from matplotlib.colors import ListedColormap, BoundaryNorm
-
-# I believe this whole function is wrong.
-def computeVelocityField(horses, Gammas, plane='YZ', shift=0, discretization=50, plotting=False):
-    # Update horses with the new Gammas
-    for horse, gamma in zip(horses, Gammas):
-        horse.Gamma = gamma
-
-    # Define the plane dimensions
-    if plane == 'YZ':
-        y_range = np.linspace(-1.5, 1.5, discretization)
-        z_range = np.linspace(-5, .5, discretization)
-
-        Y, Z = np.meshgrid(y_range, z_range)
-        N_points = len(Y.flatten())
-        points = np.column_stack((np.ones(N_points)*shift, Y.flatten(), Z.flatten()))
-
-    elif plane == 'XZ':
-        x_range = np.linspace(-1, 1, discretization)
-        z_range = np.linspace(-.5, .5, discretization)
-
-        X, Z = np.meshgrid(x_range, z_range)
-        N_points = len(X.flatten())
-        points = np.column_stack((X.flatten(), np.ones(N_points)*shift, Z.flatten()))
-
-    elif plane == 'XY':
-        x_range = np.linspace(-1., 1., discretization)
-        y_range = np.linspace(-1., 1., discretization)
-
-        X, Y = np.meshgrid(x_range, y_range)
-        N_points = len(X.flatten())
-        points = np.column_stack((X.flatten(), Y.flatten(), np.ones(N_points)*shift))
-
-    u = np.zeros(N_points)
-    v = np.zeros(N_points)
-    w = np.zeros(N_points)
-
-    # Calculate velocity field for each horse
-    for i, horse in tqdm(enumerate(horses), total=len(horses), desc="Velocity field calculation"):
-        u_vector = horse.velocity(points, vectorized=True)
-        u += u_vector[:, 0]
-        v += u_vector[:, 1]
-        w += u_vector[:, 2]
-
-    # Calculate the magnitude of the velocity field
-    magnitude = np.sqrt(u**2 + v**2 + w**2)
-    magnitude[magnitude > 25] = 25  # Cap the magnitude at 25 m/s
-    magnitude = magnitude.reshape((discretization, discretization))
-
-    # Save the magnitude to a file
-    np.savetxt('magnitude.txt', magnitude)
-
-    # Create PyVista mesh for visualization
-    mesh = pv.PolyData(points)  # Create the points from the grid
-    mesh['u'] = u  # Add u velocity component to mesh (use dictionary assignment)
-    mesh['v'] = v  # Add v velocity component to mesh
-    mesh['w'] = w  # Add w velocity component to mesh
-    mesh['magnitude'] = magnitude.flatten()  # Add magnitude of velocity to mesh
-
-    # Set bounds for colormap
-    min_mag = 0
-    max_mag = 25
-
-    # Plot the velocity magnitude using PyVista
-    plotter = pv.Plotter()
-    boring_cmap = plt.get_cmap("plasma", 15)
-
-    #vectors = np.c_[u, v, w]
-
-    #mesh['vectors'] = vectors
-    #glyphs = mesh.glyph(orient='vectors', scale='magnitude', factor=0.05)
-    # Define the number of bands
-    n_bands = 64  
-
-    # Define the colormap
-    cmap = plt.get_cmap("jet", n_bands)  # Creates discrete colors
+import ctypes
 
 
-    # dargs = dict(
-    # scalars="Nodal Displacement",
-    # cmap="jet",
-    # show_scalar_bar=True)
-    grid = pv.StructuredGrid()
-    grid.points = points  # Keep it (N,3), do NOT reshape!
-    grid.dimensions = [discretization, discretization, 1]  # Needed for 2D slices
-    grid["magnitude"] = magnitude.flatten()
-    grid['u'] = mesh['u']
-    grid['v'] = mesh['v']
-    grid['w'] = mesh['w']
+def solve(drone, updateConfig=True, case='main', save=False):
 
-        # Get the scalar range
-    min_val, max_val = grid["magnitude"].min(), grid["magnitude"].max()
-    if max_val > 25:
-        max_val = 25
-
-    # Create discrete bins for the colors
-    levels = np.linspace(min_val, max_val, n_bands + 1)  # n+1 to define edges
-    norm = BoundaryNorm(levels, cmap.N)  # Define discrete color boundaries
-    discrete_cmap = ListedColormap(cmap(np.linspace(0, 1, n_bands)))  # Apply discrete colors
-
-    if plotting:
-        pl = pv.Plotter(shape=(2, 2))
-        pl.subplot(0, 0)
-        pl.add_mesh(grid, scalars='u', cmap='jet')
-        pl.add_text("u", color='k')
-        pl.subplot(0, 1)
-        pl.add_mesh(grid.copy(),  scalars='v', cmap='jet')
-        pl.add_text("v", color='k')
-        pl.subplot(1, 0)
-        pl.add_mesh(grid.copy(),  scalars='w', cmap='jet')
-        pl.add_text("w", color='k')
-        pl.subplot(1, 1)
-        pl.add_mesh(grid.copy(),  scalars='magnitude', cmap=discrete_cmap, clim=[min_mag, max_mag], show_scalar_bar=True)
-        pl.add_text("magnitude", color='k')
-        pl.link_views()
-        pl.camera_position = 'iso'
-        pl.background_color = 'white'
-        pl.show()
-
-    # Return the velocity components
-    return u, v, w
-
-
-
-
-def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
-    # Polar data
     updateReynolds = False  
     ReInfluence = drone.reynolds
     wind = drone.wind
@@ -145,10 +21,19 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     
     collocN = (main_NB * (main_n - 1) + main_NB * small_NB * (small_n - 1))
 
+    u_influences = np.zeros((collocN, collocN))
+    v_influences = np.zeros((collocN, collocN))
+    w_influences = np.zeros((collocN, collocN))
+
+    Gammas = np.ones((collocN, 1))
+
+    mainCollocPoints = np.zeros((main_NB * (main_n - 1), 3))
+    smallCollocPoints = np.zeros((main_NB * small_NB * (small_n - 1), 3))
+
     if ReInfluence:
         polars =[]
         try: 
-            re_estimate = np.genfromtxt('./Reynolds.txt')
+            re_estimate = np.genfromtxt('./Reynolds.txt') # This is wrong adjust it !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if len(re_estimate) != collocN:
                 updateReynolds = True
                 ReInfluence = False
@@ -163,15 +48,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
         clPolar = data[:, 1]
         cdPolar = data[:, 2]  
 
-
-    u_influences = np.zeros((collocN, collocN))
-    v_influences = np.zeros((collocN, collocN))
-    w_influences = np.zeros((collocN, collocN))
-
-    Gammas = np.ones((collocN, 1))
-
-    mainCollocPoints = np.zeros((main_NB * (main_n - 1), 3))
-    smallCollocPoints = np.zeros((main_NB * small_NB * (small_n - 1), 3))
+    
 
     main_colloc = np.array(drone.main_prop.collocationPoints)
   
@@ -184,21 +61,30 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
             smallCollocPoints[i * small_NB * (small_n - 1) + j * (small_n - 1): i * small_NB * (small_n - 1) + (j + 1) * (small_n - 1)] = small_colloc[j].T
 
     total_colloc_points = np.concatenate((mainCollocPoints, smallCollocPoints))
-    total_horses = drone.main_prop.horseShoes + [horse for prop in drone.small_props for horse in prop.horseShoes]
-    
+    table = np.array(drone.vortexTABLE)
+
     if updateConfig:
-        for i, horse in tqdm(enumerate(total_horses), total=len(total_horses), desc="Influence calculation"):
-            u_vector = horse.velocity(total_colloc_points, vectorized=True)
-            u_influences[:, i] = u_vector[:, 0]
-            v_influences[:, i] = u_vector[:, 1]
-            w_influences[:, i] = u_vector[:, 2]
-        np.savetxt('u_influences.txt', u_influences)
-        np.savetxt('v_influences.txt', v_influences)
-        np.savetxt('w_influences.txt', w_influences)
+        mylib = ctypes.CDLL("./mylib.so")  
+        
+        N = len(total_colloc_points)  # Number of collocation points
+        T = len(table)  # Number of vortices
+
+        collocationPoints_ptr = total_colloc_points.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        vortexTable_ptr = table.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        uInfluence_ptr = u_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        vInfluence_ptr = v_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        wInfluence_ptr = w_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        start = time.time()
+        res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
+        time2 = time.time() - start
+        print("C function execution time:", time2, "seconds", res)
+        np.savetxt('u_influencesC.txt', u_influences)
+        np.savetxt('v_influencesC.txt', v_influences)
+        np.savetxt('w_influencesC.txt', w_influences)
     else:
-        u_influences = np.loadtxt('u_influences.txt')
-        v_influences = np.loadtxt('v_influences.txt')
-        w_influences = np.loadtxt('w_influences.txt')
+        u_influences = np.loadtxt('u_influencesC.txt')
+        v_influences = np.loadtxt('v_influencesC.txt')
+        w_influences = np.loadtxt('w_influencesC.txt')
     
 
     v_axial = np.zeros((collocN, 1))
@@ -251,10 +137,10 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
 
 
 
-    weight = 0.3
+    weight = 0.05
     err = 1.0
     iter = 0
-    while (err > 1e-6 and iter<500):
+    while (err > 1e-6 and iter<1000):
         iter+=1
         u = u_influences@Gammas
         v = v_influences@Gammas
@@ -289,7 +175,6 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
         inflowangle = np.arctan(v_axial/v_tangential)
         twist[main_NB*(main_n-1):] = inflowangle[main_NB*(main_n-1):]*180/np.pi + 5
         alpha = twist -  inflowangle*180/np.pi
-        #Cl = np.interp(alpha, alphaPolar, clPolar)
         if ReInfluence:
             Cl = np.zeros((collocN,1))
             for i in range(collocN):
@@ -300,6 +185,11 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
         Gammas  = weight * Cl * 0.5 * chords* v_mag + (1-weight)*Gammas_old
 
         err = np.linalg.norm(Gammas - Gammas_old)
+    if iter == 1000:
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        print('Max iterations reached')
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+    print(f'Iteration: {iter}, Error: {err}')
 
 
     mean_axial_main = v_axial[:main_NB*(main_n-1)].mean()
@@ -330,9 +220,7 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
     Torque = np.sum(Ftan * r)*main_NB
     Thrust = Faxial.sum() * main_NB
     print('----------------------------------')
-    
-    # print('Tip thrust required:', (Torque.sum()/(drone.main_prop.diameter/2))/main_NB, 'N')
-    # print('Tip thrust required:', (Torque.sum()/(drone.main_prop.diameter/2))/main_NB*1000/9.81, 'g')
+
     computed_power = Torque.sum()*drone.main_prop.RPM*2*np.pi/60
     
 
@@ -387,10 +275,26 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
 
     # save results to csv 
     if save:
+        table_final = table.copy()
+        hsN = 0 
+        for i in range(len(table)):
+            if i==0:
+                table[i][-1] = Gammas[0]
+                continue
+        if table[i][-1] != table[i-1][-1]:
+            hsN += 1
+            table[i][-1] = Gammas[hsN]
+        else:
+            table[i][-1] = Gammas[hsN]
+            
+        np.savetxt('table_final.txt', table_final)
+
         misc  = np.zeros((main_n-1))
         misc[0] = Thrust
         misc[1] = Torque
         misc[2] = LD
+        misc[3] = FM
+        misc[4] = power_required/total_power
         results = np.column_stack((r, 
                                 v_axial[:main_n-1].flatten(), 
                                 v_tangential[:main_n-1].flatten(), 
@@ -403,62 +307,10 @@ def solve(drone, plotting=False, updateConfig=True, case='main', save=False):
         case = case.replace('.json', '')
         np.savetxt(f'./results/{case}_res.csv', results, delimiter=',', header=header, comments='')
 
-        
-    if plotting:
-        r_small = drone.small_props[0].r
-        r_plotting = (r_main[:-1] + r_main[1:])*0.5
-        r_plotting_small = (r_small[:-1] + r_small[1:])*0.5
 
-        fig, axs = plt.subplots(2, 3, figsize=(10, 15))
-
-        # Plot inflow angle
-        axs[0, 0].plot(r_plotting, np.rad2deg(inflowangle[:main_n-1]))
-        axs[0, 0].set_xlabel('Collocation Points')
-        axs[0, 0].set_ylabel('Inflow Angle (degrees)')
-        axs[0, 0].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), np.rad2deg(inflowangle[start:stop]), label='small')
-        axs[0, 0].legend()
-
-        # # Plot axial vel30ocity
-        # axs[0, 1].plot(r_plotting, v_axial[:main_n-1])
-        # axs[0, 1].set_xlabel('Collocation Points')
-        # axs[0, 1].set_ylabel('Axial Velocity (m/s)')
-
-        # Plort alpha 
-        axs[0, 1].plot(r_plotting, alpha[:main_n-1])
-        axs[0, 1].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), alpha[start:stop], label='small')
-        axs[0, 1].set_xlabel('Collocation Points')
-        axs[0, 1].set_ylabel('Alpha (degrees)')
-        axs[0, 1].set_title('Alpha')
-        axs[0, 1].legend()
-
-        # Plot Faxial 
-        axs[0, 2].plot(r_plotting, Faxial)
-        axs[0, 2].set_xlabel('Collocation Points')
-        axs[0, 2].set_ylabel('Axial Force (N)')
-
-
-        # Plot tangential velocity
-        axs[1, 0].plot(r_plotting, -v_tangential[:main_n-1])
-        axs[1, 0].set_xlabel('Collocation Points')
-        axs[1, 0].set_ylabel('Tangential Velocity (m/s)')
-
-        # Plot circulation (Gamma)
-        axs[1, 1].plot(r_plotting, Gammas[:main_n-1])
-        axs[1, 1].plot(np.linspace(r_plotting[0], r_plotting[-1], len(r_small)-1), Gammas[start:stop], label='small')
-        axs[1, 1].set_xlabel('Collocation Points')
-        axs[1, 1].set_ylabel('Circulation (Gamma)')
-        axs[1, 1].legend()
-
-        # Plot Ftan
-        axs[1, 2].plot(r_plotting, Ftan)
-        axs[1, 2].set_xlabel('Collocation Points')
-        axs[1, 2].set_ylabel('Tangential Force (N)')
-
-
-        plt.tight_layout()
-        plt.show()
     drone.total_collocation_points = total_colloc_points
     drone.total_velocity_vectors = vel_total_output
     drone.axial_velocity = vel_axial_output  
     drone.tangential_velocity = vel_tangential_output
-    return abs(mean_axial_main), abs(mean_axial_small), total_horses, Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power
+    
+    return abs(mean_axial_main), abs(mean_axial_small), None, Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power

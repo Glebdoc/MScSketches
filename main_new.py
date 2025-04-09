@@ -21,16 +21,16 @@ OPTIMIZATION = False
 #############################
 
 # _______ INPUTS _______
-config_files = ['vladIscrazy.json' ]
+config_files = ['vladIscrazy.json']
 output_title = 'vladIscrazy'
 
 # _______ Solver _______
 err_desired = 1e-1
 max_iter = 50
 RPM_small = 10_000
-RPM_main = 1700
-small_U = 107
-main_U = 5.6
+RPM_main = 800
+small_U = 60
+main_U = 5
 weight = 0.5
 
 for config in config_files:
@@ -54,7 +54,7 @@ for config in config_files:
 
             old_main_U = main_U 
             old_small_U = small_U
-            main_U_new, small_U_new, _,_,_, created_moment, Torque, Thrust, power_required, _,_= solve(drone, case=f'{config}', plotting=False, updateConfig=True)
+            main_U_new, small_U_new, _,_,_, created_moment, Torque, Thrust, power_required, _,_= solve(drone, case=f'{config}', updateConfig=True)
 
             # update main_U and small_U using gradient descent
             main_U = main_U_new*(1-weight) + weight * main_U
@@ -78,8 +78,8 @@ for config in config_files:
 
     if SAVE_RESULTS:
         drone = defineDrone(config, main_U, small_U, RPM_main, RPM_small)
-        main_U, small_U, horses, Gammas, FM, created_moment, Torque, Thrust, power_required, _,_= solve(drone, case=f'{config}', plotting=False, updateConfig=False, save=True)
-        u, v , w = computeVelocityField(horses, Gammas, plane='XY', shift=-2, discretization=300, plotting=True)
+        main_U, small_U, horses, Gammas, FM, created_moment, Torque, Thrust, power_required, _,_= solve(drone, case=f'{config}', updateConfig=False, save=True)
+        #u, v , w = computeVelocityField(plane='XY', shift=-2, discretization=100, plotting=True)
         with open(f'configs/{config}', 'r') as f:
             config_data = json.load(f)
         

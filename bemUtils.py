@@ -2,7 +2,10 @@ import numpy as np
 import pyvista as pv
 import matplotlib.pyplot as plt
 import os, json
+import time 
+import ctypes
 from geometry import*
+from matplotlib.colors import ListedColormap, BoundaryNorm
 
 def get_axis_vectors(length=1.5):
     """
@@ -209,6 +212,100 @@ def twistGen(in_hub, in_tip, r, AoA):
     twist = k/r + m
     return twist
 
+def computeVelocityField(plane='YZ', shift=0, discretization=50, plotting=False):
+    vortexTable = np.loadtxt('table_final.txt')
+
+    if plane == 'YZ':
+        y_range = np.linspace(-1.5, 1.5, discretization)
+        z_range = np.linspace(-5, .5, discretization)
+
+        Y, Z = np.meshgrid(y_range, z_range)
+        N_points = len(Y.flatten())
+        points = np.column_stack((np.ones(N_points)*shift, Y.flatten(), Z.flatten()))
+
+    elif plane == 'XZ':
+        x_range = np.linspace(-1, 1, discretization)
+        z_range = np.linspace(-.5, .5, discretization)
+
+        X, Z = np.meshgrid(x_range, z_range)
+        N_points = len(X.flatten())
+        points = np.column_stack((X.flatten(), np.ones(N_points)*shift, Z.flatten()))
+
+    elif plane == 'XY':
+        x_range = np.linspace(-1., 1., discretization)
+        y_range = np.linspace(-1., 1., discretization)
+
+        X, Y = np.meshgrid(x_range, y_range)
+        N_points = len(X.flatten())
+        points = np.column_stack((X.flatten(), Y.flatten(), np.ones(N_points)*shift))
+
+    u = np.zeros(N_points)
+    v = np.zeros(N_points)
+    w = np.zeros(N_points)
+
+    mylib = ctypes.CDLL("./mylib.so")
+
+    T = len(vortexTable) 
+    table_ptr = vortexTable.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    points_ptr = points.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    u_ptr = u.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    v_ptr = v.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    w_ptr = w.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+
+    start = time.time()
+    mylib.computeVelocityField(N_points, T, points_ptr, table_ptr, u_ptr, v_ptr, w_ptr)
+
+    time2 = time.time() - start
+    print("C Fields function execution time:", time2, "seconds")
+
+
+    magnitude = np.sqrt(u**2 + v**2 + w**2)
+    magnitude[magnitude > 25] = 25  # Cap the magnitude at 25 m/s
+    magnitude = magnitude.reshape((discretization, discretization))
+
+    # Create PyVista mesh for visualization
+    mesh = pv.PolyData(points)  # Create the points from the grid
+    mesh['u'] = u  # Add u velocity component to mesh (use dictionary assignment)
+    mesh['v'] = v  # Add v velocity component to mesh
+    mesh['w'] = w  # Add w velocity component to mesh
+    mesh['magnitude'] = magnitude.flatten()  # Add magnitude of velocity to mesh
+
+    # Set bounds for colormap
+    min_mag = 0
+    max_mag = 25
+    n_bands = 64  
+    cmap = plt.get_cmap("jet", n_bands)  # Creates discrete colors
+
+    grid = pv.StructuredGrid()
+    grid.points = points  # Keep it (N,3), do NOT reshape!
+    grid.dimensions = [discretization, discretization, 1]  # Needed for 2D slices
+    grid["magnitude"] = magnitude.flatten()
+    grid['u'] = u
+    grid['v'] = v
+    grid['w'] = w
+
+    discrete_cmap = ListedColormap(cmap(np.linspace(0, 1, n_bands)))  # Apply discrete colors
+
+    if plotting:
+        pl = pv.Plotter(shape=(2, 2))
+        pl.subplot(0, 0)
+        pl.add_mesh(grid, scalars='u', cmap='jet')
+        pl.add_text("u", color='k')
+        pl.subplot(0, 1)
+        pl.add_mesh(grid.copy(),  scalars='v', cmap='jet')
+        pl.add_text("v", color='k')
+        pl.subplot(1, 0)
+        pl.add_mesh(grid.copy(),  scalars='w', cmap='jet')
+        pl.add_text("w", color='k')
+        pl.subplot(1, 1)
+        pl.add_mesh(grid.copy(),  scalars='magnitude', cmap=discrete_cmap, clim=[min_mag, max_mag], show_scalar_bar=True)
+        pl.add_text("magnitude", color='k')
+        pl.link_views()
+        pl.camera_position = 'iso'
+        pl.background_color = 'white'
+        pl.show()
+
+    return u, v, w
 
 def contractionCoefficients(y_close, z_close, z_far, R):
     """

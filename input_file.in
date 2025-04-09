@@ -2,9 +2,9 @@ LOAD ./airfoil/dat_files/NACA 0012.dat
 NACA 0012
 PANE
 OPER
-Visc 30000.0
+Visc 48405.79710144928
 PACC
-./airfoil/data/NACA 0012Re30000.0.txt
+./airfoil/data/NACA 0012Re48405.79710144928.txt
 
 ITER 150
 ASeq 0 15 0.5
