@@ -41,7 +41,7 @@ def genDataBase(airfoil_name, Re, max_runtime):
             createInputFile(airfoil, re)
             try:
                 start_time = time.time()
-                process = subprocess.Popen("./xfoil.exe< input_file.in", shell=True)
+                process = subprocess.Popen("xfoil.exe< input_file.in", shell=True)
                 while process.poll() is None:
                     elapsed_time = time.time() - start_time
                     if elapsed_time > max_runtime:
@@ -87,7 +87,7 @@ def plotAirfoilPolars(airfoilName):
 
 Re = np.linspace(20_000, 1_000_000, 70)
 genDataBase(airfoil_name, Re, max_runtime)
-# plotAirfoilPolars("NACA 0012")
+#plotAirfoilPolars("NACA 0012")
 
 # provided Re as a single number and airfoil name, choose 2 closest polar files and interpolate the data
 
