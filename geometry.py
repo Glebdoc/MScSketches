@@ -4,8 +4,6 @@ import bemUtils as bu
 import timeit
 import json
 import xfoilUtil as xfu
-import jax 
-import jax.numpy as jnp
 
 
 class Point:
@@ -35,93 +33,6 @@ class Vortex(Point):
         self.z2 = point2.z
         self.Gamma = Gamma
 
-    def crossX(self, x, y, z):
-        return (y - self.y1)*(z - self.z2) - (z - self.z1)*(y - self.y2)
-    
-    def crossY(self, x, y, z):
-        return (z - self.z1)*(x - self.x2) - (x - self.x1)*(z - self.z2)
-    
-    def crossZ(self, x, y, z):
-        return (x - self.x1)*(y - self.y2) - (y - self.y1)*(x - self.x2)
-    
-    def crossMag(self, x, y, z):
-        return np.sqrt(self.crossX(x, y, z)**2 + self.crossY(x, y, z)**2 + self.crossZ(x, y, z)**2)
-
-
-    def dot1(self, x, y, z):
-        return (self.x2 - self.x1)*(x - self.x1) + (self.y2 - self.y1)*(y - self.y1) + (self.z2 - self.z1)*(z - self.z1)
-    
-    def dot2(self, x, y, z):
-        return (self.x2 - self.x1)*(x - self.x2) + (self.y2 - self.y1)*(y - self.y2) + (self.z2 - self.z1)*(z - self.z2)
-    
-    def r1(self, x, y, z):
-        return np.sqrt((x - self.x1)**2 + (y - self.y1)**2 + (z - self.z1)**2)
-    
-    def r2(self, x, y, z): 
-        return np.sqrt((x - self.x2)**2 + (y - self.y2)**2 + (z - self.z2)**2)
-    
-
-    def length(self):
-        return np.sqrt((self.x2 - self.x1)**2 + (self.y2 - self.y1)**2)
-    
-    def velocity(self, point):
-        """Optimized velocity function maintaining correctness."""
-        x, y, z = point.x, point.y, point.z
-
-        cross_vec = np.array([self.crossX(x, y, z), self.crossY(x, y, z), self.crossZ(x, y, z)])
-
-        # Compute cross magnitude
-        #crossMag = self.crossMag(x, y, z)
-        crossMag =np.linalg.norm(cross_vec, axis=0)
-        if crossMag < 1e-6:
-            return np.zeros(3)
-
-        # Compute r1 and r2
-        r1, r2 = self.r1(x, y, z), self.r2(x, y, z)
-        if r1 < 1e-6 or r2 < 1e-6:
-            return np.zeros(3)
-
-        # Compute dot products
-        dot1, dot2 = self.dot1(x, y, z), self.dot2(x, y, z)
-
-        # Compute K factor
-        K = (self.Gamma / (4 * np.pi * crossMag**2)) * (dot1 / r1 - dot2 / r2)
-
-        
-
-        # Compute cross product result
-        
-
-        return K * cross_vec
-
-    def velocity_vectorized(self, points):
-        x, y, z = points[:, 0], points[:, 1], points[:, 2]
-
-        cross_vec = np.array([self.crossX(x, y, z), self.crossY(x, y, z), self.crossZ(x, y, z)]).T
-
-        # Compute cross magnitude
-        #crossMag = self.crossMag(x, y, z)
-        crossMag = np.linalg.norm(cross_vec, axis=1)
-
-        mask = crossMag < 1e-6
-        crossMag[mask] = 1
-        # Compute r1 and r2
-        r1, r2 = self.r1(x, y, z), self.r2(x, y, z)
-        r1[r1 < 1e-6] = 1e-5
-        r2[r2 < 1e-6] = 1e-5
-
-        # Compute dot products
-        dot1, dot2 = self.dot1(x, y, z), self.dot2(x, y, z)
-
-        # Compute K factor
-        K = (self.Gamma / (4 * np.pi * crossMag**2)) * (dot1 / r1 - dot2 / r2)
-
-        K[mask] = 0
-
-        # Compute cross product result
-
-        return K[:, np.newaxis] * cross_vec
-
     def translate(self, translation):
         self.x1 += translation.x
         self.y1 += translation.y
@@ -147,23 +58,6 @@ class HorseShoe(Vortex):
         self.centre = centre
         self.rightset = right
         
-
-    def velocity(self, point, vectorized=False):
-        vort1 = 0
-        vort3 = 0
-        for i in range(len(self.leftset)):
-            if vectorized:
-                vort1 += self.leftset[i].velocity_vectorized(point)
-                vort3 += self.rightset[i].velocity_vectorized(point)
-            else:
-                vort1 += self.leftset[i].velocity(point)
-                vort3 += self.rightset[i].velocity(point)
-        if vectorized:
-            vort2 = self.centre.velocity_vectorized(point)
-        else:
-            vort2 = self.centre.velocity(point)
-        return vort1 + vort2 + vort3
-
     
     def get_plot_data(self, start_index=0):
 
@@ -214,6 +108,7 @@ class HorseShoe(Vortex):
 class Propeller():
     def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='uniform', bodyIndex=0, small=False, main_rotor=None, contraction=True):
         self.diameter = diameter
+        self.position = position
         self.small = small
         self.angles = np.array(angles)
         self.NB = NB
@@ -238,24 +133,30 @@ class Propeller():
             self.bendSmallWake()
         self.rotate(*self.angles)
         self.translate(position)
+        self.fillVotexTable()
+
+    def fillVotexTable(self):
+        for i in range(len(self.horseShoes)):
+            horse = self.horseShoes[i]
+            for j in range(len(horse.leftset)):
+                local_vortex = horse.leftset[j] 
+                self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i, local_vortex.Gamma])
+                local_vortex = horse.rightset[j]
+                self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i, local_vortex.Gamma])
+            local_vortex = horse.centre
+            self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i, local_vortex.Gamma])
+        self.vortexTABLE = np.array(self.vortexTABLE)
         
     def bendSmallWake(self):
-        ppr = 16 
-        omega = 2*np.pi*self.RPM/60
-        length = self.diameter*self.wake_length
-        total_time = length/self.U
-        nrevs = total_time*omega/(2*np.pi)
-        total_steps = int(nrevs*ppr)
-        dt = np.linspace(0, total_time, total_steps)
-        zw = -self.U*dt
 
-        tempR = 0.7
+        zw = np.array(self.zw)
+        tempR = np.sqrt(self.position.x**2 + self.position.y**2)
+
         for i in range(len(self.horseShoes)):
             horse = self.horseShoes[i]
             for j in range(len(horse.leftset)):
                 if j==0:
                     continue
-
                 #Update left vortex
                 vortex = horse.leftset[j]
 
@@ -307,22 +208,17 @@ class Propeller():
 
 
     def assemble(self, main_rotor=None, contraction=True):
-        # wake
-        # I want to have D number of points per revolution of the propeller
-        # I call them points per rev (ppr)
-        ppr = 16 
+        ppr = 30 
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
         total_time = length/self.U
-        # how much time does 1 rev take?
-        # or rather how many revs can I fit in the wake?
         nrevs = total_time*omega/(2*np.pi)
         total_steps = int(nrevs*ppr)
 
-
         dt = np.linspace(0, total_time, total_steps)
-        zw = -self.U*dt # + angle etc
+        zw = -self.U*dt 
         self.zw = zw
+
         # left vortex
         horseShoes = []
 
@@ -343,18 +239,12 @@ class Propeller():
                 xwr = self.r[i+1]*np.sin(omega*dt)*mult + self.chord[i+1]
                 ywl = self.r[i]*np.cos(omega*dt)*mult # + angle etc
                 ywr = self.r[i+1]*np.cos(omega*dt)*mult # + angle etc
-                leftVortex = [(Vortex( Point(self.chord[i], self.r[i], 0), Point(0, self.r[i], 0), 0))]
-                self.vortexTABLE.append([self.chord[i], self.r[i], 0, 0, self.r[i], 0, self.bodyIndex*(self.n*self.NB) + j*self.n + i])
-                rightVortex = [(Vortex(Point(0, self.r[i+1], 0), Point(self.chord[i+1], self.r[i+1], 0), 0))]
-                self.vortexTABLE.append([0, self.r[i+1], 0, self.chord[i+1], self.r[i+1], 0, self.bodyIndex*(self.n*self.NB) + j*self.n + i])
+                leftVortex = [(Vortex( Point(self.chord[i], self.r[i], 0), Point(0, self.r[i], 0), 1))] #removed 0 
+                rightVortex = [(Vortex(Point(0, self.r[i+1], 0), Point(self.chord[i+1], self.r[i+1], 0),1))] # removed 0 
                 wakeLeft = []
                 wakeRight = []
                 
                 for k in range(len(xwl)-1):
-                    # aLeft = Point(xwl[k+1], ywl[k+1]*mult[k], zw[k+1])
-                    # bLeft = Point(xwl[k], ywl[k]*mult[k], zw[k])
-                    # aRight = Point(xwr[k], ywr[k]*mult[k], zw[k])
-                    # bRight = Point(xwr[k+1], ywr[k+1]*mult[k], zw[k+1])
 
                     # playing with contraction 
                     aLeft = Point(xwl[k+1], ywl[k+1], zw[k+1])
@@ -363,15 +253,12 @@ class Propeller():
                     bRight = Point(xwr[k+1], ywr[k+1], zw[k+1])
 
                     wakeLeft.append(Vortex(aLeft, bLeft, 1))
-                    #self.vortexTABLE.append([xwl[k+1], ywl[k+1], zw[k+1], xwl[k], ywl[k], zw[k], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
                     wakeRight.append(Vortex(aRight, bRight, 1))
-                    #self.vortexTABLE.append([xwr[k], ywr[k], zw[k], xwr[k+1], ywr[k+1], zw[k+1], self.bodyIndex*(self.n*self.NB) + j*self.n + i])
 
                 leftVortex = leftVortex + wakeLeft
                 rightVortex = rightVortex + wakeRight
 
-                centralVortex = (Vortex(Point(0, self.r[i], 0), Point(0, self.r[i+1], 0), 0))
-                self.vortexTABLE.append([0, self.r[i], 0, 0, self.r[i+1], 0, self.bodyIndex*(self.n*self.NB) + j*self.n + i])
+                centralVortex = (Vortex(Point(0, self.r[i], 0), Point(0, self.r[i+1], 0),1)) # removed 0 
                 horseShoe = HorseShoe(leftVortex, centralVortex, rightVortex)
                 if j != 0:
                     horseShoe.rotate(R)
@@ -389,7 +276,10 @@ class Propeller():
                 
 
     def rotate(self, delta_x=0, delta_y=0, delta_z=0):
+        
+
         self.angles = np.array([delta_x, delta_y, delta_z])
+
         R = bu.rotation_matrix(*self.angles)
 
         for horseShoe in self.horseShoes:
@@ -429,9 +319,6 @@ class Propeller():
 
         plotter.show()
 
-# drone = Drone(main_position, main_angles, main_hub, main_diameter, main_NB, main_pitch, main_RPM, main_chord, main_n,
-#               small_props_angles, small_props_diameter, small_props_NB,
-#               small_props_RPM, small_props_chord, small_props_n)
 
 class Drone:
     def __init__(self, main_position, main_angles, main_hub, main_diameter,
@@ -473,7 +360,7 @@ class Drone:
         if helicopter==False:
             for i in range(main_NB):
                 shift = i*(2*np.pi/main_NB)
-                position = Point(main_R*np.sin(shift), main_R*np.cos(shift), 0)
+                position = Point(main_R*np.sin(shift), main_R*np.cos(shift), 0.05)
 
                 angles = np.array([0,-small_props_angle*np.pi/180,-shift])
                 small_prop = Propeller(position, 
@@ -490,8 +377,14 @@ class Drone:
                                     distribution=small_distribution,
                                     bodyIndex=i+1,
                                     small=True, main_rotor=self.main_prop, contraction=contraction)
+                
+                table = small_prop.vortexTABLE
+                table[:,-1]+=(self.vortexTABLE[-1,-1] + 1) 
+
+                self.vortexTABLE = np.concatenate((self.vortexTABLE, table), axis=0)
+
                 self.small_props.append(small_prop)
-                self.vortexTABLE.extend(small_prop.vortexTABLE)
+
     def translate(self, translation):
         self.main_prop.translate(translation)
         for small_prop in self.small_props:

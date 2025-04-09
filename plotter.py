@@ -1,21 +1,22 @@
 import os, json
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
-def plot(files, show = True, title=False):
+def plot(files, show=True, title=False, misc=True):
+    # Create figure and gridspec
+    fig = plt.figure(figsize=(15, 12))  # Just use plt.figure, not plt.subplots
+    gs = gridspec.GridSpec(3, 3, height_ratios=[1, 3, 3])  # First row for table
 
-    # define a figure with 6 subplots
-    fig, axs = plt.subplots(2, 3, figsize=(15, 10)) 
+    # Subplots: rows 1 and 2
+    axs = np.array([
+        [fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1]), fig.add_subplot(gs[1, 2])],
+        [fig.add_subplot(gs[2, 0]), fig.add_subplot(gs[2, 1]), fig.add_subplot(gs[2, 2])]
+    ])
 
-    # read CFD data 
-    # cfd = np.genfromtxt('./results/cumulativeLift.txt', delimiter=None, skip_header=5)
-    # r = cfd[:, 0]
-    # lift_cumulative = cfd[:, 1]
-    # # now we need to take a derivative of the cumulative lift to get the lift
-    # step = r[1] - r[0]
-    # lift = (lift_cumulative[1:] - lift_cumulative[:-1])
+    labels = ['Thrust', 'Torque', 'LD', 'FM', 'η']
+    table_data = []
 
-    # axs[1, 1].plot(r[:-1], lift, label='CFD', marker='o')
 
     for file in files:
         data = np.genfromtxt(f'./results/{file}_res.csv', delimiter=',', skip_header=1)
@@ -46,10 +47,22 @@ def plot(files, show = True, title=False):
         axs[1, 2].plot(data[:, 0], data[:, 6], label=f'{file}', marker='o')
         axs[1, 2].set_title('r vs Ftan')
         axs[1, 2].legend()
+    
+        if misc:
+            
+            values = data[:5, -1] if data.shape[0] >= 5 else np.zeros(5)
+            row = [file] + [f"{v:.2f}" for v in values]
+            table_data.append(row)
+    col_labels = ['Config'] + labels
+    ax_table = fig.add_subplot(gs[0, :])
+    ax_table.axis('off')
+    table = ax_table.table(cellText=table_data, colLabels=col_labels, loc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.2, 1.5)
     if title:
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 0.75, 1])
         plt.savefig(f'./plots/fig_{title}.png', dpi = 500)
-
     
     if show:
         plt.show()
