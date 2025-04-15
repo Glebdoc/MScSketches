@@ -124,7 +124,8 @@ class Propeller():
             self.r = np.linspace(hub, 1 , n)*diameter*0.5
         self.azimuth = np.array([0, 0, 1])
         self.origin = position
-        self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
+        #self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
+        self.collocationPoints = [np.vstack((self.chord[:self.n-1]*0.5, (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
         self.vortexTABLE = []
         self.horseShoes = None
         self.bodyIndex = bodyIndex
@@ -360,7 +361,7 @@ class Drone:
         if helicopter==False:
             for i in range(main_NB):
                 shift = i*(2*np.pi/main_NB)
-                position = Point(main_R*np.sin(shift), main_R*np.cos(shift), 0.05)
+                position = Point(main_R*np.sin(shift), main_R*np.cos(shift), 0.05) # try 0.05
 
                 angles = np.array([0,-small_props_angle*np.pi/180,-shift])
                 small_prop = Propeller(position, 
@@ -419,6 +420,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         main_pitch_root = config['main_propeller']['pitch_root']
         main_pitch_tip = config['main_propeller']['pitch_tip']
         main_airfoil = config['main_propeller']['airfoil']
+        main_wake_length = config['main_propeller']['wake_length']
 
         if main_U is None:
             main_U = config['main_propeller']['uWake']
@@ -452,6 +454,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         small_pitch_root = config['small_propellers']['pitch_root']
         small_pitch_tip = config['small_propellers']['pitch_tip']
         small_AoA = config['small_propellers']['AoA']
+        small_wake_length = config['small_propellers']['wake_length']
 
         small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
 
@@ -475,7 +478,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
                                     main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
-                                    mainWakeLength=3, smallWakeLength=6, main_U=main_U, small_U = small_U, 
+                                    mainWakeLength=main_wake_length, smallWakeLength=small_wake_length, main_U=main_U, small_U = small_U, 
                                     main_distribution='uniform', small_distribution='uniform', 
                                     contraction=contraction, wind=wind, reynolds=reynolds)
 

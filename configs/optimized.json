@@ -14,7 +14,7 @@
         "GEOMETRY": "__",
         "airfoil": "NACA 4412",
         "hub": 0.1,
-        "diameter": 2.0,
+        "diameter": 2.5,
         "NB": 3,
         "chord_root": 0.16,
         "chord_tip": 0.1,
@@ -23,10 +23,10 @@
         "OPERATION": "__",
         "rpm": 370,
         "REFINEMENT": "__",
-        "n": 20,
+        "n": 19,
         "INITIAL": "__",
         "uWake": 2,
-        "optimal_AoA": 7.5
+        "optimal_AoA": 7.0
     },
     "small_propellers": {
         "POSITIONING": "__",
@@ -34,8 +34,8 @@
         "GEOMETRY": "__",
         "diameter": 0.15,
         "NB": 2,
-        "chord_root": 0.02,
-        "chord_tip": 0.005,
+        "chord_root": 0.06,
+        "chord_tip": 0.02,
         "hub": 0.03,
         "pitch_root": 88,
         "pitch_tip": 20,
@@ -49,13 +49,13 @@
     },
     "settings": {
         "contraction": true,
-        "reynolds": true,
+        "reynolds": false,
         "wind_speed": 0,
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 113.0857838609061,
-        "Torque": 11.270621568897813,
-        "FM": 0.6473487007985977
+        "Thrust": 220.88854219291267,
+        "Torque": 33.39897042515323,
+        "FM": 0.42246410635706133
     }
 }

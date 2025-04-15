@@ -78,13 +78,13 @@ def solve(drone, updateConfig=True, case='main', save=False):
         res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
         time2 = time.time() - start
         print("C function execution time:", time2, "seconds", res)
-        np.savetxt('u_influencesC.txt', u_influences)
-        np.savetxt('v_influencesC.txt', v_influences)
-        np.savetxt('w_influencesC.txt', w_influences)
+        np.savetxt('./aux/u_influences.txt', u_influences)
+        np.savetxt('./aux/v_influences.txt', v_influences)
+        np.savetxt('./aux/w_influences.txt', w_influences)
     else:
-        u_influences = np.loadtxt('u_influencesC.txt')
-        v_influences = np.loadtxt('v_influencesC.txt')
-        w_influences = np.loadtxt('w_influencesC.txt')
+        u_influences = np.loadtxt('./aux/u_influences.txt')
+        v_influences = np.loadtxt('./aux/v_influences.txt')
+        w_influences = np.loadtxt('./aux/w_influences.txt')
     
 
     v_axial = np.zeros((collocN, 1))
@@ -137,10 +137,10 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
 
 
-    weight = 0.05
+    weight = 0.1
     err = 1.0
     iter = 0
-    while (err > 1e-6 and iter<1000):
+    while (err > 1e-5 and iter<10_000):
         iter+=1
         u = u_influences@Gammas
         v = v_influences@Gammas
@@ -173,7 +173,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
             print('Reynolds.txt updated')
             updateReynolds = False
         inflowangle = np.arctan(v_axial/v_tangential)
-        twist[main_NB*(main_n-1):] = inflowangle[main_NB*(main_n-1):]*180/np.pi + 5
+        twist[main_NB*(main_n-1):] = inflowangle[main_NB*(main_n-1):]*180/np.pi + 5  # THSI IS JUST A TRICK FIX IT !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         alpha = twist -  inflowangle*180/np.pi
         if ReInfluence:
             Cl = np.zeros((collocN,1))
@@ -210,8 +210,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
     Lift = 0.5 * 1.225 * Cl[:main_n-1].flatten() * (v_mag[:main_n-1].flatten()**2) * chords[:main_n-1].flatten() * r_steps.flatten()
     Drag = 0.5 * 1.225 * Cd[:main_n-1].flatten() * (v_mag[:main_n-1].flatten()**2) * chords[:main_n-1].flatten() * r_steps.flatten()
-
-    LD= Lift.sum()/Drag.sum()
+    LD= (Lift.sum())/(Drag.sum())
 
     Faxial = Lift * np.cos(inflowangle[:main_n-1].flatten()) - Drag * np.sin(inflowangle[:main_n-1].flatten())
     Ftan = Lift * np.sin(inflowangle[:main_n-1].flatten()) + Drag * np.cos(inflowangle[:main_n-1].flatten())
@@ -223,9 +222,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
     computed_power = Torque.sum()*drone.main_prop.RPM*2*np.pi/60
     
-
     # Compute small propeller thrust and torque
-
     start = main_NB*(main_n-1)
     stop = main_NB*(main_n-1) + (small_n-1)
     lift = 0.5 * 1.225 * Cl[start:stop].flatten() * (v_mag[start:stop].flatten()**2) * chords[start:stop].flatten() * r_small_steps.flatten()
@@ -242,13 +239,14 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
     created_moment = main_NB*Thrust_small*drone.main_prop.diameter/2
     #print("Small Blade Torque", Torque_small.sum(), "Combined torque (to create moment): ", created_moment)  
-    power_required = main_NB*Torque_small.sum()*drone.small_props[0].RPM*2*np.pi/60
+    power_required = main_NB*Torque_small*drone.small_props[0].RPM*2*np.pi/60
+    print("computing power required, used RPM: ", drone.small_props[0].RPM)
     #print("Small Blade Power", Torque_small.sum()*drone.small_props[0].RPM*2*np.pi/60, "Power required: ", power_required)
 
     
 
     # Compute the induced power for the main rotor
-    induced_power = main_NB*(abs(v_axial[:main_n-1].flatten()) * Faxial.flatten()).sum()
+    induced_power = main_NB*(-v_axial[:main_n-1].flatten() * Faxial.flatten()).sum()
     print("Induced power main rotor", induced_power)    
 
     # Compute the profile power for the main rotor
@@ -267,7 +265,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
     p_ideal = Thrust * np.sqrt(Thrust/(2*(drone.main_prop.diameter**2)*np.pi*1.225/4))
     FM = p_ideal/total_power
 
-    print(f"Main Blade Thrust {Thrust:.2f} Main Blade Torque {Torque.sum():.2f} Main Blade Power {computed_power:.2f} T/Q: {Thrust/Torque.sum():.2f} FM:{FM:.2f} Preq/Protor: {power_required/total_power:.2f}")
+    print(f"Main Blade Thrust {Thrust:.2f} Main Blade Torque {Torque:.2f} Main Blade Power {computed_power:.2f} T/Q: {Thrust/Torque:.2f} FM:{FM:.2f} Preq/Protor: {power_required/total_power:.2f}")
     print('----------------------------------')
     
 
@@ -295,6 +293,10 @@ def solve(drone, updateConfig=True, case='main', save=False):
         misc[2] = LD
         misc[3] = FM
         misc[4] = power_required/total_power
+        misc[5] = induced_power 
+        misc[6] = profile_power
+        misc[7] = induced_power + profile_power
+        misc[8] = computed_power
         results = np.column_stack((r, 
                                 v_axial[:main_n-1].flatten(), 
                                 v_tangential[:main_n-1].flatten(), 

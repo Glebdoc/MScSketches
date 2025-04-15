@@ -24,6 +24,7 @@
         "rpm": 370,
         "REFINEMENT": "__",
         "n": 30,
+        "wake_length": 2,
         "INITIAL": "__",
         "uWake": 2,
         "optimal_AoA": 5.0
@@ -44,18 +45,19 @@
         "rpm": 10000,
         "REFINEMENT": "__",
         "n": 10,
+        "wake_length": 5,
         "INITIAL": "__",
         "uWake": 30
     },
     "settings": {
         "contraction": true,
-        "reynolds": true,
+        "reynolds": false,
         "wind_speed": 0,
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 32.22178872354267,
-        "Torque": 2.278744133640729,
-        "FM": 0.9809233182239683
+        "Thrust": 31.27629225772396,
+        "Torque": 2.5314177114138916,
+        "FM": 0.7383810294162881
     }
 }

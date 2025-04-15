@@ -14,7 +14,17 @@ def plot(files, show=True, title=False, misc=True):
         [fig.add_subplot(gs[2, 0]), fig.add_subplot(gs[2, 1]), fig.add_subplot(gs[2, 2])]
     ])
 
-    labels = ['Thrust', 'Torque', 'LD', 'FM', 'η']
+    # misc[0] = Thrust
+    # misc[1] = Torque
+    # misc[2] = LD
+    # misc[3] = FM
+    # misc[4] = power_required/total_power
+    # misc[5] = induced_power 
+    # misc[6] = profile_power
+    # misc[7] = induced_power + profile_power
+    # misc[8] = computed_power
+
+    labels = ['Thrust', 'Torque', 'LD', 'FM', 'η', 'P_ind', 'P_prof', 'P_tot', 'P_comp', 'err']
     table_data = []
 
 
@@ -49,8 +59,9 @@ def plot(files, show=True, title=False, misc=True):
         axs[1, 2].legend()
     
         if misc:
-            
-            values = data[:5, -1] if data.shape[0] >= 5 else np.zeros(5)
+            data[9, -1] = 100*(data[7, -1] - data[8, -1])/data[7, -1]  # err
+            print('error', data[9, -1])
+            values = data[:10, -1] if data.shape[0] >= 10 else np.zeros(10)
             row = [file] + [f"{v:.2f}" for v in values]
             table_data.append(row)
     col_labels = ['Config'] + labels
@@ -66,3 +77,5 @@ def plot(files, show=True, title=False, misc=True):
     
     if show:
         plt.show()
+
+    

@@ -9,6 +9,41 @@ from bemUtils import*
 from geometry import*
 import plotter as myPlt
 from solver import*
+from generator import *
+
+def adaptive_rpm_controller(
+    Torque, created_moment, RPM_small, 
+    err_moment_old, base_lr=1.5, 
+    min_lr=1.001, max_lr=2.0, 
+    sensitivity=0.001
+):
+    # Calculate current error
+    
+    err_moment = np.abs(created_moment - Torque)
+    if err_moment > err_moment_old:
+        lr = base_lr - sensitivity * err_moment
+    else:
+        lr = base_lr + sensitivity * err_moment
+
+    # Clamp lr to stay stable
+    if err_moment < 1:
+        max_lr = 1.01
+        sensitivity = 0.001
+
+    if err_moment < 0.5:
+        max_lr = 1.001
+        sensitivity = 0.0001
+
+    lr = np.clip(lr, min_lr, max_lr)
+    
+    # Adjust RPM based on error direction
+    if created_moment > Torque:
+        RPM_small /= lr
+    else:
+        RPM_small *= lr
+
+    # Return updated values
+    return RPM_small, err_moment, lr
 
 #############################
 # ______ FLAGS ______
@@ -21,15 +56,23 @@ OPTIMIZATION = False
 #############################
 
 # _______ INPUTS _______
-config_files = ['vladIscrazy.json']
-output_title = 'vladIscrazy'
+#config_files = ['Um10Us3.json', 'Um10Us5.json','Um10Us7.json']
+# read base config 
+with open('configs/base.json', 'r') as f:
+    base_config = json.load(f)
+
+variables_to_test = {
+    "main_propeller.NB": [2, 3, 4]
+}
+config_files = generate_flexible_configs(base_config, variables_to_test, case="study")
+output_title = 'NB_influence_rpm1200_D15'
 
 # _______ Solver _______
 err_desired = 1e-1
 max_iter = 50
 RPM_small = 10_000
-RPM_main = 800
-small_U = 60
+RPM_main = 1200
+small_U = 138
 main_U = 5
 weight = 0.5
 
@@ -43,7 +86,11 @@ for config in config_files:
     err = 1
     iter = 0
     err_moment = 1
-    lr = 1.1
+    dcmdRPM = 1.0
+    created_moment_old = 10
+    RPM_small_old = 10_000
+    alpha = 1000
+    lr = 1.3
 
     # load config file
     while err_moment > err_desired and iter<max_iter:
@@ -65,15 +112,41 @@ for config in config_files:
 
             print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}, Small U: {small_U}')
         err_moment_old = err_moment
-        err_moment = np.abs(created_moment - Torque)
-        if err_moment_old < err_moment:
-            lr -= lr*0.01
-        if created_moment > Torque:
-            RPM_small/= lr
+        err_moment = abs(created_moment - Torque)
+
+
+
+        if err_moment <  err_moment_old:
+            lr /= 1.05
+            if lr < 1.003:
+                lr = 1.003
+        if err_moment < 0.5:
+            lr = 1.001
+            
+
+        if created_moment - Torque > 0:
+            RPM_small /= lr
         else:
-            RPM_small*= lr
+            RPM_small *= lr
+
+
+        
+        # print(f'Derivative of created moment: {dcmdRPM}')
+        # created_moment_old = created_moment
+
+        
+        
+        # RPM_small, err_moment, lr = adaptive_rpm_controller(Torque, created_moment, RPM_small, err_moment_old, lr)
+        # if err_moment_old < err_moment:
+        #     lr -= lr*0.001
+        #     if lr < 1.01:
+        #         lr = 1.001
+        # if created_moment > Torque:
+        #     RPM_small/= lr
+        # else:
+        #     RPM_small*= lr
         # update RPMs in the config file
-        print(f'Created moment: {created_moment}, Torque: {Torque}, RPM_small: {RPM_small}')
+        print(f'Created moment: {created_moment}, Torque: {Torque}, RPM_small: {RPM_small} , err_moment: {err_moment}, lr: {lr} iteration: {iter}')
 
 
     if SAVE_RESULTS:
