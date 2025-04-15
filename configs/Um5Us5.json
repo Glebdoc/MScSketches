@@ -24,10 +24,10 @@
         "rpm": 370,
         "REFINEMENT": "__",
         "n": 30,
-        "wake_length": 2,
+        "wake_length": 5,
         "INITIAL": "__",
         "uWake": 2,
-        "optimal_AoA": 5.0
+        "optimal_AoA": 4.5
     },
     "small_propellers": {
         "POSITIONING": "__",
@@ -56,8 +56,8 @@
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 31.27629225772396,
-        "Torque": 2.5314177114138916,
-        "FM": 0.7383810294162881
+        "Thrust": 40.40315838270712,
+        "Torque": 3.1034189001244643,
+        "FM": 0.7991519697481321
     }
 }

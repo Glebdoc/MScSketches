@@ -12,19 +12,19 @@
             0
         ],
         "GEOMETRY": "__",
-        "airfoil": "a18sm",
+        "airfoil": "NACA 0012",
         "hub": 0.1,
         "diameter": 1.5,
-        "NB": 3,
-        "chord_root": 0.14,
-        "chord_tip": 0.08,
-        "pitch_root": 12,
+        "NB": 2,
+        "chord_root": 0.1,
+        "chord_tip": 0.07,
+        "pitch_root": 14,
         "pitch_tip": 4.5,
         "OPERATION": "__",
         "rpm": 370,
         "REFINEMENT": "__",
         "n": 30,
-        "wake_length": 2,
+        "wake_length": 5,
         "INITIAL": "__",
         "uWake": 2,
         "optimal_AoA": 5.0
@@ -33,7 +33,7 @@
         "POSITIONING": "__",
         "angle": 90,
         "GEOMETRY": "__",
-        "diameter": 0.15,
+        "diameter": 0.13,
         "NB": 2,
         "chord_root": 0.02,
         "chord_tip": 0.005,
@@ -56,8 +56,8 @@
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 31.27629225772396,
-        "Torque": 2.5314177114138916,
-        "FM": 0.7383810294162881
+        "Thrust": 6.228903687486652,
+        "Torque": 0.31099804935442443,
+        "FM": 0.718225414629708
     }
 }

@@ -85,8 +85,8 @@ def plotAirfoilPolars(airfoilName):
     plt.ylabel("CL")
     plt.show()
 
-Re = np.linspace(20_000, 1_000_000, 70)
-genDataBase(airfoil_name, Re, max_runtime)
+# Re = np.linspace(20_000, 1_000_000, 70)
+# genDataBase(airfoil_name, Re, max_runtime)
 #plotAirfoilPolars("NACA 0012")
 
 # provided Re as a single number and airfoil name, choose 2 closest polar files and interpolate the data
