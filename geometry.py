@@ -124,8 +124,8 @@ class Propeller():
             self.r = np.linspace(hub, 1 , n)*diameter*0.5
         self.azimuth = np.array([0, 0, 1])
         self.origin = position
-        #self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
-        self.collocationPoints = [np.vstack((self.chord[:self.n-1]*0.5, (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
+        self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
+        #self.collocationPoints = [np.vstack((self.chord[:self.n-1]*0.5, (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
         self.vortexTABLE = []
         self.horseShoes = None
         self.bodyIndex = bodyIndex

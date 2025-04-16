@@ -243,7 +243,11 @@ def computeVelocityField(plane='YZ', shift=0, discretization=50, plotting=False)
     v = np.zeros(N_points)
     w = np.zeros(N_points)
 
-    mylib = ctypes.CDLL("./mylib.so")
+    if os.name == 'nt':
+            mylib = ctypes.CDLL("./mylib.dll")  
+    else:
+        # Assuming Linux or MacOS
+        mylib = ctypes.CDLL("./mylib.so")
 
     T = len(vortexTable) 
     table_ptr = vortexTable.ctypes.data_as(ctypes.POINTER(ctypes.c_double))

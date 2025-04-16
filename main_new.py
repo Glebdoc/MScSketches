@@ -11,40 +11,6 @@ import plotter as myPlt
 from solver import*
 from generator import *
 
-def adaptive_rpm_controller(
-    Torque, created_moment, RPM_small, 
-    err_moment_old, base_lr=1.5, 
-    min_lr=1.001, max_lr=2.0, 
-    sensitivity=0.001
-):
-    # Calculate current error
-    
-    err_moment = np.abs(created_moment - Torque)
-    if err_moment > err_moment_old:
-        lr = base_lr - sensitivity * err_moment
-    else:
-        lr = base_lr + sensitivity * err_moment
-
-    # Clamp lr to stay stable
-    if err_moment < 1:
-        max_lr = 1.01
-        sensitivity = 0.001
-
-    if err_moment < 0.5:
-        max_lr = 1.001
-        sensitivity = 0.0001
-
-    lr = np.clip(lr, min_lr, max_lr)
-    
-    # Adjust RPM based on error direction
-    if created_moment > Torque:
-        RPM_small /= lr
-    else:
-        RPM_small *= lr
-
-    # Return updated values
-    return RPM_small, err_moment, lr
-
 #############################
 # ______ FLAGS ______
 #############################
@@ -62,16 +28,16 @@ with open('configs/base.json', 'r') as f:
     base_config = json.load(f)
 
 variables_to_test = {
-    "main_propeller.NB": [2, 3, 4]
+    "small_propellers.n": [10]
 }
-config_files = generate_flexible_configs(base_config, variables_to_test, case="study")
-output_title = 'NB_influence_rpm1200_D15'
+config_files = generate_flexible_configs(base_config, variables_to_test, case="nS")
+output_title = 'small_n'
 
 # _______ Solver _______
 err_desired = 1e-1
 max_iter = 50
-RPM_small = 10_000
-RPM_main = 900
+RPM_small = 25_000
+RPM_main = 1200
 small_U = 138
 main_U = 5
 weight = 0.5
@@ -86,11 +52,7 @@ for config in config_files:
     err = 1
     iter = 0
     err_moment = 1
-    dcmdRPM = 1.0
-    created_moment_old = 10
-    RPM_small_old = 10_000
-    alpha = 1000
-    lr = 1.3
+    lr = 1.1
 
     # load config file
     while err_moment > err_desired and iter<max_iter:
@@ -111,36 +73,14 @@ for config in config_files:
             iter += 1
 
             print(f'Iteration: {iter}, Error: {err}, Main U: {main_U}, Small U: {small_U}')
-        err_moment_old = err_moment
-        err_moment = abs(created_moment - Torque)
 
-
-
-        # if err_moment <  err_moment_old:
-        #     lr /= 1.05
-        #     if lr < 1.003:
-        #         lr = 1.003
-        # if err_moment < 0.5:
-        #     lr = 1.0005
-            
-
-        # if created_moment - Torque > 0:
-        #     RPM_small /= lr
-        # else:
-        #     RPM_small *= lr
-
-
-        
-        # print(f'Derivative of created moment: {dcmdRPM}')
-        # created_moment_old = created_moment
-
-        
-        
         # RPM_small, err_moment, lr = adaptive_rpm_controller(Torque, created_moment, RPM_small, err_moment_old, lr)
+        err_moment_old = err_moment
+        err_moment = np.abs(created_moment - Torque)
         if err_moment_old < err_moment:
-            lr -= lr*0.001
-            if lr < 1.01:
-                lr = 1.001
+            lr -= lr*0.01
+            if lr < 1.0001:
+                lr = 1.0001
         if created_moment > Torque:
             RPM_small/= lr
         else:
@@ -152,7 +92,7 @@ for config in config_files:
     if SAVE_RESULTS:
         drone = defineDrone(config, main_U, small_U, RPM_main, RPM_small)
         main_U, small_U, horses, Gammas, FM, created_moment, Torque, Thrust, power_required, _,_= solve(drone, case=f'{config}', updateConfig=False, save=True)
-        #u, v , w = computeVelocityField(plane='XY', shift=-2, discretization=100, plotting=True)
+        u, v , w = computeVelocityField(plane='XY', shift=-2, discretization=100, plotting=True)
         with open(f'configs/{config}', 'r') as f:
             config_data = json.load(f)
         
