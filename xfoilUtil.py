@@ -10,13 +10,13 @@ from scipy.interpolate import RegularGridInterpolator
 # airfoil polars for Various Re numbers
 ###
 
-airfoil_name = ["NACA 0012", "a18sm", "NACA 0010", "NACA 2224", "NACA 4412", "NACA 2412", "NACA 4410", "NACA 3412" ]
+airfoil_name = ["NACA 0012", "a18sm" ]
 directory = "./airfoil/dat_files"
 
-alpha_i = 0
-alpha_f = 15
+alpha_i = -5
+alpha_f = 17
 alpha_step = 0.5
-n_iter = 150
+n_iter = 300
 max_runtime = 10  # Max time (in seconds) allowed per XFOIL run
 
 def createInputFile(airfoil_name, Re):
@@ -232,8 +232,8 @@ class PolarDatabase:
 # print("Cl =", Cl)
 # print("Cd =", Cd)
 
-# Re = np.linspace(20_000, 1_000_000, 70)
-# genDataBase(airfoil_name, Re, max_runtime)
+Re = np.linspace(10_000, 5_000_000, 30)
+genDataBase(airfoil_name, Re, max_runtime)
 #plotAirfoilPolars("NACA 0012")
 
 # provided Re as a single number and airfoil name, choose 2 closest polar files and interpolate the data
