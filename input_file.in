@@ -1,13 +1,13 @@
-LOAD ./airfoil/dat_files/NACA 3412.dat
-NACA 3412
+LOAD ./airfoil/dat_files/a18sm.dat
+a18sm
 PANE
 OPER
-Visc 1000000.0
+Visc 5000000.0
 PACC
-./airfoil/data/NACA 3412Re1000000.0.txt
+./airfoil/data/a18smRe5000000.0.txt
 
-ITER 150
-ASeq 0 15 0.5
+ITER 300
+ASeq -5 17 0.5
 
 
 quit
