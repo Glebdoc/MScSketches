@@ -31,24 +31,14 @@ def solve(drone, updateConfig=True, case='main', save=False):
     smallCollocPoints = np.zeros((main_NB * small_NB * (small_n - 1), 3))
 
     if ReInfluence:
-        polars =[]
-        try: 
-            re_estimate = np.genfromtxt('./Reynolds.txt') # This is wrong adjust it !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if len(re_estimate) != collocN:
-                updateReynolds = True
-                ReInfluence = False
-                print('Reynolds.txt needs to be updated for current n_small and n_main')
-            for i in range(collocN):
-                polars.append(xf.getClosestRePolar(re_estimate[i], main_airfoil))
-        except:
-            print('Reynolds.txt not found')
+        db = xf.PolarDatabase("./airfoil/data")
+
     else:
         data = np.loadtxt('./A18.txt', skiprows=12)
         alphaPolar = data[:, 0]
         clPolar = data[:, 1]
         cdPolar = data[:, 2]  
 
-    
 
     main_colloc = np.array(drone.main_prop.collocationPoints)
   
@@ -142,7 +132,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
 
 
-    weight = 0.1
+    weight = 0.03
     err = 1.0
     iter = 0
     while (err > 1e-5 and iter<10_000):
@@ -172,20 +162,17 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
         
         v_mag = np.sqrt(v_axial**2 + v_tangential**2)
-        if updateReynolds:
-            Re = 1.225*v_mag.flatten()*chords.flatten()/1.81e-5
-            np.savetxt('./Reynolds.txt', Re)
-            print('Reynolds.txt updated')
-            updateReynolds = False
+        Re = 1.225*v_mag.flatten()*chords.flatten()/1.81e-5
+
         inflowangle = np.arctan(v_axial/v_tangential)
         twist[main_NB*(main_n-1):] = inflowangle[main_NB*(main_n-1):]*180/np.pi + 5  # THSI IS JUST A TRICK FIX IT !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         alpha = twist -  inflowangle*180/np.pi
         if ReInfluence:
-            Cl = np.zeros((collocN,1))
-            for i in range(collocN):
-                Cl[i] = np.interp(alpha[i], polars[i]["alpha"], polars[i]["CL"])
+
+            Cl, Cd = db.get_cl_cd(main_airfoil, Re, alpha.flatten())
         else:
             Cl = np.interp(alpha, alphaPolar, clPolar)
+
         Gammas_old = Gammas
         Gammas  = weight * Cl * 0.5 * chords* v_mag + (1-weight)*Gammas_old
 
@@ -205,11 +192,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
     r_steps = (r_main[1:] - r_main[:-1])
     r_small_steps = (r_small[1:] - r_small[:-1])
 
-    if ReInfluence:
-        Cd = np.zeros((collocN,1))
-        for i in range(collocN):
-            Cd[i] = np.interp(alpha[i], polars[i]["alpha"], polars[i]["CD"])
-    else:
+    if not ReInfluence:
         Cd = np.interp(alpha, alphaPolar, cdPolar)
 
 

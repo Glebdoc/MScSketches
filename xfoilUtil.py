@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import pandas as pd
+from scipy.interpolate import RegularGridInterpolator
 
 ### The goal of this file is to pre save relevant
 # airfoil polars for Various Re numbers
@@ -85,13 +86,7 @@ def plotAirfoilPolars(airfoilName):
     plt.ylabel("CL")
     plt.show()
 
-# Re = np.linspace(20_000, 1_000_000, 70)
-# genDataBase(airfoil_name, Re, max_runtime)
-#plotAirfoilPolars("NACA 0012")
-
-# provided Re as a single number and airfoil name, choose 2 closest polar files and interpolate the data
-
-def getClosestRePolar(Re, airfoil_name):
+def interpolate_Re_polar(Re, airfoil_name):
     Re_files = []
     for polar in os.listdir("./airfoil/data"):
         if airfoil_name in polar:
@@ -99,8 +94,160 @@ def getClosestRePolar(Re, airfoil_name):
     Re_files = np.array(Re_files)
     Re_files.sort()
 
-    closest_re = Re_files[np.argmin(np.abs(Re_files - Re))]
-    df = pd.read_csv(f"./airfoil/data/{airfoil_name}Re{closest_re}.txt", sep='\s+', skiprows=12, header=None)
-    df.columns = ["alpha", "CL", "CD", "CDp", "CM", "Top_Xtr", "Bot_Xtr"]
-    return df
+
+class PolarDatabase:
+    def __init__(self, folder_path):
+        self.data = {}  # {airfoil: {Re: {'alpha': ..., 'Cl': ..., 'Cd': ...}}}
+        self.interpolators = {}  # {airfoil: {'Cl': ..., 'Cd': ..., 'bounds': ...}}
+        self._load_polars(folder_path)
+        self._build_all_interpolators()
+
+    def _parse_filename(self, filename):
+        name_part = filename.split("Re")
+        airfoil = name_part[0]
+        Re_str = name_part[1].split(".txt")[0]
+        Re = float(Re_str)
+        return airfoil, Re
+
+    def _load_polars(self, folder_path):
+        for filename in os.listdir(folder_path):
+            if not filename.endswith('.txt') or 'Re' not in filename:
+                continue
+            airfoil, Re = self._parse_filename(filename)
+            file_path = os.path.join(folder_path, filename)
+            try:
+                data = np.loadtxt(file_path, skiprows=12)
+                alpha, Cl, Cd = data[:, 0], data[:, 1], data[:, 2]
+                if airfoil not in self.data:
+                    self.data[airfoil] = {}
+                self.data[airfoil][Re] = {'alpha': alpha, 'Cl': Cl, 'Cd': Cd}
+            except Exception as e:
+                print(f"Failed to load {filename}: {e}")
+
+    def _build_all_interpolators(self):
+        for airfoil, re_data in self.data.items():
+            Re_vals = sorted(re_data.keys())
+
+            # Overlapping alpha range
+            alpha_ranges = [re_data[Re]['alpha'] for Re in Re_vals]
+            alpha_min = max(alpha[0] for alpha in alpha_ranges)
+            alpha_max = min(alpha[-1] for alpha in alpha_ranges)
+
+            if alpha_max <= alpha_min:
+                raise ValueError(f"No overlapping alpha range for airfoil '{airfoil}'")
+
+            alpha_common = np.linspace(alpha_min, alpha_max, 100)
+            Cl_array, Cd_array = [], []
+
+            for Re in Re_vals:
+                alpha = re_data[Re]['alpha']
+                Cl = re_data[Re]['Cl']
+                Cd = re_data[Re]['Cd']
+
+                Cl_interp = np.interp(alpha_common, alpha, Cl)
+                Cd_interp = np.interp(alpha_common, alpha, Cd)
+
+                Cl_array.append(Cl_interp)
+                Cd_array.append(Cd_interp)
+
+            Cl_array = np.array(Cl_array)
+            Cd_array = np.array(Cd_array)
+
+            self.interpolators[airfoil] = {
+                'Cl': RegularGridInterpolator((Re_vals, alpha_common), Cl_array, bounds_error=False, fill_value=None),
+                'Cd': RegularGridInterpolator((Re_vals, alpha_common), Cd_array, bounds_error=False, fill_value=None),
+                'bounds': {
+                    'Re': (Re_vals[0], Re_vals[-1]),
+                    'alpha': (alpha_common[0], alpha_common[-1])
+                }
+            }
+
+    def get_cl_cd(self, airfoil, Re_query, alpha_query):
+        if airfoil not in self.interpolators:
+            raise ValueError(f"Airfoil '{airfoil}' not found.")
+
+        Re_query = np.atleast_1d(Re_query)
+        alpha_query = np.atleast_1d(alpha_query)
+
+        if Re_query.shape != alpha_query.shape:
+            raise ValueError("Re_query and alpha_query must have the same shape.")
+
+        bounds = self.interpolators[airfoil]['bounds']
+        Re_min, Re_max = bounds['Re']
+        alpha_min, alpha_max = bounds['alpha']
+
+        Cl_results = []
+        Cd_results = []
+
+        for Re_val, alpha_val in zip(Re_query, alpha_query):
+            within_re_bounds = Re_min <= Re_val <= Re_max
+            within_alpha_bounds = alpha_min <= alpha_val <= alpha_max
+
+            # If Re or alpha is out of bounds, print a message
+            if not within_re_bounds:
+                print(f"Re = {Re_val} is out of bounds [{Re_min}, {Re_max}]")
+            if not within_alpha_bounds:
+                print(f"Alpha = {alpha_val} is out of bounds [{alpha_min}, {alpha_max}]")
+
+            # In bounds → Interpolate
+            if within_re_bounds and within_alpha_bounds:
+                point = (Re_val, alpha_val)
+                Cl = self.interpolators[airfoil]['Cl'](point)
+                Cd = self.interpolators[airfoil]['Cd'](point)
+
+            # Out of bounds → fallback to nearest available polar
+            else:
+                available_res = sorted(self.data[airfoil].keys())
+                closest_re = min(available_res, key=lambda r: abs(r - Re_val))
+                alpha_vals = self.data[airfoil][closest_re]['alpha']
+                Cl_vals = self.data[airfoil][closest_re]['Cl']
+                Cd_vals = self.data[airfoil][closest_re]['Cd']
+
+                closest_idx = np.argmin(np.abs(alpha_vals - alpha_val))
+                Cl = Cl_vals[closest_idx]
+                Cd = Cd_vals[closest_idx]
+
+            Cl_results.append(float(Cl))
+            Cd_results.append(float(Cd))
+
+        # Convert the lists to numpy arrays and reshape to (N, 1)
+        Cl_results = np.array(Cl_results).reshape(-1, 1)
+        Cd_results = np.array(Cd_results).reshape(-1, 1)
+
+        return Cl_results, Cd_results
+
+
+
+
+    def get_bounds(self, airfoil):
+        if airfoil not in self.interpolators:
+            raise ValueError(f"Airfoil '{airfoil}' not found.")
+        return self.interpolators[airfoil]['bounds']
+# directory = "./airfoil/data"
+# db = PolarDatabase(directory)
+# Re_vec = np.array([300_000.0, 400_000.0, 250_000.0])
+# alpha_vec = np.array([10.0, 12.5, 20.0])  # last one might be out of bounds
+
+# Cl, Cd = db.get_cl_cd("a18sm", Re_vec, alpha_vec)
+# print("Cl =", Cl)
+# print("Cd =", Cd)
+
+# Re = np.linspace(20_000, 1_000_000, 70)
+# genDataBase(airfoil_name, Re, max_runtime)
+#plotAirfoilPolars("NACA 0012")
+
+# provided Re as a single number and airfoil name, choose 2 closest polar files and interpolate the data
+
+# def getClosestRePolar(Re, airfoil_name):
+#     Re_files = []
+#     for polar in os.listdir("./airfoil/data"):
+#         if airfoil_name in polar:
+#             Re_files.append(float(polar.split("Re")[1].split(".txt")[0]))
+#     Re_files = np.array(Re_files)
+#     Re_files.sort()
+
+#     closest_re = Re_files[np.argmin(np.abs(Re_files - Re))]
+#     df = pd.read_csv(f"./airfoil/data/{airfoil_name}Re{closest_re}.txt", sep='\s+', skiprows=12, header=None)
+#     df.columns = ["alpha", "CL", "CD", "CDp", "CM", "Top_Xtr", "Bot_Xtr"]
+#     return df
 #getClosestRePolar(137_000, "NACA 0012")
