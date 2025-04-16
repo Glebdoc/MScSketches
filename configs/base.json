@@ -23,7 +23,7 @@
         "OPERATION": "__",
         "rpm": 370,
         "REFINEMENT": "__",
-        "n": 30,
+        "n": 20,
         "wake_length": 10,
         "INITIAL": "__",
         "uWake": 2,
@@ -51,7 +51,7 @@
     },
     "settings": {
         "contraction": true,
-        "reynolds": false,
+        "reynolds": true,
         "wind_speed": 0,
         "wind_angle": 0
     },

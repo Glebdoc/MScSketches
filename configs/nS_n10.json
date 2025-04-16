@@ -23,11 +23,11 @@
         "OPERATION": "__",
         "rpm": 370,
         "REFINEMENT": "__",
-        "n": 30,
+        "n": 20,
         "wake_length": 10,
         "INITIAL": "__",
         "uWake": 2,
-        "optimal_AoA": 6.0,
+        "optimal_AoA": 5.5,
         "aspect_ratio": 11.7647,
         "rotor_solidity": 0.0812
     },
@@ -55,13 +55,13 @@
     },
     "settings": {
         "contraction": true,
-        "reynolds": false,
+        "reynolds": true,
         "wind_speed": 0,
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 6.228903687486652,
-        "Torque": 0.31099804935442443,
-        "FM": 0.718225414629708
+        "Thrust": 275.7809287808696,
+        "Torque": 23.064004097850017,
+        "FM": 0.6003304229375646
     }
 }
