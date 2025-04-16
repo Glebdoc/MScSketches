@@ -35,7 +35,7 @@
         "POSITIONING": "__",
         "angle": 90,
         "GEOMETRY": "__",
-        "diameter": 0.13,
+        "diameter": 0.15,
         "NB": 2,
         "chord_root": 0.02,
         "chord_tip": 0.005,
@@ -50,8 +50,8 @@
         "wake_length": 5,
         "INITIAL": "__",
         "uWake": 30,
-        "aspect_ratio": 5.2,
-        "rotor_solidity": 0.1224
+        "aspect_ratio": 6.0,
+        "rotor_solidity": 0.1061
     },
     "settings": {
         "contraction": true,

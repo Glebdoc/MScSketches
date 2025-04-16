@@ -1,6 +1,6 @@
 from tqdm import tqdm
 import numpy as np
-import time
+import time, os
 from geometry import Point
 import matplotlib.pyplot as plt
 import pyvista as pv
@@ -64,7 +64,12 @@ def solve(drone, updateConfig=True, case='main', save=False):
     table = np.array(drone.vortexTABLE)
 
     if updateConfig:
-        mylib = ctypes.CDLL("./mylib.so")  
+        # check if windows 
+        if os.name == 'nt':
+            mylib = ctypes.CDLL("./mylib.dll")  
+        else:
+            # Assuming Linux or MacOS
+            mylib = ctypes.CDLL("./mylib.so")
         
         N = len(total_colloc_points)  # Number of collocation points
         T = len(table)  # Number of vortices
@@ -78,13 +83,13 @@ def solve(drone, updateConfig=True, case='main', save=False):
         res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr)
         time2 = time.time() - start
         print("C function execution time:", time2, "seconds", res)
-        np.savetxt('./aux/u_influences.txt', u_influences)
-        np.savetxt('./aux/v_influences.txt', v_influences)
-        np.savetxt('./aux/w_influences.txt', w_influences)
+        np.savetxt('./auxx/u_influences.txt', u_influences)
+        np.savetxt('./auxx/v_influences.txt', v_influences)
+        np.savetxt('./auxx/w_influences.txt', w_influences)
     else:
-        u_influences = np.loadtxt('./aux/u_influences.txt')
-        v_influences = np.loadtxt('./aux/v_influences.txt')
-        w_influences = np.loadtxt('./aux/w_influences.txt')
+        u_influences = np.loadtxt('./auxx/u_influences.txt')
+        v_influences = np.loadtxt('./auxx/v_influences.txt')
+        w_influences = np.loadtxt('./auxx/w_influences.txt')
     
 
     v_axial = np.zeros((collocN, 1))
