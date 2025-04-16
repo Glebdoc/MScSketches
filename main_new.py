@@ -71,7 +71,7 @@ output_title = 'NB_influence_rpm1200_D15'
 err_desired = 1e-1
 max_iter = 50
 RPM_small = 10_000
-RPM_main = 1200
+RPM_main = 900
 small_U = 138
 main_U = 5
 weight = 0.5
@@ -116,18 +116,18 @@ for config in config_files:
 
 
 
-        if err_moment <  err_moment_old:
-            lr /= 1.05
-            if lr < 1.003:
-                lr = 1.003
-        if err_moment < 0.5:
-            lr = 1.001
+        # if err_moment <  err_moment_old:
+        #     lr /= 1.05
+        #     if lr < 1.003:
+        #         lr = 1.003
+        # if err_moment < 0.5:
+        #     lr = 1.0005
             
 
-        if created_moment - Torque > 0:
-            RPM_small /= lr
-        else:
-            RPM_small *= lr
+        # if created_moment - Torque > 0:
+        #     RPM_small /= lr
+        # else:
+        #     RPM_small *= lr
 
 
         
@@ -137,14 +137,14 @@ for config in config_files:
         
         
         # RPM_small, err_moment, lr = adaptive_rpm_controller(Torque, created_moment, RPM_small, err_moment_old, lr)
-        # if err_moment_old < err_moment:
-        #     lr -= lr*0.001
-        #     if lr < 1.01:
-        #         lr = 1.001
-        # if created_moment > Torque:
-        #     RPM_small/= lr
-        # else:
-        #     RPM_small*= lr
+        if err_moment_old < err_moment:
+            lr -= lr*0.001
+            if lr < 1.01:
+                lr = 1.001
+        if created_moment > Torque:
+            RPM_small/= lr
+        else:
+            RPM_small*= lr
         # update RPMs in the config file
         print(f'Created moment: {created_moment}, Torque: {Torque}, RPM_small: {RPM_small} , err_moment: {err_moment}, lr: {lr} iteration: {iter}')
 
