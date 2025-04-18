@@ -179,23 +179,20 @@ class PolarDatabase:
         Cl_results = []
         Cd_results = []
 
-        for Re_val, alpha_val in zip(Re_query, alpha_query):
+        for i, (Re_val, alpha_val) in enumerate(zip(Re_query, alpha_query)):
             within_re_bounds = Re_min <= Re_val <= Re_max
             within_alpha_bounds = alpha_min <= alpha_val <= alpha_max
 
-            # If Re or alpha is out of bounds, print a message
             if not within_re_bounds:
-                print(f"Re = {Re_val} is out of bounds [{Re_min}, {Re_max}]")
-            if not within_alpha_bounds:
-                print(f"Alpha = {alpha_val} is out of bounds [{alpha_min}, {alpha_max}]")
+                print(f"[ID {i}] Re = {Re_val:.2f} is out of bounds [{Re_min}, {Re_max}]")
 
-            # In bounds → Interpolate
+            if not within_alpha_bounds:
+                print(f"[ID {i}] Alpha = {alpha_val:.2f} is out of bounds [{alpha_min}, {alpha_max}]")
+
             if within_re_bounds and within_alpha_bounds:
                 point = (Re_val, alpha_val)
                 Cl = self.interpolators[airfoil]['Cl'](point)
                 Cd = self.interpolators[airfoil]['Cd'](point)
-
-            # Out of bounds → fallback to nearest available polar
             else:
                 available_res = sorted(self.data[airfoil].keys())
                 closest_re = min(available_res, key=lambda r: abs(r - Re_val))
@@ -210,11 +207,7 @@ class PolarDatabase:
             Cl_results.append(float(Cl))
             Cd_results.append(float(Cd))
 
-        # Convert the lists to numpy arrays and reshape to (N, 1)
-        Cl_results = np.array(Cl_results).reshape(-1, 1)
-        Cd_results = np.array(Cd_results).reshape(-1, 1)
-
-        return Cl_results, Cd_results
+        return np.array(Cl_results).reshape(-1, 1), np.array(Cd_results).reshape(-1, 1)
 
 
 
@@ -232,8 +225,8 @@ class PolarDatabase:
 # print("Cl =", Cl)
 # print("Cd =", Cd)
 
-Re = np.linspace(10_000, 5_000_000, 30)
-genDataBase(airfoil_name, Re, max_runtime)
+# Re = np.linspace(10_000, 5_000_000, 30)
+# genDataBase(airfoil_name, Re, max_runtime)
 #plotAirfoilPolars("NACA 0012")
 
 # provided Re as a single number and airfoil name, choose 2 closest polar files and interpolate the data

@@ -36,11 +36,14 @@ output_title = 'small_n'
 # _______ Solver _______
 err_desired = 1e-1
 max_iter = 50
+iter_outer =0
 RPM_small = 25_000
 RPM_main = 800
 small_U = 138
 main_U = 5
 weight = 0.5
+upper_bound = 30_000
+lower_bound = 10_000
 
 for config in config_files:
 
@@ -53,9 +56,11 @@ for config in config_files:
     iter = 0
     err_moment = 1
     lr = 1.1
+    
+    RPM_small = upper_bound
 
     # load config file
-    while err_moment > err_desired and iter<max_iter:
+    while err_moment > err_desired and iter_outer<max_iter:
         err = 1
         iter = 0
         while (err > err_desired and iter<max_iter): 
@@ -77,16 +82,35 @@ for config in config_files:
         # RPM_small, err_moment, lr = adaptive_rpm_controller(Torque, created_moment, RPM_small, err_moment_old, lr)
         err_moment_old = err_moment
         err_moment = np.abs(created_moment - Torque)
-        if err_moment_old < err_moment:
-            lr -= lr*0.01
-            if lr < 1.0001:
-                lr = 1.0001
+
+        # Let's try bisection method 
+        if iter_outer == 0 and created_moment < Torque:
+            print('MAX Created moment is less than Torque, adjust boundaries')
+
         if created_moment > Torque:
-            RPM_small/= lr
-        else:
-            RPM_small*= lr
+            midpoint = (upper_bound + lower_bound)/2
+            upper_bound = RPM_small
+            RPM_small = midpoint
+        if created_moment < Torque:
+            midpoint = (upper_bound + lower_bound)/2
+            lower_bound = RPM_small
+            RPM_small = midpoint
+
+
+        
+
+
+        # if err_moment_old < err_moment:
+        #     lr -= lr*0.01
+        #     if lr < 1.001:
+        #         lr = 1.001
+        # if created_moment > Torque:
+        #     RPM_small/= lr
+        # else:
+        #     RPM_small*= lr
         # update RPMs in the config file
-        print(f'Created moment: {created_moment}, Torque: {Torque}, RPM_small: {RPM_small} , err_moment: {err_moment}, lr: {lr} iteration: {iter}')
+        print(f'Created moment: {created_moment}, Torque: {Torque}, RPM_small: {RPM_small} , err_moment: {err_moment}, lr: {lr} iteration: {iter_outer}')
+        iter_outer += 1
 
 
     if SAVE_RESULTS:

@@ -33,6 +33,7 @@ void computeVelocityField(
             double (*v_vec)[1] = (double (*)[1]) v;
             double (*w_vec)[1] = (double (*)[1]) w;
 
+            #pragma omp parallel for
             for (int i=0; i<N; i++){
                 for(int j=0; j<T; j++){
                     double x1 = table[j][0];
@@ -54,7 +55,7 @@ void computeVelocityField(
                     double crossZ = (x - x1)*(y - y2) - (y - y1)*(x - x2);
 
                     double crossMag = sqrt(crossX*crossX + crossY*crossY + crossZ*crossZ);
-                    if (crossMag < 1e-5){
+                    if (crossMag < 1e-3){
                         crossMag = 1; 
                         flagK = 1;
                     }
@@ -143,7 +144,7 @@ int computeInfluenceMatrices(
             double crossZ = (x - x1)*(y - y2) - (y - y1)*(x - x2);
 
             double crossMag = sqrt(crossX*crossX + crossY*crossY + crossZ*crossZ);
-            if (crossMag < 1e-4){
+            if (crossMag < 1e-3){
                 crossMag = 1; 
                 flagK = 1;
             }

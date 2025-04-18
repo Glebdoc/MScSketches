@@ -132,7 +132,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
 
 
-    weight = 0.03
+    weight = 0.15
     err = 1.0
     iter = 0
     while (err > 1e-5 and iter<10_000):
@@ -177,6 +177,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
         Gammas  = weight * Cl * 0.5 * chords* v_mag + (1-weight)*Gammas_old
 
         err = np.linalg.norm(Gammas - Gammas_old)
+        #print(f'Iteration: {iter}, Error: {err}')
     if iter == 1000:
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         print('Max iterations reached')

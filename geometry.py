@@ -106,7 +106,7 @@ class HorseShoe(Vortex):
 
 
 class Propeller():
-    def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='uniform', bodyIndex=0, small=False, main_rotor=None, contraction=True):
+    def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='cosine', bodyIndex=0, small=False, main_rotor=None, contraction=True):
         self.diameter = diameter
         self.position = position
         self.small = small
@@ -118,8 +118,14 @@ class Propeller():
         self.U = U
         self.wake_length = wake_length
         self.chord = chord
+        distribution = 'cosine'
         if distribution == 'cosine':
-            self.r = np.linspace(hub, 1 , n)*diameter*0.5*np.cos(np.linspace(0, np.pi, n))
+            R = diameter*0.5
+            theta = np.linspace(np.arccos(hub/R), np.pi/8,  n)
+            spacing = np.cos(0.5*theta)
+            spacing = (spacing - np.min(spacing)) / (np.max(spacing) - np.min(spacing)) 
+            spacing = spacing *(R - hub) + hub
+            self.r = spacing
         else:
             self.r = np.linspace(hub, 1 , n)*diameter*0.5
         self.azimuth = np.array([0, 0, 1])
