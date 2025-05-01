@@ -100,7 +100,8 @@ int computeInfluenceMatrices(
             double *table_flat,   // 1D pointer
             double *uInfluence_flat, // 1D pointer
             double *vInfluence_flat, // 1D pointer
-            double *wInfluence_flat  // 1D pointer
+            double *wInfluence_flat,  // 1D pointer
+            float CORE
 
         ) {
 
@@ -139,33 +140,42 @@ int computeInfluenceMatrices(
             double y = points[i][1];
             double z = points[i][2];
 
+            double r1 = sqrt((x - x1)*(x - x1) + (y - y1)*(y - y1) + (z - z1)*(z - z1));
+            if (r1 < CORE){
+                continue;
+            }
+            double r2 = sqrt((x - x2)*(x - x2) + (y - y2)*(y - y2) + (z - z2)*(z - z2));
+            if (r2 < CORE){
+                continue;
+            }
+
             double crossX = (y - y1)*(z - z2) - (z - z1)*(y - y2);
             double crossY = (z - z1)*(x - x2) - (x - x1)*(z - z2);
             double crossZ = (x - x1)*(y - y2) - (y - y1)*(x - x2);
 
+
+
             double crossMag = sqrt(crossX*crossX + crossY*crossY + crossZ*crossZ);
-            if (crossMag < 1e-3){
-                crossMag = 1; 
-                flagK = 1;
+
+            double r_0 = sqrt((x1-x2)*(x1-x2) + (y1- y2)*(y1 - y2) + (z1 - z2)*(z1 - z2));
+
+            double d = crossMag/r_0;
+
+            if (d < CORE) {
+                continue;
             }
 
             double dot1  = (x2 - x1)*(x - x1) + (y2 - y1)*(y - y1) + (z2 - z1)*(z - z1);
             double dot2  = (x2 - x1)*(x - x2) + (y2 - y1)*(y - y2) + (z2 - z1)*(z - z2);
 
-            double r1 = sqrt((x - x1)*(x - x1) + (y - y1)*(y - y1) + (z - z1)*(z - z1));
-            if (r1 < 1e-4){
-                r1 = 1e-4; 
-            }
-            double r2 = sqrt((x - x2)*(x - x2) + (y - y2)*(y - y2) + (z - z2)*(z - z2));
-            if (r2 < 1e-4){
-                r2 = 1e-4; 
-            }
+            
 
-            double coef = gamma/(4*PI*crossMag*crossMag);
+            
             if (flagK == 1){
                  K = 0;
             }
             else{
+                 double coef = gamma/(4*PI*crossMag*crossMag);
                  K = coef*(dot1/r1 - dot2/r2);
             }
 
