@@ -183,11 +183,11 @@ class PolarDatabase:
             within_re_bounds = Re_min <= Re_val <= Re_max
             within_alpha_bounds = alpha_min <= alpha_val <= alpha_max
 
-            if not within_re_bounds:
-                print(f"[ID {i}] Re = {Re_val:.2f} is out of bounds [{Re_min}, {Re_max}]")
+            # if not within_re_bounds:
+            #     print(f"[ID {i}] Re = {Re_val:.2f} is out of bounds [{Re_min}, {Re_max}]")
 
-            if not within_alpha_bounds:
-                print(f"[ID {i}] Alpha = {alpha_val:.2f} is out of bounds [{alpha_min}, {alpha_max}]")
+            # if not within_alpha_bounds:
+            #     print(f"[ID {i}] Alpha = {alpha_val:.2f} is out of bounds [{alpha_min}, {alpha_max}]")
 
             if within_re_bounds and within_alpha_bounds:
                 point = (Re_val, alpha_val)

@@ -175,11 +175,38 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
                 coll_points.extend(body.collocationPoints[c].T)
                  
 
-            for i in body.horseShoes:
-                points, lines = i.get_plot_data(start_index)
-                all_points.extend(points)
-                all_lines.extend(lines)
-                start_index += len(points)
+            for i in range(body.vortexTABLE.shape[0]):
+                all_points.append(body.vortexTABLE[i,:3].tolist())
+                all_points.append(body.vortexTABLE[i,3:-2].tolist())
+                all_lines.append([2, start_index, start_index + 1])
+                start_index += 2
+            #     points, lines = i.get_plot_data(start_index)
+            #     all_points.extend(points)
+            #     all_lines.extend(lines)
+            #     start_index += len(points)
+
+                    # plotter = pv.Plotter()
+
+            # lines_data = np.genfromtxt('test_table.txt', delimiter=',')
+
+            # all_points = []
+            # all_lines = []
+
+            # for i in range(len(lines_data)):
+            #     all_points.append( lines_data[i, :3].tolist())  
+            #     all_points.append(lines_data[i, 3:-1].tolist())
+            #     all_lines.append([2, i*2, i*2 + 1])
+
+            # mesh = pv.PolyData()
+            # mesh.points = np.array(all_points)
+            # mesh.lines = np.array(all_lines).flatten()
+
+            # plotter.add_mesh(mesh, color='green', line_width=2)
+            # point_cloud = pv.PolyData(all_points)
+            # plotter.add_points(point_cloud, color='red', point_size=10, render_points_as_spheres=True)
+
+            # plotter.show_grid()
+            # plotter.show()
 
         
             poly_data = pv.PolyData(np.array(all_points))
@@ -353,4 +380,33 @@ def contraction_sigmoid(z, contraction=0.78):
     y = 1 / (1 + np.exp(-k*z)) + 0.5
     
     return y
+
+
+# def cRotate(horse, R):
+#     points = []
+#     for i in range(len(horse.leftset)):
+#         points.append(horse.leftset[i].p1.x, horse.leftset[i].p1.y, horse.leftset[i].p1.z)
+#         points.append(horse.leftset[i].p2.x, horse.leftset[i].p2.y, horse.leftset[i].p2.z)
+#         points.append(horse.rightset[i].p1.x, horse.rightset[i].p1.y, horse.rightset[i].p1.z)
+#         points.append(horse.rightset[i].p2.x, horse.rightset[i].p2.y, horse.rightset[i].p2.z)
+    
+#     points = np.array(points)
+
+#     points_ptr = points.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+#     N = len(points)
+#     points_rotated = np.zeros((N, 3))
+#     points_rotated_ptr = points_rotated.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+#     R_ptr = R.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+
+#     mylib = ctypes.CDLL("./rotate.so")
+
+#     mylib.rotate(points_ptr, points_rotated_ptr, R_ptr, N)
+
+#     # assemble the horseshoe again 
+
+#     leftset = []
+#     rightset = []
+
+#     for i in range((N-2)):
+        
 

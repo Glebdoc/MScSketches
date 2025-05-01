@@ -28,33 +28,48 @@ def plot(files, show=True, title=False, misc=True):
     table_data = []
 
 
+
+
     for file in files:
         data = np.genfromtxt(f'./results/{file}_res.csv', delimiter=',', skip_header=1)
+        data_small = np.genfromtxt(f'./results/{file}_res_small.csv', delimiter=',', skip_header=1)
         file = file.replace("_res.csv", "")
+
+        r_small = data_small[:, 0]
+        r_small_normalized = (r_small - r_small[0]) / (r_small[-1] - r_small[0])
+        r_small_rescaled = r_small_normalized * (data[-1, 0] - data[0, 0]) + data[0, 0]
+        r_small = r_small_rescaled
+        print(r_small)
 
         # plot the data
         # r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan
         axs[0, 0].plot(data[:, 0], -data[:, 1], label=f'{file}', marker='o')
+        axs[0, 0].plot(r_small, -data_small[:, 1], label=f'{file} small', marker='o', linestyle="--")
         axs[0, 0].set_title('r vs v_axial')
         axs[0, 0].legend()
 
         axs[0, 1].plot(data[:, 0], -data[:, 2], label=f'{file}', marker='o')
+        axs[0, 1].plot(r_small, -data_small[:, 2], label=f'{file} small', marker='o', linestyle="--")
         axs[0, 1].set_title('r vs v_tangential')
         axs[0, 1].legend()
 
         axs[0, 2].plot(data[:, 0], np.rad2deg(data[:, 3]), label=f'{file}', marker='o')
+        axs[0, 2].plot(r_small, np.rad2deg(data_small[:, 3]), label=f'{file} small', marker='o', linestyle="--")
         axs[0, 2].set_title('r vs inflowangle')
         axs[0, 2].legend()
 
         axs[1, 0].plot(data[:, 0], data[:, 4], label=f'{file}', marker='o')
+        axs[1, 0].plot(r_small, data_small[:, 4], label=f'{file} small', marker='o', linestyle="--")
         axs[1, 0].set_title('r vs alpha')
         axs[1, 0].legend()
 
         axs[1, 1].plot(data[:, 0], data[:, 5], label=f'{file}', marker='o')
+        axs[1, 1].plot(r_small, data_small[:, 5], label=f'{file} small', marker='o', linestyle="--")
         axs[1, 1].set_title('r vs Faxial')
         axs[1, 1].legend()
 
         axs[1, 2].plot(data[:, 0], data[:, 6], label=f'{file}', marker='o')
+        axs[1, 2].plot(r_small, data_small[:, 6], label=f'{file} small', marker='o', linestyle="--")
         axs[1, 2].set_title('r vs Ftan')
         axs[1, 2].legend()
     

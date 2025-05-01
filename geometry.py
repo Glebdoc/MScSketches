@@ -2,9 +2,10 @@ import numpy as np
 import pyvista as pv
 import bemUtils as bu
 import timeit
+import time
 import json
 import xfoilUtil as xfu
-
+import matplotlib.pyplot as plt
 
 class Point:
     def __init__(self, x, y, z):
@@ -20,6 +21,7 @@ class Point:
     def rotate(self, R):
         new_coords = R @ np.array([self.x, self.y, self.z])
         self.x, self.y, self.z = new_coords
+        return self
 
 class Vortex(Point):
     def __init__(self, point1, point2, Gamma=1):
@@ -118,8 +120,8 @@ class Propeller():
         self.U = U
         self.wake_length = wake_length
         self.chord = chord
-        distribution = 'cosine'
-        if distribution == 'cosine':
+        self.distribution = distribution
+        if self.distribution == 'cosine':
             R = diameter*0.5
             theta = np.linspace(np.arccos(hub/R), np.pi/8,  n)
             spacing = np.cos(0.5*theta)
@@ -127,11 +129,10 @@ class Propeller():
             spacing = spacing *(R - hub) + hub
             self.r = spacing
         else:
-            self.r = np.linspace(hub, 1 , n)*diameter*0.5
+            self.r = np.linspace(hub, diameter*0.5 , n)
         self.azimuth = np.array([0, 0, 1])
         self.origin = position
         self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
-        #self.collocationPoints = [np.vstack((self.chord[:self.n-1]*0.5, (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
         self.vortexTABLE = []
         self.horseShoes = None
         self.bodyIndex = bodyIndex
@@ -140,77 +141,34 @@ class Propeller():
             self.bendSmallWake()
         self.rotate(*self.angles)
         self.translate(position)
-        self.fillVotexTable()
 
-    def fillVotexTable(self):
-        for i in range(len(self.horseShoes)):
-            horse = self.horseShoes[i]
-            for j in range(len(horse.leftset)):
-                local_vortex = horse.leftset[j] 
-                self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i, local_vortex.Gamma])
-                local_vortex = horse.rightset[j]
-                self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i, local_vortex.Gamma])
-            local_vortex = horse.centre
-            self.vortexTABLE.append([local_vortex.x1, local_vortex.y1, local_vortex.z1, local_vortex.x2, local_vortex.y2, local_vortex.z2, i, local_vortex.Gamma])
-        self.vortexTABLE = np.array(self.vortexTABLE)
-        
+
     def bendSmallWake(self):
 
-        zw = np.array(self.zw)
         tempR = np.sqrt(self.position.x**2 + self.position.y**2)
 
-        for i in range(len(self.horseShoes)):
-            horse = self.horseShoes[i]
-            for j in range(len(horse.leftset)):
-                if j==0:
-                    continue
-                #Update left vortex
-                vortex = horse.leftset[j]
+        points = self.vortexTABLE[:, :6]
+        points = points.reshape(-1, 3)
 
-                vortex.p1.y += tempR
-                vortex.p2.y += tempR
+        points[:, 1] += tempR
+        theta= np.arctan(points[:, 2]/tempR)
 
-                r_to_point_1 = np.sqrt(vortex.p1.z**2 + vortex.p1.y**2)
-                r_to_point_2 = np.sqrt(vortex.p2.z**2 + vortex.p2.y**2)
+        r_to_axis = np.sqrt(tempR**2 + points[:, 2]**2)
 
-                theta= np.arctan(zw[j]/tempR)
-                r_to_axis = np.sqrt(tempR**2 + zw[j]**2)
+        r_to_point = np.sqrt((points[:, 2]**2).flatten() + (points[:, 1]**2).flatten())
 
-                deltaR1 = r_to_point_1 - r_to_axis
-                deltaR2 = r_to_point_2 - r_to_axis
+        deltaR = r_to_point - r_to_axis
+        r_new = tempR + deltaR
 
-                r_new1 = tempR + deltaR1
-                r_new2 = tempR + deltaR2
+        dz = r_new * np.sin(theta)
+        dy = r_new * np.cos(theta) 
 
-                vortex.p1.z = r_new1 * np.sin(theta) 
-                vortex.p1.y = r_new1 * np.cos(theta) - tempR
-
-                vortex.p2.z = r_new2 * np.sin(theta)
-                vortex.p2.y = r_new2 * np.cos(theta) - tempR
-
-                #Update right vortex
-                vortex = horse.rightset[j]
-
-                vortex.p1.y += tempR
-                vortex.p2.y += tempR
-
-                r_to_point_1 = np.sqrt(vortex.p1.z**2 + vortex.p1.y**2)
-                r_to_point_2 = np.sqrt(vortex.p2.z**2 + vortex.p2.y**2)
-
-                theta= np.arctan(zw[j]/tempR)
-                r_to_axis = np.sqrt(tempR**2 + zw[j]**2)
-
-                deltaR1 = r_to_point_1 - r_to_axis
-                deltaR2 = r_to_point_2 - r_to_axis
-
-                r_new1 = tempR + deltaR1
-                r_new2 = tempR + deltaR2
-
-                vortex.p1.z = r_new1 * np.sin(theta) 
-                vortex.p1.y = r_new1 * np.cos(theta) - tempR
-
-                vortex.p2.z = r_new2 * np.sin(theta)
-                vortex.p2.y = r_new2 * np.cos(theta) - tempR
+        dy -= tempR
+        
+        points[:, 2] = dz
+        points[:, 1] = dy
+        points = points.reshape(-1, 6)
+        self.vortexTABLE[:,:6] = points
 
 
 
@@ -222,12 +180,11 @@ class Propeller():
         nrevs = total_time*omega/(2*np.pi)
         total_steps = int(nrevs*ppr)
 
+        table = []
+
         dt = np.linspace(0, total_time, total_steps)
         zw = -self.U*dt 
         self.zw = zw
-
-        # left vortex
-        horseShoes = []
 
         if contraction:
             mult = bu.contraction_sigmoid(zw, contraction=0.55)
@@ -239,47 +196,92 @@ class Propeller():
             shift = j*2*np.pi/self.NB
             if j != 0:
                 R = bu.rotation_matrix(0, 0, shift)
-                self.collocationPoints.extend(R @ self.collocationPoints[0:self.n-1])
+                self.collocationPoints.extend(R @ self.collocationPoints[:self.n-1])
+            else:
+                R = np.eye(3)
 
-            for i in range(self.n - 1):
-                xwl = self.r[i]*np.sin(omega*dt)*mult + self.chord[i]
-                xwr = self.r[i+1]*np.sin(omega*dt)*mult + self.chord[i+1]
-                ywl = self.r[i]*np.cos(omega*dt)*mult # + angle etc
-                ywr = self.r[i+1]*np.cos(omega*dt)*mult # + angle etc
-                leftVortex = [(Vortex( Point(self.chord[i], self.r[i], 0), Point(0, self.r[i], 0), 1))] #removed 0 
-                rightVortex = [(Vortex(Point(0, self.r[i+1], 0), Point(self.chord[i+1], self.r[i+1], 0),1))] # removed 0 
-                wakeLeft = []
-                wakeRight = []
-                
-                for k in range(len(xwl)-1):
+            hn = np.arange((j+0)*(self.n-1), (j+1)*(self.n-1))
 
-                    # playing with contraction 
-                    aLeft = Point(xwl[k+1], ywl[k+1], zw[k+1])
-                    bLeft = Point(xwl[k], ywl[k], zw[k])
-                    aRight = Point(xwr[k], ywr[k], zw[k])
-                    bRight = Point(xwr[k+1], ywr[k+1], zw[k+1])
+            x_0 = np.zeros(self.n)
+            xwl_m = np.outer(self.r[:-1], np.sin(omega*dt)*mult) + self.chord[:self.n-1].reshape(-1, 1)
+            xwl = np.hstack([x_0[:-1].reshape(-1, 1), xwl_m])
+            xwl = np.stack((xwl[:, 1:], xwl[:, :-1]), axis=2).reshape(-1, 2)
 
-                    wakeLeft.append(Vortex(aLeft, bLeft, 1))
-                    wakeRight.append(Vortex(aRight, bRight, 1))
+            hnl = np.repeat(hn, xwl.shape[0]//(self.n-1))
 
-                leftVortex = leftVortex + wakeLeft
-                rightVortex = rightVortex + wakeRight
+            xwr_m = np.outer(self.r[1:], np.sin(omega*dt)*mult) + self.chord[1:self.n].reshape(-1, 1)
+            xwr = np.hstack([x_0[1:].reshape(-1, 1), xwr_m])
+            xwr = np.stack((xwr[:, :-1], xwr[:, 1:]), axis=2).reshape(-1, 2)
+            hnr = np.repeat(hn, xwr.shape[0]//(self.n-1))
 
-                centralVortex = (Vortex(Point(0, self.r[i], 0), Point(0, self.r[i+1], 0),1)) # removed 0 
-                horseShoe = HorseShoe(leftVortex, centralVortex, rightVortex)
-                if j != 0:
-                    horseShoe.rotate(R)
-                horseShoes.append(horseShoe)
-        self.horseShoes = horseShoes
+            xc = np.stack((x_0[:-1], x_0[1:]), axis=1)
+
+            hn = np.hstack([hnl, hnr, hn]).reshape(-1, 1)
+
+            x_coord = np.vstack([xwl, xwr, xc]).reshape(-1, 1)
+
+            y_0 = self.r 
+
+            ywl_m = np.outer(self.r[:-1], np.cos(omega*dt)*mult) #+ self.r[:-1].reshape(-1,1)
+            ywl = np.hstack([y_0[:-1].reshape(-1, 1), ywl_m])
+            ywl = np.stack((ywl[:, 1:], ywl[:, :-1]), axis=2).reshape(-1, 2)
+
+            ywr_m = np.outer(self.r[1:], np.cos(omega*dt)*mult)
+            ywr = np.hstack([y_0[1:].reshape(-1, 1), ywr_m])
+            ywr = np.stack((ywr[:, :-1], ywr[:, 1:]), axis=2).reshape(-1, 2)
+
+            yc = np.stack((y_0[:-1], y_0[1:]), axis=1)
+
+            y_coord = np.vstack([ywl, ywr, yc]).reshape(-1, 1)
+
+            z_0 = np.zeros(self.n)
+            zwl = np.outer(np.ones(self.n-1), zw)
+            zwl  = np.hstack([z_0[:-1].reshape(-1, 1), zwl])
+            zwl = np.stack((zwl[:, 1:], zwl[:, :-1]), axis=2).reshape(-1, 2)
+
+            zwr = np.outer(np.ones(self.n-1), zw)
+            zwr  = np.hstack([z_0[1:].reshape(-1, 1), zwr])
+            zwr = np.stack((zwr[:, :-1], zwr[:, 1:]), axis=2).reshape(-1, 2)
+
+            zc = np.stack((z_0[:-1], z_0[1:]), axis=1)
+
+            z_coord = np.vstack([zwl, zwr, zc]).reshape(-1, 1)
+
+            coordinates = np.hstack([x_coord, y_coord, z_coord])
+            
+            coorcdinates = (R @ coordinates.T).T
+
+            x = coorcdinates[:, 0].reshape(-1, 2)
+            y = coorcdinates[:, 1].reshape(-1, 2)
+            z = coorcdinates[:, 2].reshape(-1, 2)
+
+            Gamma = np.ones((x.shape[0], 1))
+
+            chunk = np.stack([x[:,0], y[:,0], z[:,0], x[:,1], y[:,1], z[:,1], hn[:, 0], Gamma[:,0]], axis=1)
+            table.append(chunk)
+
+        self.vortexTABLE = np.vstack(table)
+
+
 
     def translate(self, translation):
-        translation_array = np.array([translation.x, translation.y, translation.z]).reshape(3, 1)
-
-        for horseShoe in self.horseShoes:
-            horseShoe.translate(translation)
+        table = self.vortexTABLE
+        table[:,0] += translation.x
+        table[:,1] += translation.y
+        table[:,2] += translation.z
+        table[:,3] += translation.x
+        table[:,4] += translation.y
+        table[:,5] += translation.z
 
         for i in range(self.NB):
-            self.collocationPoints[i] += translation_array
+            collocs = np.array(self.collocationPoints[i])
+            collocs[0,:] += translation.x
+            collocs[1,:] += translation.y
+            collocs[2,:] += translation.z
+            self.collocationPoints[i] = collocs
+
+
+        self.vortexTABLE = table
                 
 
     def rotate(self, delta_x=0, delta_y=0, delta_z=0):
@@ -289,13 +291,21 @@ class Propeller():
 
         R = bu.rotation_matrix(*self.angles)
 
-        for horseShoe in self.horseShoes:
-            horseShoe.rotate(R)
+        table = self.vortexTABLE
+
+        points = table[:, :6].reshape(-1, 3) 
+        points = (R @ points.T).T 
+        table[:, :6] = points.reshape(-1, 6)
+        self.vortexTABLE = table
+
 
         for i in range(self.NB):
             self.collocationPoints[i] = R @ self.collocationPoints[i]
 
+
         self.azimuth = R @ self.azimuth
+
+
 
 
     def display(self, color):
@@ -332,9 +342,9 @@ class Drone:
                  main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                  small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                  small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
-                 mainWakeLength, smallWakeLength, main_U, small_U, main_distribution='uniform', 
-                 small_distribution='uniform', 
-                 helicopter=False, contraction=True, wind=None, reynolds=False):
+                 mainWakeLength, smallWakeLength, main_U, small_U, main_distribution, 
+                 small_distribution, 
+                 helicopter=False, contraction=True, wind=None, reynolds=False, core_size = 1e-5):
         # Main propeller
         self.main_prop = Propeller(main_position, 
                                    main_angles,
@@ -352,6 +362,7 @@ class Drone:
                                    )
         
         # Small propellers
+        self.core_size = core_size
         self.main_prop.airfoil = main_airfoil
         self.small_props = []
         self.wind = wind
@@ -367,9 +378,9 @@ class Drone:
         if helicopter==False:
             for i in range(main_NB):
                 shift = i*(2*np.pi/main_NB)
-                position = Point(main_R*np.sin(shift), main_R*np.cos(shift), 0.05) # try 0.05
+                position = Point(main_R*np.cos(shift+np.pi/2), main_R*np.sin(shift+np.pi/2), 0.0) # try 0.05
 
-                angles = np.array([0,-small_props_angle*np.pi/180,-shift])
+                angles = np.array([0,-small_props_angle*np.pi/180, shift]) 
                 small_prop = Propeller(position, 
                                     angles, 
                                     small_props_hub, 
@@ -443,10 +454,8 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) + main_optimal_AoA
         main_pitch = np.concatenate([main_pitch]*main_NB)
 
-        main_chord = np.linspace(main_chord_root, main_chord_tip, main_n-1)
+        main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
         main_chord = np.concatenate([main_chord]*main_NB)
-
-
 
         small_props_angle = config['small_propellers']['angle']
         small_props_diameter = config['small_propellers']['diameter']
@@ -464,7 +473,8 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
 
         small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
 
-        small_props_pitch = bu.twistGen(small_pitch_root, small_pitch_tip, small_r, small_AoA)
+        #small_props_pitch = bu.twistGen(small_pitch_root, small_pitch_tip, small_r, small_AoA)
+        small_props_pitch = np.linspace(small_pitch_root, small_pitch_tip, small_props_n-1)
         small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
 
         contraction = config['settings']['contraction']
@@ -477,16 +487,18 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         
         reynolds = config['settings']['reynolds']
 
-        
+        core_size = config['settings']['core_size']
 
+        main_distribution = config['main_propeller']['distribution']
+        small_distribution = config['small_propellers']['distribution']
 
         drone = Drone(main_position, main_angles, main_hub, main_diameter, 
                                     main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
                                     mainWakeLength=main_wake_length, smallWakeLength=small_wake_length, main_U=main_U, small_U = small_U, 
-                                    main_distribution='uniform', small_distribution='uniform', 
-                                    contraction=contraction, wind=wind, reynolds=reynolds)
+                                    main_distribution=main_distribution, small_distribution=small_distribution, 
+                                    contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size)
 
         # write optimal AoA to config file
         config['main_propeller']['optimal_AoA'] = main_optimal_AoA
