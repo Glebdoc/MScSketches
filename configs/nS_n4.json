@@ -23,7 +23,7 @@
         "OPERATION": "__",
         "rpm": 370,
         "REFINEMENT": "__",
-        "n": 20,
+        "n": 4,
         "wake_length": 10,
         "INITIAL": "__",
         "uWake": 2,
@@ -47,7 +47,7 @@
         "OPERATION": "__",
         "rpm": 10000,
         "REFINEMENT": "__",
-        "n": 7,
+        "n": 5,
         "wake_length": 6,
         "INITIAL": "__",
         "uWake": 30,
@@ -63,8 +63,8 @@
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 74.9261931226938,
-        "Torque": 5.756451511474813,
-        "FM": 1.6043575757769022
+        "Thrust": 6.228903687486652,
+        "Torque": 0.31099804935442443,
+        "FM": 0.718225414629708
     }
 }

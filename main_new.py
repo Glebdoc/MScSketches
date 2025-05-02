@@ -28,7 +28,7 @@ with open('configs/base.json', 'r') as f:
     base_config = json.load(f)
 
 variables_to_test = {
-    "main_propeller.n":[30], 
+    "main_propeller.n":[3], 
 }
 config_files = generate_flexible_configs(base_config, variables_to_test, case="nS")
 output_title = 'core'

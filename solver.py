@@ -70,7 +70,13 @@ def computeVrotational(drone, total_colloc_points, Omega, n_azimuth, n_origin, n
 
     # V rotational small props 
     v_rotational_small = np.cross(total_colloc_points[npM:] - n_origin[npM:], n_azimuth[npM:]*Omega[npM:]) + np.cross(total_colloc_points[npM:], azimuthVector*Omega[0])
+
     v_rotational = np.concatenate( (v_rotational_main, v_rotational_small))
+
+    # collocs are fine
+
+
+   # return v_rotational, v_rotational_main, v_rotational_small
     return v_rotational
 
 def computeVaxial(v_rotational, n_azimuth, total_colloc_points, n_origin):
@@ -174,6 +180,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
     table = np.array(drone.vortexTABLE)
 
     if updateConfig:
+        print('Updating config')
         if os.name == 'nt':
             mylib = ctypes.CDLL("./mylib.dll")  
         else:
@@ -200,7 +207,32 @@ def solve(drone, updateConfig=True, case='main', save=False):
         v_influences = np.loadtxt('./auxx/v_influences.txt')
         w_influences = np.loadtxt('./auxx/w_influences.txt')
 
-    
+    fig, ax = plt.subplots()
+    im = ax.imshow(w_influences, cmap='viridis')
+
+    # Grid lines to simulate borders
+    ax.set_xticks(np.arange(w_influences.shape[1]+1) - 0.5, minor=True)
+    ax.set_yticks(np.arange(w_influences.shape[0]+1) - 0.5, minor=True)
+    ax.grid(which='minor', color='w', linestyle='-', linewidth=1)
+
+    # Major ticks centered in cells
+    ax.set_xticks(np.arange(w_influences.shape[1]))
+    ax.set_yticks(np.arange(w_influences.shape[0]))
+    ax.set_xticklabels(np.arange(w_influences.shape[1]))
+    ax.set_yticklabels(np.arange(w_influences.shape[0]))
+
+    # Optional: rotate for better visibility
+    plt.setp(ax.get_xticklabels(), rotation=0, ha="center")
+
+    # Remove minor tick marks (we only want the grid)
+    ax.tick_params(which='minor', bottom=False, left=False)
+
+    # Add color bar
+    cbar = plt.colorbar(im, ax=ax)
+    cbar.set_label('Influence Coefficient', rotation=270, labelpad=15)
+
+    plt.title("w_influences Heatmap with Borders and Indices")
+    plt.show()
 
     # n_azimuth, n_origin 
     n_azimuth, n_origin = computeAzimuthAndOrigin(drone, npM, npS, main_NB, collocN)
@@ -223,7 +255,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
     weight = 0.2
     err = 1.0
     iter = 0
-    while (err > 1e-8 and iter<10_000):
+    while (err > 1e-12 and iter<10_000):
         iter+=1
         if iter % 50 == 0:
             print('Weight:', weight, 'Iter:', iter, 'Error:', err)
@@ -363,7 +395,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
             
         np.savetxt('table_final.txt', table_final)
 
-        misc  = np.zeros((main_n-1, 1))
+        misc  = np.zeros((collocN, 1))
         misc[0] = Thrust
         misc[1] = Torque
         misc[2] = LD
@@ -373,27 +405,29 @@ def solve(drone, updateConfig=True, case='main', save=False):
         misc[6] = profile_power
         misc[7] = induced_power + profile_power
         misc[8] = computed_power
-        results = np.column_stack((r[:main_n-1], 
-                                v_axial[:main_n-1].flatten(), 
-                                v_tangential[:main_n-1].flatten(), 
-                                inflowangle[:main_n-1].flatten(), 
-                                alpha[:main_n-1].flatten(),
-                                Faxial[:main_n-1].flatten(), 
-                                Ftan[:main_n-1].flatten(),
+        misc[9] = npM
+        misc[10] = npS
+        misc[11] = main_NB
+        misc[12] = small_NB
+        results = np.column_stack((r.flatten(), 
+                                v_axial.flatten(), 
+                                v_tangential.flatten(), 
+                                inflowangle.flatten(), 
+                                alpha.flatten(),
+                                Faxial.flatten(), 
+                                Ftan.flatten(),
+                                Gammas.flatten(),
+                                np.linalg.norm(v_rotational, axis=1),
+                                np.sum(v_rotational * n_azimuth, axis=1), # axial rotational velocity
+                                np.sum(v_rotational * tan_direction, axis=1), # tangential rotational velocity
+                                u.flatten(),
+                                v.flatten(),
+                                w.flatten(),
                                 misc))
-        results_small = np.column_stack((r[npM:npM+npS].flatten(), 
-                                         v_axial[npM:npM+npS].flatten(),
-                                            v_tangential[npM:npM+npS].flatten(),
-                                            inflowangle[npM:npM+npS].flatten(),
-                                            alpha[npM:npM+npS].flatten(),
-                                            Faxial[npM:npM+npS].flatten(),
-                                            Ftan[npM:npM+npS].flatten()))
 
-        header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, misc"
-        header_small = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan"
+        header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, v_rot_a, v_rot_t, u, v, w,  misc"
         case = case.replace('.json', '')
         np.savetxt(f'./results/{case}_res.csv', results, delimiter=',', header=header, comments='')
-        np.savetxt(f'./results/{case}_res_small.csv', results_small, delimiter=',', header=header_small, comments='')
 
     
     return abs(mean_axial_main), abs(mean_axial_small), None, Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power

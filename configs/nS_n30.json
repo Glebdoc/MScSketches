@@ -47,7 +47,7 @@
         "OPERATION": "__",
         "rpm": 10000,
         "REFINEMENT": "__",
-        "n": 25,
+        "n": 7,
         "wake_length": 6,
         "INITIAL": "__",
         "uWake": 30,
@@ -58,13 +58,13 @@
     "settings": {
         "contraction": true,
         "core_size": 1e-07,
-        "reynolds": true,
+        "reynolds": false,
         "wind_speed": 0,
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 48.65991364910833,
-        "Torque": 3.7408537274780573,
-        "FM": 0.5747660221136877
+        "Thrust": 72.52812055857459,
+        "Torque": 5.807863820201758,
+        "FM": 0.833410522683933
     }
 }

@@ -38,29 +38,32 @@ origin = np.array([0, 0, 0])
 import pyvista as pv
 import numpy as np
 
+
+
+
 # Define vectors and origin
-vectors = np.array([
-    vector,
-    rotated_vector_y,
-    rotated_vector_yz
-])
-origins = np.array([
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0]
-])
+# vectors = np.array([
+#     vector,
+#     rotated_vector_y,
+#     rotated_vector_yz
+# ])
+# origins = np.array([
+#     [0, 0, 0],
+#     [0, 0, 0],
+#     [0, 0, 0]
+# ])
 
-# Create PyVista point cloud
-point_cloud = pv.PolyData(origins)
-point_cloud["vectors"] = vectors  # attach vectors to each point
+# # Create PyVista point cloud
+# point_cloud = pv.PolyData(origins)
+# point_cloud["vectors"] = vectors  # attach vectors to each point
 
-# Use glyphs to draw arrows with actual magnitude
-arrows = point_cloud.glyph(orient="vectors", scale="vectors", factor=1.0)
+# # Use glyphs to draw arrows with actual magnitude
+# arrows = point_cloud.glyph(orient="vectors", scale="vectors", factor=1.0)
 
-# Plot
-plotter = pv.Plotter()
-plotter.add_mesh(arrows, color="orange")
-plotter.add_point_labels(origins + vectors, ["v1", "v2", "v3"], font_size=36, text_color="black")
-plotter.add_axes_at_origin()
-plotter.show_bounds(xlabel='X', ylabel='Y', zlabel='Z')
-plotter.show()
+# # Plot
+# plotter = pv.Plotter()
+# plotter.add_mesh(arrows, color="orange")
+# plotter.add_point_labels(origins + vectors, ["v1", "v2", "v3"], font_size=36, text_color="black")
+# plotter.add_axes_at_origin()
+# plotter.show_bounds(xlabel='X', ylabel='Y', zlabel='Z')
+# plotter.show()
