@@ -17,6 +17,9 @@ import matplotlib.gridspec as gridspec
         #                         u.flatten(),                 11
                                 #v.flatten(),                  12
                                 #w.flatten(),                  13
+                                #Cl.flatten(),                 14
+                                #Cd.flatten(),                 15
+                                # Re.flatten(),                16 
         #                         misc))
 
 def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, i):
@@ -62,7 +65,7 @@ def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 
 
 def plot(files, show=True, title=False, misc=True):
     # Create figure and gridspec
-    fig = plt.figure(figsize=(15, 12))  # Just use plt.figure, not plt.subplots
+    fig = plt.figure(figsize=(20, 12))  # Just use plt.figure, not plt.subplots
     gs = gridspec.GridSpec(3, 3, height_ratios=[1, 3, 3])  # First row for table
 
     # Subplots: rows 1 and 2
@@ -84,8 +87,10 @@ def plot(files, show=True, title=False, misc=True):
     # misc[10] = npS
     # misc[11] = main_NB
     # misc[12] = small_NB
+    # misc[13] = drone.main_prop.RPM
+    #     misc[14] = drone.small_props[0].RPM
 
-    labels = ['Thrust', 'Torque', 'LD', 'FM', 'η', 'P_ind', 'P_prof', 'P_tot', 'P_comp', 'err']
+    labels = ['Thrust', 'Torque', 'LD', 'FM', 'η', 'P_ind', 'P_prof', 'P_tot', 'P_comp', 'npM', 'npS', 'NBm', 'NBs', 'RPMmain', 'RPMsmall', 'err',]
     table_data = []
 
 
@@ -100,114 +105,97 @@ def plot(files, show=True, title=False, misc=True):
         main_NB = int(data[11, -1])
         small_NB = int(data[12, -1])
 
-        print(npM, npS, main_NB, small_NB)
-
         n_main = int(npM/main_NB)
         n_small = int(npS/small_NB)
-
-        print(n_main, n_small)
 
         r_small = data[npM:npM + n_small, 0]
         r_main = data[:n_main, 0]
 
-        plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, i =13)
 
         #plot the data
         # r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, u, v, w
+        v_axial = data[:, 1]
+        v_tangential = data[:, 2]
+        inflowangle = data[:, 3]
+        alpha = data[:, 4]
+        Faxial = data[:, 5]
+        Ftan = data[:, 6]
+        Gammas = data[:, 7]
+        Cl = data[:, 14]
+        Cd = data[:, 15]
 
-        # v_axial = data[:, 1]
-        # axs[0, 0].plot(r_main, -data[:n_main, 1], label=f'm1{file}', marker='o')
-        # axs[0, 0].plot(r_main, -data[n_main:2*n_main, 1], label=f'm2{file}', marker='o')
-        # axs[0, 0].plot(r_main, -data[2*n_main:3*n_main, 1], label=f'm2{file}', marker='o')
+        r_small_normalized = (r_small - r_small[0]) / (r_small[-1] - r_small[0])
+        r_small_rescaled = r_small_normalized * (r_main[-1] - r_main[0]) + r_main[0]
+        r_small = r_small_rescaled
 
-        # # axs[0, 0].plot(r_small, -data_small[:, 1], label=f'{file} small', marker='o', linestyle="--")
+        # # plot V_axial for the 
+        # axs[0, 0].plot(r_main, -v_axial[:n_main], label=f'm1{file}', marker='o')
+        # axs[0, 0].plot(r_small, -v_axial[npM:npM + n_small], label=f's1{file}', marker='o')
+
         # axs[0, 0].set_title('r vs v_axial')
         # axs[0, 0].legend()
 
-        # axs[0, 1].plot(r_main, -data[:n_main, 8], label=f'm1{file}', marker='o')
-        # axs[0, 1].plot(r_main, -data[n_main:2*n_main, 8], label=f'm2{file}', marker='o')
-        # axs[0, 1].plot(r_main, -data[2*n_main:3*n_main, 8], label=f'm2{file}', marker='o')
-
-        # # axs[0, 0].plot(r_small, -data_small[:, 1], label=f'{file} small', marker='o', linestyle="--")
-        # axs[0, 1].set_title('r vs v_rot')
+        # # plot V_tangential 
+        # axs[0, 1].plot(r_main, -v_tangential[:n_main], label=f'm1{file}', marker='o')
+        # axs[0, 1].plot(r_small, -v_tangential[npM:npM + n_small], label=f's1{file}', marker='o')
+        # axs[0, 1].set_title('r vs v_tangential')
         # axs[0, 1].legend()
 
-        # axs[0, 2].plot(r_small, -data[npM:npM+n_small, 8], label=f's11{file}', marker='o')
-        # axs[0, 2].plot(r_small, -data[npM + npS:npM+npS + n_small, 8], label=f's12{file}', marker='o')
-        # axs[0, 2].plot(r_small, -data[npM+ 2*npS:npM+2*npS + n_small, 8], label=f's13{file}', marker='o')
+        # plot Cl 
+        axs[0, 0].plot(r_main, Cl[:n_main], label=f'm1{file}', marker='o')
+        axs[0, 0].plot(r_small, Cl[npM:npM + n_small], label=f's1{file}', marker='o')
+        axs[0, 0].set_title('r vs Cl')
+        axs[0, 0].legend()
 
-        # # axs[0, 0].plot(r_small, -data_small[:, 1], label=f'{file} small', marker='o', linestyle="--")
-        # axs[0, 2].set_title('r vs v_rot_small')
-        # axs[0, 2].legend()
+        # plot Cd
+        axs[0, 1].plot(r_main, Cd[:n_main], label=f'm1{file}', marker='o')
+        axs[0, 1].plot(r_small, Cd[npM:npM + n_small], label=f's1{file}', marker='o')
+        axs[0, 1].set_title('r vs Cd')
+        axs[0, 1].legend()
 
-        # axs[1, 0].plot(r_small, -data[npM+n_small:npM+2*n_small, 8], label=f's21{file}', marker='o')
-        # axs[1, 0].plot(r_small, -data[npM + n_small+ npS:npM+npS + 2*n_small, 8], label=f's22{file}', marker='o')
-        # axs[1, 0].plot(r_small, -data[npM+ 2*npS + n_small:npM+2*npS + 2*n_small, 8], label=f's23{file}', marker='o')
+        # plot inflowangle
+        axs[0, 2].plot(r_main, np.rad2deg(inflowangle[:n_main]), label=f'm1{file}', marker='o')
+        axs[0, 2].plot(r_small, np.rad2deg(inflowangle[npM:npM + n_small]), label=f's1{file}', marker='o')
+        axs[0, 2].set_title('r vs inflowangle')
+        axs[0, 2].legend()
 
-        # # axs[0, 0].plot(r_small, -data_small[:, 1], label=f'{file} small', marker='o', linestyle="--")
-        # axs[1, 0].set_title('r vs v_rot_small')
-        # axs[1, 0].legend()
+        # plot alpha
+        axs[1, 0].plot(r_main, alpha[:n_main], label=f'm1{file}', marker='o')
+        axs[1, 0].plot(r_small, alpha[npM:npM + n_small], label=f's1{file}', marker='o')
+        axs[1, 0].set_title('r vs alpha')
+        axs[1, 0].legend()
 
-        # axs[1,1].plot(r_small, -data[npM+2*n_small:npM+3*n_small, 8], label=f's31{file}', marker='o')
-        # axs[1, 1].plot(r_small, -data[npM + 2*n_small+ npS:npM+npS + 3*n_small, 8], label=f's32{file}', marker='o')
-        # axs[1, 1].plot(r_small, -data[npM+ 2*npS + 2*n_small:npM+2*npS + 3*n_small, 8], label=f's33{file}', marker='o')
-
-        # # axs[0, 0].plot(r_small, -data_small[:, 1], label=f'{file} small', marker='o', linestyle="--")
-        # axs[1, 1].set_title('r vs v_rot_small')
+        # # plot Faxial
+        # axs[1, 1].plot(r_main, Faxial[:n_main], label=f'm1{file}', marker='o')
+        # axs[1, 1].plot(r_small, Faxial[npM:npM + n_small], label=f's1{file}', marker='o')
+        # axs[1, 1].set_title('r vs Faxial')
         # axs[1, 1].legend()
 
+        # plot Re 
+        axs[1, 1].plot(r_main, data[:n_main, 16], label=f'm1{file}', marker='o')
+        axs[1, 1].plot(r_small, data[npM:npM + n_small, 16], label=f's1{file}', marker='o')
+        axs[1, 1].set_title('r vs Re')
+        axs[1, 1].legend()
+        # plot Ftan
+        axs[1, 2].plot(r_main, Ftan[:n_main], label=f'm1{file}', marker='o')
+        axs[1, 2].plot(r_small, Ftan[npM:npM + n_small], label=f's1{file}', marker='o')
+        axs[1, 2].set_title('r vs Ftan')
+        axs[1, 2].legend()
 
-    #     r_small = data_small[:, 0]
-    #     r_small_normalized = (r_small - r_small[0]) / (r_small[-1] - r_small[0])
-    #     r_small_rescaled = r_small_normalized * (data[-1, 0] - data[0, 0]) + data[0, 0]
-    #     r_small = r_small_rescaled
-    #     print(r_small)
+        if misc:
+            data[15, -1] = 100*(data[7, -1] - data[8, -1])/data[7, -1]  # err
+            values = data[:15, -1] if data.shape[0] >= 15 else np.zeros(15)
+            # extend values
 
-    #     # plot the data
-    #     # r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan
-    #     axs[0, 0].plot(data[:, 0], -data[:, 1], label=f'{file}', marker='o')
-    #     axs[0, 0].plot(r_small, -data_small[:, 1], label=f'{file} small', marker='o', linestyle="--")
-    #     axs[0, 0].set_title('r vs v_axial')
-    #     axs[0, 0].legend()
-
-    #     axs[0, 1].plot(data[:, 0], -data[:, 2], label=f'{file}', marker='o')
-    #     axs[0, 1].plot(r_small, -data_small[:, 2], label=f'{file} small', marker='o', linestyle="--")
-    #     axs[0, 1].set_title('r vs v_tangential')
-    #     axs[0, 1].legend()
-
-    #     axs[0, 2].plot(data[:, 0], np.rad2deg(data[:, 3]), label=f'{file}', marker='o')
-    #     axs[0, 2].plot(r_small, np.rad2deg(data_small[:, 3]), label=f'{file} small', marker='o', linestyle="--")
-    #     axs[0, 2].set_title('r vs inflowangle')
-    #     axs[0, 2].legend()
-
-    #     axs[1, 0].plot(data[:, 0], data[:, 4], label=f'{file}', marker='o')
-    #     axs[1, 0].plot(r_small, data_small[:, 4], label=f'{file} small', marker='o', linestyle="--")
-    #     axs[1, 0].set_title('r vs alpha')
-    #     axs[1, 0].legend()
-
-    #     axs[1, 1].plot(data[:, 0], data[:, 5], label=f'{file}', marker='o')
-    #     axs[1, 1].plot(r_small, data_small[:, 5], label=f'{file} small', marker='o', linestyle="--")
-    #     axs[1, 1].set_title('r vs Faxial')
-    #     axs[1, 1].legend()
-
-    #     axs[1, 2].plot(data[:, 0], data[:, 6], label=f'{file}', marker='o')
-    #     axs[1, 2].plot(r_small, data_small[:, 6], label=f'{file} small', marker='o', linestyle="--")
-    #     axs[1, 2].set_title('r vs Ftan')
-    #     axs[1, 2].legend()
-    
-    #     if misc:
-    #         data[9, -1] = 100*(data[7, -1] - data[8, -1])/data[7, -1]  # err
-    #         print('error', data[9, -1])
-    #         values = data[:10, -1] if data.shape[0] >= 10 else np.zeros(10)
-    #         row = [file] + [f"{v:.2f}" for v in values]
-    #         table_data.append(row)
-    # col_labels = ['Config'] + labels
-    # ax_table = fig.add_subplot(gs[0, :])
-    # ax_table.axis('off')
-    # table = ax_table.table(cellText=table_data, colLabels=col_labels, loc='center')
-    # table.auto_set_font_size(False)
-    # table.set_fontsize(10)
-    # table.scale(1.2, 1.5)
+            row = [file] + [f"{v:.2f}" for v in values]
+            table_data.append(row)
+    col_labels = ['Config'] + labels
+    ax_table = fig.add_subplot(gs[0, :])
+    ax_table.axis('off')
+    table = ax_table.table(cellText=table_data, colLabels=col_labels, loc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.2, 1.5)
     if title:
         plt.tight_layout(rect=[0, 0, 0.75, 1])
         plt.savefig(f'./plots/fig_{title}.png', dpi = 500)

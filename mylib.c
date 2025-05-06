@@ -125,7 +125,11 @@ int computeInfluenceMatrices(
     // Print table 
     #pragma omp parallel for
     for (int i = 0; i < N; i++) {
+    //for (int i = 0; i < 2; i++) {
+        // printf("Collocation point %d: (%.2f, %.2f, %.2f)\n", i, points[i][0], points[i][1], points[i][2]);
+        // printf("i = %d\n", i);
         for (int j = 0; j<T; j++) {
+            
             double x1 = table[j][0];
             double y1 = table[j][1];
             double z1 = table[j][2];
@@ -193,6 +197,8 @@ int computeInfluenceMatrices(
             uInfluence[i][horse_index] += u_induced;
             vInfluence[i][horse_index] += v_induced;
             wInfluence[i][horse_index] += w_induced;
+
+            // printf("j = %d, contribution from horse %d \n", j, horse_index);
         }
     }
     

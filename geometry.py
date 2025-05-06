@@ -173,6 +173,13 @@ class Propeller():
 
 
     def assemble(self, main_rotor=None, contraction=True):
+        # body_index = self.bodyIndex
+        # # compute number of collocs before you 
+        # if body_index == 0:
+        #     add =0
+        # else:
+
+
         ppr = 30 
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
@@ -199,7 +206,7 @@ class Propeller():
                 self.collocationPoints.extend(R @ self.collocationPoints[:self.n-1])
             else:
                 R = np.eye(3)
-
+            
             hn = np.arange((j+0)*(self.n-1), (j+1)*(self.n-1))
 
             x_0 = np.zeros(self.n)
@@ -373,12 +380,16 @@ class Drone:
         self.tangential_velocity = None
         self.vortexTABLE = self.main_prop.vortexTABLE
 
+        addHSN = max(self.vortexTABLE[:, -2])
+        print('addHSN', addHSN)
+
+
         main_NB = self.main_prop.NB
         main_R = self.main_prop.diameter/2
         if helicopter==False:
             for i in range(main_NB):
                 shift = i*(2*np.pi/main_NB)
-                position = Point(main_R*np.cos(shift+np.pi/2), main_R*np.sin(shift+np.pi/2), 0.0) # try 0.05
+                position = Point(main_R*np.cos(shift+np.pi/2), main_R*np.sin(shift+np.pi/2), 0.05) # try 0.05
 
                 angles = np.array([0,-small_props_angle*np.pi/180, shift]) 
                 small_prop = Propeller(position, 
@@ -397,7 +408,9 @@ class Drone:
                                     small=True, main_rotor=self.main_prop, contraction=contraction)
                 
                 table = small_prop.vortexTABLE
-                table[:,-1]+=(self.vortexTABLE[-1,-1] + 1) 
+                table[:, -2] += addHSN+1
+                addHSN = np.max(table[:, -2])
+
 
                 self.vortexTABLE = np.concatenate((self.vortexTABLE, table), axis=0)
 

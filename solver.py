@@ -207,32 +207,68 @@ def solve(drone, updateConfig=True, case='main', save=False):
         v_influences = np.loadtxt('./auxx/v_influences.txt')
         w_influences = np.loadtxt('./auxx/w_influences.txt')
 
-    fig, ax = plt.subplots()
-    im = ax.imshow(w_influences, cmap='viridis')
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
 
-    # Grid lines to simulate borders
-    ax.set_xticks(np.arange(w_influences.shape[1]+1) - 0.5, minor=True)
-    ax.set_yticks(np.arange(w_influences.shape[0]+1) - 0.5, minor=True)
-    ax.grid(which='minor', color='w', linestyle='-', linewidth=1)
+    colormap = plt.get_cmap('viridis')
 
-    # Major ticks centered in cells
-    ax.set_xticks(np.arange(w_influences.shape[1]))
-    ax.set_yticks(np.arange(w_influences.shape[0]))
-    ax.set_xticklabels(np.arange(w_influences.shape[1]))
-    ax.set_yticklabels(np.arange(w_influences.shape[0]))
+    # u_influences
+    im0 = ax[0].imshow(u_influences, cmap=colormap)
+    ax[0].set_title("u_influences")
+    ax[0].set_xticks(np.arange(u_influences.shape[1] + 1) - 0.5, minor=True)
+    ax[0].set_yticks(np.arange(u_influences.shape[0] + 1) - 0.5, minor=True)
+    ax[0].grid(which='minor', color='w', linestyle='-', linewidth=1)
+    fig.colorbar(im0, ax=ax[0])
 
-    # Optional: rotate for better visibility
-    plt.setp(ax.get_xticklabels(), rotation=0, ha="center")
+    # v_influences
+    im1 = ax[1].imshow(v_influences, cmap=colormap)
+    ax[1].set_title("v_influences")
+    ax[1].set_xticks(np.arange(v_influences.shape[1] + 1) - 0.5, minor=True)
+    ax[1].set_yticks(np.arange(v_influences.shape[0] + 1) - 0.5, minor=True)
+    ax[1].grid(which='minor', color='w', linestyle='-', linewidth=1)
+    fig.colorbar(im1, ax=ax[1])
 
-    # Remove minor tick marks (we only want the grid)
-    ax.tick_params(which='minor', bottom=False, left=False)
+    # w_influences
+    im2 = ax[2].imshow(w_influences, cmap=colormap)
+    ax[2].set_title("w_influences")
+    ax[2].set_xticks(np.arange(w_influences.shape[1] + 1) - 0.5, minor=True)
+    ax[2].set_yticks(np.arange(w_influences.shape[0] + 1) - 0.5, minor=True)
+    ax[2].grid(which='minor', color='w', linestyle='-', linewidth=1)
+    fig.colorbar(im2, ax=ax[2])
 
-    # Add color bar
-    cbar = plt.colorbar(im, ax=ax)
-    cbar.set_label('Influence Coefficient', rotation=270, labelpad=15)
-
-    plt.title("w_influences Heatmap with Borders and Indices")
+    plt.tight_layout()
     plt.show()
+
+    # add color bar
+
+
+    # # # Optional: rotate for better visibility
+    # cbar = plt.colorbar(im, ax=ax[0, 2])
+
+
+
+    # # Grid lines to simulate borders
+    # ax.set_xticks(np.arange(w_influences.shape[1]+1) - 0.5, minor=True)
+    # ax.set_yticks(np.arange(w_influences.shape[0]+1) - 0.5, minor=True)
+    # ax.grid(which='minor', color='w', linestyle='-', linewidth=1)
+
+    # # Major ticks centered in cells
+    # ax.set_xticks(np.arange(w_influences.shape[1]))
+    # ax.set_yticks(np.arange(w_influences.shape[0]))
+    # ax.set_xticklabels(np.arange(w_influences.shape[1]))
+    # ax.set_yticklabels(np.arange(w_influences.shape[0]))
+
+    # # Optional: rotate for better visibility
+    # plt.setp(ax.get_xticklabels(), rotation=0, ha="center")
+
+    # # Remove minor tick marks (we only want the grid)
+    # ax.tick_params(which='minor', bottom=False, left=False)
+
+    # # Add color bar
+    # cbar = plt.colorbar(im, ax=ax)
+    # cbar.set_label('Influence Coefficient', rotation=270, labelpad=15)
+
+    # plt.title("w_influences Heatmap with Borders and Indices")
+    # plt.show()
 
     # n_azimuth, n_origin 
     n_azimuth, n_origin = computeAzimuthAndOrigin(drone, npM, npS, main_NB, collocN)
@@ -255,12 +291,12 @@ def solve(drone, updateConfig=True, case='main', save=False):
     weight = 0.2
     err = 1.0
     iter = 0
-    while (err > 1e-12 and iter<10_000):
+    while (err > 1e-8 and iter<1_000):
         iter+=1
-        if iter % 50 == 0:
+        if iter % 200 == 0:
             print('Weight:', weight, 'Iter:', iter, 'Error:', err)
-            weight -= weight*0.1
-            weight = max(weight, 0.1)
+            # weight -= weight*0.1
+            # weight = max(weight, 0.1)
         u = u_influences@Gammas
         v = v_influences@Gammas
         w = w_influences@Gammas
@@ -281,6 +317,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
         inflowangle = np.arctan(-v_axial/v_tangential)
         alpha = twist.flatten() -  (inflowangle*180/np.pi).flatten()
+        #alpha[npM:] = 5
         alpha = np.reshape(alpha, (-1, 1))
 
         if ReInfluence:
@@ -322,12 +359,29 @@ def solve(drone, updateConfig=True, case='main', save=False):
     r_steps = np.concatenate((r_main, r_small), axis=None)
 
     Lift = 0.5 * 1.225 * Cl.flatten() * (v_mag.flatten()**2) * chords.flatten() * r_steps.flatten()
+
     Drag = 0.5 * 1.225 * Cd.flatten() * (v_mag.flatten()**2) * chords.flatten() * r_steps.flatten()
+    print('----------------------------------')
+    # print('Lift small:', Lift[npM:npM + npS])
+    # print('Drag small:', Drag[npM:npM + npS])
 
     LD= (Lift[:npM].sum())/(Drag[:npM].sum())
 
+
+
     Faxial = Lift * np.cos(inflowangle.flatten()) - Drag * np.sin(inflowangle.flatten())
+    Faxial[npM:] = Lift[npM:] * np.cos(-(inflowangle[npM:]-np.pi/2).flatten()) - Drag[npM:] * np.sin(-(inflowangle[npM:]-np.pi/2).flatten())
     Ftan = Lift * np.sin(inflowangle.flatten()) + Drag * np.cos(inflowangle.flatten())
+
+    # print('V_axial small:', v_axial[npM:npM + npS])
+    # print('V_tangential small:', v_tangential[npM:npM + npS])
+    # print('V_rotational small:', v_rotational[npM:npM + npS, :])
+    # print('inflowangle small:', inflowangle[npM:npM + npS]*180/np.pi)
+    # print('alpha small:', alpha[npM:npM + npS])
+    # print('Faxial small:', Faxial[npM:npM + npS])
+    # print('Ftan small:', Ftan[npM:npM + npS])
+    # print('----------------------------------')
+
 
     r_main =  drone.main_prop.r
     r_small = drone.small_props[0].r
@@ -409,6 +463,8 @@ def solve(drone, updateConfig=True, case='main', save=False):
         misc[10] = npS
         misc[11] = main_NB
         misc[12] = small_NB
+        misc[13] = drone.main_prop.RPM
+        misc[14] = drone.small_props[0].RPM
         results = np.column_stack((r.flatten(), 
                                 v_axial.flatten(), 
                                 v_tangential.flatten(), 
@@ -423,9 +479,12 @@ def solve(drone, updateConfig=True, case='main', save=False):
                                 u.flatten(),
                                 v.flatten(),
                                 w.flatten(),
+                                Cl.flatten(),
+                                Cd.flatten(),
+                                Re.flatten(),
                                 misc))
 
-        header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, v_rot_a, v_rot_t, u, v, w,  misc"
+        header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, v_rot_a, v_rot_t, u, v, w, Cl, Cd,  misc"
         case = case.replace('.json', '')
         np.savetxt(f'./results/{case}_res.csv', results, delimiter=',', header=header, comments='')
 

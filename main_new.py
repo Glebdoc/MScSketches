@@ -28,10 +28,10 @@ with open('configs/base.json', 'r') as f:
     base_config = json.load(f)
 
 variables_to_test = {
-    "main_propeller.n":[3], 
+    "small_propellers.n":[ 20, 25, 30, 35, 40], 
 }
 config_files = generate_flexible_configs(base_config, variables_to_test, case="nS")
-output_title = 'core'
+output_title = 'small_props_noRe'
 
 # _______ Solver _______
 
@@ -47,7 +47,7 @@ for config in config_files:
     main_U = 5
     weight = 0.5
     upper_bound = 35_000
-    lower_bound = 2_000
+    lower_bound = 1_000
     if JUST_DISPLAY:
         drone = defineDrone(config)
         drone.display(color_main='blue', color_small='green', extra_points=None, extra_lines=None)
