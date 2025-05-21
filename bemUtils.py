@@ -180,34 +180,6 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
                 all_points.append(body.vortexTABLE[i,3:-2].tolist())
                 all_lines.append([2, start_index, start_index + 1])
                 start_index += 2
-            #     points, lines = i.get_plot_data(start_index)
-            #     all_points.extend(points)
-            #     all_lines.extend(lines)
-            #     start_index += len(points)
-
-                    # plotter = pv.Plotter()
-
-            # lines_data = np.genfromtxt('test_table.txt', delimiter=',')
-
-            # all_points = []
-            # all_lines = []
-
-            # for i in range(len(lines_data)):
-            #     all_points.append( lines_data[i, :3].tolist())  
-            #     all_points.append(lines_data[i, 3:-1].tolist())
-            #     all_lines.append([2, i*2, i*2 + 1])
-
-            # mesh = pv.PolyData()
-            # mesh.points = np.array(all_points)
-            # mesh.lines = np.array(all_lines).flatten()
-
-            # plotter.add_mesh(mesh, color='green', line_width=2)
-            # point_cloud = pv.PolyData(all_points)
-            # plotter.add_points(point_cloud, color='red', point_size=10, render_points_as_spheres=True)
-
-            # plotter.show_grid()
-            # plotter.show()
-
         
             poly_data = pv.PolyData(np.array(all_points))
             poly_data.lines = np.array(all_lines)
@@ -244,23 +216,23 @@ def computeVelocityField(plane='YZ', shift=0, discretization=50, plotting=False)
 
     if plane == 'YZ':
         y_range = np.linspace(-1.5, 1.5, discretization)
-        z_range = np.linspace(-5, .5, discretization)
+        z_range = np.linspace(-2, .5, discretization)
 
         Y, Z = np.meshgrid(y_range, z_range)
         N_points = len(Y.flatten())
         points = np.column_stack((np.ones(N_points)*shift, Y.flatten(), Z.flatten()))
 
     elif plane == 'XZ':
-        x_range = np.linspace(-1, 1, discretization)
-        z_range = np.linspace(-.5, .5, discretization)
+        x_range = np.linspace(-1.5, 1.5, discretization)
+        z_range = np.linspace(-2, 0.5, discretization)
 
         X, Z = np.meshgrid(x_range, z_range)
         N_points = len(X.flatten())
         points = np.column_stack((X.flatten(), np.ones(N_points)*shift, Z.flatten()))
 
     elif plane == 'XY':
-        x_range = np.linspace(-1., 1., discretization)
-        y_range = np.linspace(-1., 1., discretization)
+        x_range = np.linspace(-1.5, 1.5, discretization)
+        y_range = np.linspace(-1.5, 1.5, discretization)
 
         X, Y = np.meshgrid(x_range, y_range)
         N_points = len(X.flatten())

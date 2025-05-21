@@ -1,13 +1,13 @@
-LOAD ./airfoil/dat_files/a18sm.dat
-a18sm
+LOAD ./airfoil/dat_files/a18.dat
+a18
 PANE
 OPER
-Visc 5000000.0
+Visc 50000.0
 PACC
-./airfoil/data/a18smRe5000000.0.txt
+././airfoil/playground/a18Re50000.0.txt
 
 ITER 300
-ASeq -5 17 0.5
+ASeq -2 15 0.5
 
 
 quit

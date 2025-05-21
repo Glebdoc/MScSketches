@@ -22,6 +22,21 @@ import matplotlib.gridspec as gridspec
                                 # Re.flatten(),                16 
         #                         misc))
 
+# misc[0] = Thrust
+    # misc[1] = Torque
+    # misc[2] = LD
+    # misc[3] = FM
+    # misc[4] = power_required/total_power
+    # misc[5] = induced_power 
+    # misc[6] = profile_power
+    # misc[7] = induced_power + profile_power
+    # misc[8] = computed_power
+    # misc[9] = npM
+    # misc[10] = npS
+    # misc[11] = main_NB
+    # misc[12] = small_NB
+    # misc[13] = drone.main_prop.RPM
+    # misc[14] = drone.small_props[0].RPM
 def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, i):
     axs[0, 0].plot(r_main, -data[:n_main, 1], label=f'm1{file}', marker='o')
     axs[0, 0].plot(r_main, -data[n_main:2*n_main, 1], label=f'm2{file}', marker='o')
@@ -63,55 +78,43 @@ def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 
     axs[1, 1].set_title('r vs v_rot_small')
     axs[1, 1].legend()
 
-def plot(files, show=True, title=False, misc=True):
+def plot(files, show=True, title=False, misc=True, helicopter=False, QBlade=False):
     # Create figure and gridspec
-    fig = plt.figure(figsize=(20, 12))  # Just use plt.figure, not plt.subplots
-    gs = gridspec.GridSpec(3, 3, height_ratios=[1, 3, 3])  # First row for table
+    fig = plt.figure(figsize=(25, 8))  # Just use plt.figure, not plt.subplots
+    gs = gridspec.GridSpec(3, 4, height_ratios=[1, 3, 3])  # First row for table
 
     # Subplots: rows 1 and 2
     axs = np.array([
-        [fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1]), fig.add_subplot(gs[1, 2])],
-        [fig.add_subplot(gs[2, 0]), fig.add_subplot(gs[2, 1]), fig.add_subplot(gs[2, 2])]
+        [fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1]), fig.add_subplot(gs[1, 2]), fig.add_subplot(gs[1, 3])],
+        [fig.add_subplot(gs[2, 0]), fig.add_subplot(gs[2, 1]), fig.add_subplot(gs[2, 2]), fig.add_subplot(gs[2, 3])]
     ])
 
-    # misc[0] = Thrust
-    # misc[1] = Torque
-    # misc[2] = LD
-    # misc[3] = FM
-    # misc[4] = power_required/total_power
-    # misc[5] = induced_power 
-    # misc[6] = profile_power
-    # misc[7] = induced_power + profile_power
-    # misc[8] = computed_power
-    #     misc[9] = npM
-    # misc[10] = npS
-    # misc[11] = main_NB
-    # misc[12] = small_NB
-    # misc[13] = drone.main_prop.RPM
-    #     misc[14] = drone.small_props[0].RPM
+    
 
     labels = ['Thrust', 'Torque', 'LD', 'FM', 'η', 'P_ind', 'P_prof', 'P_tot', 'P_comp', 'npM', 'npS', 'NBm', 'NBs', 'RPMmain', 'RPMsmall', 'err',]
     table_data = []
 
-
-
-
+    colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+    count = 0
     for file in files:
+
         data = np.genfromtxt(f'./results/{file}_res.csv', delimiter=',', skip_header=1)
         file = file.replace("_res.csv", "")
 
         npM = int(data[9, -1])  # number of points in the main rotor
-        npS = int(data[10, -1])  # number of points in the small rotor
         main_NB = int(data[11, -1])
-        small_NB = int(data[12, -1])
-
         n_main = int(npM/main_NB)
-        n_small = int(npS/small_NB)
-
-        r_small = data[npM:npM + n_small, 0]
         r_main = data[:n_main, 0]
 
-
+        if not helicopter:
+            npS = int(data[10, -1])  # number of points in the small rotor
+            small_NB = int(data[12, -1])
+            n_small = int(npS/small_NB)
+            r_small = data[npM:npM + n_small, 0]
+            r_small_normalized = (r_small - r_small[0]) / (r_small[-1] - r_small[0])
+            r_small_rescaled = r_small_normalized * (r_main[-1] - r_main[0]) + r_main[0]
+            r_small = r_small_rescaled
+        
         #plot the data
         # r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, u, v, w
         v_axial = data[:, 1]
@@ -124,63 +127,89 @@ def plot(files, show=True, title=False, misc=True):
         Cl = data[:, 14]
         Cd = data[:, 15]
 
-        r_small_normalized = (r_small - r_small[0]) / (r_small[-1] - r_small[0])
-        r_small_rescaled = r_small_normalized * (r_main[-1] - r_main[0]) + r_main[0]
-        r_small = r_small_rescaled
-
-        # # plot V_axial for the 
-        # axs[0, 0].plot(r_main, -v_axial[:n_main], label=f'm1{file}', marker='o')
-        # axs[0, 0].plot(r_small, -v_axial[npM:npM + n_small], label=f's1{file}', marker='o')
-
-        # axs[0, 0].set_title('r vs v_axial')
-        # axs[0, 0].legend()
-
-        # # plot V_tangential 
-        # axs[0, 1].plot(r_main, -v_tangential[:n_main], label=f'm1{file}', marker='o')
-        # axs[0, 1].plot(r_small, -v_tangential[npM:npM + n_small], label=f's1{file}', marker='o')
-        # axs[0, 1].set_title('r vs v_tangential')
-        # axs[0, 1].legend()
+        color = colors[count % len(colors)]
 
         # plot Cl 
-        axs[0, 0].plot(r_main, Cl[:n_main], label=f'm1{file}', marker='o')
-        axs[0, 0].plot(r_small, Cl[npM:npM + n_small], label=f's1{file}', marker='o')
+        axs[0, 0].plot(r_main, Cl[:n_main], label=f'm1{file}', marker='o', color=color)
+        if not helicopter:
+            axs[0, 0].plot(r_small, Cl[npM:npM + n_small], label=f's1{file}', marker='x',  color=color, linestyle="--")   
+        if QBlade:
+            data_qb = np.genfromtxt(f'./QBlade_cl.txt', skip_header=3)
+            axs[0, 0].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
         axs[0, 0].set_title('r vs Cl')
         axs[0, 0].legend()
 
         # plot Cd
-        axs[0, 1].plot(r_main, Cd[:n_main], label=f'm1{file}', marker='o')
-        axs[0, 1].plot(r_small, Cd[npM:npM + n_small], label=f's1{file}', marker='o')
+        axs[0, 1].plot(r_main, Cd[:n_main], label=f'm1{file}', marker='o', color=color)
+        if not helicopter:
+            axs[0, 1].plot(r_small, Cd[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
+        if QBlade:
+            data_qb = np.genfromtxt(f'./QBlade_cd.txt', skip_header=3)
+            axs[0, 1].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
         axs[0, 1].set_title('r vs Cd')
         axs[0, 1].legend()
 
-        # plot inflowangle
-        axs[0, 2].plot(r_main, np.rad2deg(inflowangle[:n_main]), label=f'm1{file}', marker='o')
-        axs[0, 2].plot(r_small, np.rad2deg(inflowangle[npM:npM + n_small]), label=f's1{file}', marker='o')
-        axs[0, 2].set_title('r vs inflowangle')
+        # plot Re 
+        axs[0, 2].plot(r_main, data[:n_main, 16], label=f'm1{file}', marker='o', color=color)
+        if not helicopter:
+            axs[0, 2].plot(r_small, data[npM:npM + n_small, 16], label=f's1{file}', marker='x', color=color, linestyle="--")
+        if QBlade:
+            data_qb = np.genfromtxt(f'./QBlade_re.txt', skip_header=3)
+            axs[0, 2].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
+        axs[0, 2].set_title('r vs Re')
         axs[0, 2].legend()
 
-        # plot alpha
-        axs[1, 0].plot(r_main, alpha[:n_main], label=f'm1{file}', marker='o')
-        axs[1, 0].plot(r_small, alpha[npM:npM + n_small], label=f's1{file}', marker='o')
-        axs[1, 0].set_title('r vs alpha')
+        # plot v_axial
+        axs[0, 3].plot(r_main, v_axial[:n_main], label=f'm1{file}', marker='o', color=color)
+        if not helicopter:
+            axs[0, 3].plot(r_small, v_axial[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
+        # if QBlade:
+        #     data_qb = np.genfromtxt(f'./QBlade_vaxial.txt', skip_header=3)
+        #     axs[0, 3].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
+        axs[0, 3].set_title('r vs v_axial')
+        axs[0, 3].legend()
+        
+
+        # plot inflowangle
+        axs[1, 0].plot(r_main, np.rad2deg(inflowangle[:n_main]), label=f'm1{file}', marker='o', color=color)
+        if not helicopter:
+            axs[1, 0].plot(r_small, np.rad2deg(inflowangle[npM:npM + n_small]), label=f's1{file}', marker='x', color=color, linestyle="--")
+        if QBlade:
+            data_qb = np.genfromtxt(f'./QBlade_inflow.txt', skip_header=3)
+            axs[1, 0].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
+        axs[1, 0].set_title('r vs inflowangle')
         axs[1, 0].legend()
 
-        # # plot Faxial
-        # axs[1, 1].plot(r_main, Faxial[:n_main], label=f'm1{file}', marker='o')
-        # axs[1, 1].plot(r_small, Faxial[npM:npM + n_small], label=f's1{file}', marker='o')
-        # axs[1, 1].set_title('r vs Faxial')
-        # axs[1, 1].legend()
-
-        # plot Re 
-        axs[1, 1].plot(r_main, data[:n_main, 16], label=f'm1{file}', marker='o')
-        axs[1, 1].plot(r_small, data[npM:npM + n_small, 16], label=f's1{file}', marker='o')
-        axs[1, 1].set_title('r vs Re')
+        # plot alpha
+        axs[1, 1].plot(r_main, alpha[:n_main], label=f'm1{file}', marker='o', color=color)
+        if not helicopter:
+            axs[1, 1].plot(r_small, alpha[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
+        if QBlade:
+            data_qb = np.genfromtxt(f'./QBlade_aoa.txt', skip_header=3)
+            axs[1, 1].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
+        axs[1, 1].set_title('r vs alpha')
         axs[1, 1].legend()
-        # plot Ftan
-        axs[1, 2].plot(r_main, Ftan[:n_main], label=f'm1{file}', marker='o')
-        axs[1, 2].plot(r_small, Ftan[npM:npM + n_small], label=f's1{file}', marker='o')
-        axs[1, 2].set_title('r vs Ftan')
+
+        # plot Faxial
+        axs[1, 2].plot(r_main, Faxial[:n_main], label=f'm1{file}', marker='o', color=color)
+        if not helicopter:
+            axs[1, 2].plot(r_small, Faxial[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
+        if QBlade:
+            data_qb = np.genfromtxt(f'./QBlade_Faxial.txt', skip_header=3)
+            axs[1, 2].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
+        axs[1, 2].set_title('r vs Faxial')
         axs[1, 2].legend()
+
+        
+        # plot Ftan
+        axs[1, 3].plot(r_main, Ftan[:n_main], label=f'm1{file}', marker='o', color=color)
+        if not helicopter:
+            axs[1, 3].plot(r_small, Ftan[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
+        if QBlade:
+            data_qb = np.genfromtxt(f'./QBlade_Ftan.txt', skip_header=3)
+            axs[1, 3].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
+        axs[1, 3].set_title('r vs Ftan')
+        axs[1, 3].legend()
 
         if misc:
             data[15, -1] = 100*(data[7, -1] - data[8, -1])/data[7, -1]  # err
@@ -189,6 +218,7 @@ def plot(files, show=True, title=False, misc=True):
 
             row = [file] + [f"{v:.2f}" for v in values]
             table_data.append(row)
+        count += 1
     col_labels = ['Config'] + labels
     ax_table = fig.add_subplot(gs[0, :])
     ax_table.axis('off')
@@ -204,3 +234,4 @@ def plot(files, show=True, title=False, misc=True):
         plt.show()
 
     
+#plot(files=['experimental_pitch_root30'], show=True, title='no', misc=True, helicopter=True, QBlade=False)

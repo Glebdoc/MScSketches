@@ -107,6 +107,18 @@ class HorseShoe(Vortex):
         self.centre.rotate(R)
 
 
+def median_filter(data, kernel_size=5, startFromTheEnd=True, times=1):
+    for _ in range(times):
+        if startFromTheEnd:
+            data = data[::-1]
+        for i in range(len(data)):
+            if i < kernel_size // 2 or i >= len(data) - kernel_size // 2:
+                continue
+            data[i] = np.median(data[i - kernel_size // 2:i + kernel_size // 2 + 1])
+        if startFromTheEnd:
+            data = data[::-1]
+    return data
+
 class Propeller():
     def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='cosine', bodyIndex=0, small=False, main_rotor=None, contraction=True):
         self.diameter = diameter
@@ -120,6 +132,7 @@ class Propeller():
         self.U = U
         self.wake_length = wake_length
         self.chord = chord
+        self.v_axial = None
         self.distribution = distribution
         if self.distribution == 'cosine':
             R = diameter*0.5
@@ -136,11 +149,12 @@ class Propeller():
         self.vortexTABLE = []
         self.horseShoes = None
         self.bodyIndex = bodyIndex
-        self.assemble(main_rotor=None, contraction=contraction)
+        self.assemble(main_rotor=main_rotor, contraction=contraction)
         if self.small:
             self.bendSmallWake()
         self.rotate(*self.angles)
         self.translate(position)
+        
 
 
     def bendSmallWake(self):
@@ -178,7 +192,8 @@ class Propeller():
         # if body_index == 0:
         #     add =0
         # else:
-
+        if main_rotor is not None:
+            n_main = main_rotor.n
 
         ppr = 30 
         omega = 2*np.pi*self.RPM/60
@@ -191,6 +206,35 @@ class Propeller():
 
         dt = np.linspace(0, total_time, total_steps)
         zw = -self.U*dt 
+
+        try:
+            v_axial_orig = np.genfromtxt('./auxx/v_axial.txt')
+            if self.bodyIndex == 0:
+                v_axial = median_filter(v_axial_orig[:self.n-1].copy(), kernel_size=3, times=1)
+            else:
+                v_axial = median_filter(v_axial_orig[n_main-1:n_main-1 + self.n-1].copy(), kernel_size=3, times=1)
+
+            #v_axial = median_filter(v_axial, kernel_size=7, times=1)
+            v_axial = np.tile(v_axial, (self.NB))
+            print('V_axial loaded')
+
+            # plt.plot(v_axial_orig)
+            # plt.plot(v_axial)
+            # plt.show()
+
+        except:
+            v_axial = None
+            print('V_axial not loaded')
+
+        if v_axial is None:
+            print('V_axial is None')
+            my_U = np.linspace(-1, -3, self.n-1)
+        else:
+            print('V_axial is not None')
+            my_U = v_axial[:self.n-1]
+
+        # plt.plot(self.r[:-1], my_U)
+        # plt.show()
         self.zw = zw
 
         if contraction:
@@ -242,11 +286,17 @@ class Propeller():
             y_coord = np.vstack([ywl, ywr, yc]).reshape(-1, 1)
 
             z_0 = np.zeros(self.n)
-            zwl = np.outer(np.ones(self.n-1), zw)
+            #zwl = np.outer(np.ones(self.n-1), zw)
+            zwl = np.outer(my_U, dt)
+            # plt.imshow(zwl)
+            # plt.gca().set_aspect(20)
+            # plt.show()
             zwl  = np.hstack([z_0[:-1].reshape(-1, 1), zwl])
             zwl = np.stack((zwl[:, 1:], zwl[:, :-1]), axis=2).reshape(-1, 2)
+            
 
-            zwr = np.outer(np.ones(self.n-1), zw)
+            #zwr = np.outer(np.ones(self.n-1), zw)
+            zwr = np.outer(my_U, dt)
             zwr  = np.hstack([z_0[1:].reshape(-1, 1), zwr])
             zwr = np.stack((zwr[:, :-1], zwr[:, 1:]), axis=2).reshape(-1, 2)
 
@@ -256,11 +306,12 @@ class Propeller():
 
             coordinates = np.hstack([x_coord, y_coord, z_coord])
             
-            coorcdinates = (R @ coordinates.T).T
+            
+            coordinates = (R @ coordinates.T).T
 
-            x = coorcdinates[:, 0].reshape(-1, 2)
-            y = coorcdinates[:, 1].reshape(-1, 2)
-            z = coorcdinates[:, 2].reshape(-1, 2)
+            x = coordinates[:, 0].reshape(-1, 2)
+            y = coordinates[:, 1].reshape(-1, 2)
+            z = coordinates[:, 2].reshape(-1, 2)
 
             Gamma = np.ones((x.shape[0], 1))
 
@@ -268,8 +319,6 @@ class Propeller():
             table.append(chunk)
 
         self.vortexTABLE = np.vstack(table)
-
-
 
     def translate(self, translation):
         table = self.vortexTABLE
@@ -353,6 +402,7 @@ class Drone:
                  small_distribution, 
                  helicopter=False, contraction=True, wind=None, reynolds=False, core_size = 1e-5):
         # Main propeller
+
         self.main_prop = Propeller(main_position, 
                                    main_angles,
                                    main_hub,
@@ -373,17 +423,14 @@ class Drone:
         self.main_prop.airfoil = main_airfoil
         self.small_props = []
         self.wind = wind
+        self.helicopter = helicopter
         self.reynolds = reynolds
         self.total_velocity_vectors = None
         self.total_collocation_points = None
         self.axial_velocity = None
         self.tangential_velocity = None
         self.vortexTABLE = self.main_prop.vortexTABLE
-
         addHSN = max(self.vortexTABLE[:, -2])
-        print('addHSN', addHSN)
-
-
         main_NB = self.main_prop.NB
         main_R = self.main_prop.diameter/2
         if helicopter==False:
@@ -415,6 +462,7 @@ class Drone:
                 self.vortexTABLE = np.concatenate((self.vortexTABLE, table), axis=0)
 
                 self.small_props.append(small_prop)
+        self.nPoints = np.max(self.vortexTABLE[:, -2])
 
     def translate(self, translation):
         self.main_prop.translate(translation)
@@ -439,6 +487,14 @@ class Drone:
 def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=None):
     with open(f'./configs/{filename}', 'r') as f:
         config = json.load(f)
+
+        aircraft_type = config['main_propeller']['AIRCRAFT']
+
+        if aircraft_type == 'helicopter':
+            helicopter = True
+        else:
+            helicopter = False
+
         main_position = Point(*config['main_propeller']['position'])
         main_angles = config['main_propeller']['angles']
         main_hub = config['main_propeller']['hub']
@@ -452,43 +508,58 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         main_airfoil = config['main_propeller']['airfoil']
         main_wake_length = config['main_propeller']['wake_length']
 
-        if main_U is None:
-            main_U = config['main_propeller']['uWake']
-        if small_U is None:
-            small_U = config['small_propellers']['uWake']
-        if main_RPM is None:
-            main_RPM = config['main_propeller']['rpm']
-        if small_RPM is None:
-            small_RPM = config['small_propellers']['rpm']
-
-        Re_avg = 1.225*main_RPM*0.7*0.5*main_diameter * 2*np.pi/60 * 0.5*(main_chord_tip+main_chord_root)/1.81e-5
-        main_optimal_AoA = xfu.optimalAoA(main_airfoil, Re_avg)
-
-        main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) + main_optimal_AoA
+        main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) #+ main_optimal_AoA
         main_pitch = np.concatenate([main_pitch]*main_NB)
 
         main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
         main_chord = np.concatenate([main_chord]*main_NB)
 
-        small_props_angle = config['small_propellers']['angle']
-        small_props_diameter = config['small_propellers']['diameter']
-        small_props_NB = config['small_propellers']['NB']
+        if main_U is None:
+            main_U = config['main_propeller']['uWake']
         
-        small_chord_root = config['small_propellers']['chord_root']
-        small_chord_tip = config['small_propellers']['chord_tip']
-        small_props_n = config['small_propellers']['n']
-        small_props_hub = config['small_propellers']['hub']
+        if main_RPM is None:
+            main_RPM = config['main_propeller']['rpm']
+
         
-        small_pitch_root = config['small_propellers']['pitch_root']
-        small_pitch_tip = config['small_propellers']['pitch_tip']
-        small_AoA = config['small_propellers']['AoA']
-        small_wake_length = config['small_propellers']['wake_length']
 
-        small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
+        if helicopter!= True:
+            if small_U is None:
+                small_U = config['small_propellers']['uWake']
+            if small_RPM is None:
+                small_RPM = config['small_propellers']['rpm']
 
-        #small_props_pitch = bu.twistGen(small_pitch_root, small_pitch_tip, small_r, small_AoA)
-        small_props_pitch = np.linspace(small_pitch_root, small_pitch_tip, small_props_n-1)
-        small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
+        
+            small_props_angle = config['small_propellers']['angle']
+            small_props_diameter = config['small_propellers']['diameter']
+            small_props_NB = config['small_propellers']['NB']
+            
+            small_chord_root = config['small_propellers']['chord_root']
+            small_chord_tip = config['small_propellers']['chord_tip']
+            small_props_n = config['small_propellers']['n']
+            small_props_hub = config['small_propellers']['hub']
+            
+            small_pitch_root = config['small_propellers']['pitch_root']
+            small_pitch_tip = config['small_propellers']['pitch_tip']
+            small_AoA = config['small_propellers']['AoA']
+            small_wake_length = config['small_propellers']['wake_length']
+
+            small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
+
+            #small_props_pitch = bu.twistGen(small_pitch_root, small_pitch_tip, small_r, small_AoA)
+            small_props_pitch = np.linspace(small_pitch_root, small_pitch_tip, small_props_n-1)
+            small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
+            small_distribution = config['small_propellers']['distribution']
+        else:
+            small_props_angle = None
+            small_props_diameter = None
+            small_props_NB = None
+            small_props_hub = None
+            small_props_n = None
+            small_wake_length = None
+            small_props_chord = None
+            small_props_pitch = None
+            small_distribution = 'cosine'
+
 
         contraction = config['settings']['contraction']
         wind_speed = config['settings']['wind_speed']
@@ -503,19 +574,13 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         core_size = config['settings']['core_size']
 
         main_distribution = config['main_propeller']['distribution']
-        small_distribution = config['small_propellers']['distribution']
-
+        
         drone = Drone(main_position, main_angles, main_hub, main_diameter, 
                                     main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
                                     mainWakeLength=main_wake_length, smallWakeLength=small_wake_length, main_U=main_U, small_U = small_U, 
                                     main_distribution=main_distribution, small_distribution=small_distribution, 
-                                    contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size)
-
-        # write optimal AoA to config file
-        config['main_propeller']['optimal_AoA'] = main_optimal_AoA
-        with open(f'./configs/{filename}', 'w') as f:
-            json.dump(config, f, indent=4)
+                                    contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size, helicopter=helicopter)
 
         return drone
