@@ -38,7 +38,7 @@ output_title = 'exp_drone'
 
 for config in config_files:
     err_desired = 1e-1
-    err_inner = 1e-2
+    err_inner = 1e-3
     max_iter = 50
     max_iter_thrust = 50
     iter_outer =0
@@ -83,15 +83,43 @@ for config in config_files:
                 print('_______________________________')
                 helicopter = drone.helicopter
                 if iter == 0:
-                    v_axial_old = np.linspace(0, -1, int(drone.nPoints+1))
+                    
+                    main_prop_n = drone.main_prop.n
+                    main_prop_NB = drone.main_prop.NB
+                    small_prop_n = drone.small_props[0].n
+                    nsm = (main_prop_n-1)*main_prop_NB
+                    v_axial_old_main = np.linspace(0, -1, nsm)
+                    v_axial_old_small = np.linspace(0, -1, int(drone.nPoints+1 - nsm))
                 old_main_U = main_U 
                 old_small_U = small_U
                 main_U_new, small_U_new, _,_,_, created_moment, Torque, Thrust, power_required, _,_, v_axial= solve(drone, case=f'{config}', updateConfig=True)
                 print('Solved')
                 print('_______________________________')
-                err = np.linalg.norm(v_axial_old - v_axial)
-                np.savetxt('./auxx/v_axial.txt', v_axial*weight + v_axial_old*(1-weight))
-                v_axial_old = v_axial
+                # error of the main rotor 
+
+                v_axial_main = v_axial[:nsm]
+                v_axial_small = v_axial[nsm:]
+
+                # normalize the axial velocity
+                v_axial_main_normalized = v_axial_main/np.linalg.norm(v_axial_main)
+                v_axial_small_normalized = v_axial_small/np.linalg.norm(v_axial_small)
+                
+                err_main = np.linalg.norm(v_axial_old_main - v_axial_main_normalized)
+                err_small = np.linalg.norm(v_axial_old_small - v_axial_small_normalized)
+
+                v_axial_old_main = v_axial_main_normalized
+                v_axial_old_small = v_axial_small_normalized
+
+                # update the axial velocity
+                v_axial_main_new = (1 - weight) * v_axial_main + weight * v_axial_old_main * np.linalg.norm(v_axial_main)
+                v_axial_small_new = (1 - weight) * v_axial_small + weight * v_axial_old_small * np.linalg.norm(v_axial_small)
+
+                
+                err = err_main + err_small
+                v_axial = np.concatenate((v_axial_main_new, v_axial_small_new))
+                #np.savetxt('./auxx/v_axial.txt', v_axial*weight + v_axial_old*(1-weight))
+                np.savetxt('./auxx/v_axial.txt', v_axial)
+                # v_axial_old = v_axial
 
 
                 # main_U = main_U_new*(1-weight) + weight * main_U

@@ -253,9 +253,14 @@ def solve(drone, updateConfig=True, case='main', save=False):
         vel_total  = np.column_stack((vel_total_x, vel_total_y, vel_total_z))
 
         v_axial = np.sum(vel_total * n_azimuth, axis=1)
+        #plt.plot(v_axial, marker='o', label='v_axial')
+
         tan_direction = np.cross(total_colloc_points - n_origin, n_azimuth)
         tan_direction = tan_direction / np.linalg.norm(tan_direction, axis=1)[:, np.newaxis]
         v_tangential = np.sum(vel_total * tan_direction, axis=1)
+        # plt.plot(v_tangential, marker='o', label='v_tangential')
+        # plt.legend()
+        # plt.show()
 
         v_mag = np.sqrt(v_axial**2 + v_tangential**2)
         Re = 1.225*v_mag.flatten()*chords.flatten()/1.81e-5
@@ -283,8 +288,8 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
 
         alpha = twist.flatten() -  (inflowangle*180/np.pi).flatten()
-        if not helicopter:
-            alpha[npM:] = 5.5
+        # if not helicopter:
+        #     alpha[npM:] = 5.5
         alpha = np.reshape(alpha, (-1, 1))
 
         if ReInfluence:

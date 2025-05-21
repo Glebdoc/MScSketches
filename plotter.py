@@ -234,4 +234,4 @@ def plot(files, show=True, title=False, misc=True, helicopter=False, QBlade=Fals
         plt.show()
 
     
-#plot(files=['experimental_pitch_root30'], show=True, title='no', misc=True, helicopter=True, QBlade=False)
+# plot(files=['exp_drone_pitch_root20'], show=True, title='no', misc=True, helicopter=False, QBlade=False)

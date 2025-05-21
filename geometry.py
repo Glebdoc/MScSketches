@@ -194,6 +194,7 @@ class Propeller():
         # else:
         if main_rotor is not None:
             n_main = main_rotor.n
+            main_NB = main_rotor.NB
 
         ppr = 30 
         omega = 2*np.pi*self.RPM/60
@@ -212,7 +213,9 @@ class Propeller():
             if self.bodyIndex == 0:
                 v_axial = median_filter(v_axial_orig[:self.n-1].copy(), kernel_size=3, times=1)
             else:
-                v_axial = median_filter(v_axial_orig[n_main-1:n_main-1 + self.n-1].copy(), kernel_size=3, times=1)
+                #v_axial = median_filter(v_axial_orig[n_main-1:n_main-1 + self.n-1].copy(), kernel_size=3, times=1)
+                #v_axial = median_filter(v_axial_orig[main_NB*(n_main-1):main_NB*(n_main-1) + self.n-1].copy(), kernel_size=3, times=1)
+                v_axial = v_axial_orig[main_NB*(n_main-1):main_NB*(n_main-1) + self.n-1]
 
             #v_axial = median_filter(v_axial, kernel_size=7, times=1)
             v_axial = np.tile(v_axial, (self.NB))
@@ -228,7 +231,18 @@ class Propeller():
 
         if v_axial is None:
             print('V_axial is None')
-            my_U = np.linspace(-1, -3, self.n-1)
+            #my_U = np.linspace(-1, -3, self.n-1)
+            omega = 2*np.pi*self.RPM/60
+            solidity = self.NB*self.chord[:self.n-1].flatten()/(np.pi*self.r[:self.n-1])
+            twist_local = np.radians(self.pitch[:self.n-1])
+            cla = 0.5
+            inflowratio = solidity*cla/16*(np.sqrt(1 + 32*twist_local/(cla*solidity)) - 1)
+            if self.bodyIndex == 0:
+                my_U = - inflowratio*omega*self.r[:-1] 
+            else:
+                my_U = - inflowratio*omega*self.r[:-1] - main_rotor.RPM*0.10472*main_rotor.diameter*0.5
+
+
         else:
             print('V_axial is not None')
             my_U = v_axial[:self.n-1]
