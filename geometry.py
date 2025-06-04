@@ -187,11 +187,6 @@ class Propeller():
 
 
     def assemble(self, main_rotor=None, contraction=True):
-        # body_index = self.bodyIndex
-        # # compute number of collocs before you 
-        # if body_index == 0:
-        #     add =0
-        # else:
         if main_rotor is not None:
             n_main = main_rotor.n
             main_NB = main_rotor.NB
@@ -212,18 +207,13 @@ class Propeller():
             v_axial_orig = np.genfromtxt('./auxx/v_axial.txt')
             if self.bodyIndex == 0:
                 v_axial = median_filter(v_axial_orig[:self.n-1].copy(), kernel_size=3, times=1)
+                v_axial = np.tile(v_axial, (self.NB))
             else:
-                #v_axial = median_filter(v_axial_orig[n_main-1:n_main-1 + self.n-1].copy(), kernel_size=3, times=1)
-                #v_axial = median_filter(v_axial_orig[main_NB*(n_main-1):main_NB*(n_main-1) + self.n-1].copy(), kernel_size=3, times=1)
-                v_axial = v_axial_orig[main_NB*(n_main-1):main_NB*(n_main-1) + self.n-1]
+                start = main_NB*(n_main-1) + (self.n-1)*self.NB*(self.bodyIndex-1)
+                end = main_NB*(n_main-1) + (self.n-1)*self.NB*self.bodyIndex
+                v_axial = v_axial_orig[start:end]
 
-            #v_axial = median_filter(v_axial, kernel_size=7, times=1)
-            v_axial = np.tile(v_axial, (self.NB))
             print('V_axial loaded')
-
-            # plt.plot(v_axial_orig)
-            # plt.plot(v_axial)
-            # plt.show()
 
         except:
             v_axial = None
@@ -242,13 +232,10 @@ class Propeller():
             else:
                 my_U = - inflowratio*omega*self.r[:-1] - main_rotor.RPM*0.10472*main_rotor.diameter*0.5
 
-
+        
         else:
             print('V_axial is not None')
             my_U = v_axial[:self.n-1]
-
-        # plt.plot(self.r[:-1], my_U)
-        # plt.show()
         self.zw = zw
 
         if contraction:
@@ -258,6 +245,8 @@ class Propeller():
         
 
         for j in range(self.NB):
+            if v_axial is not None:
+                my_U = v_axial[j*(self.n-1):(j+1)*(self.n-1)]
             shift = j*2*np.pi/self.NB
             if j != 0:
                 R = bu.rotation_matrix(0, 0, shift)

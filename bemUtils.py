@@ -130,7 +130,7 @@ def endurance(power_required, battery_capacity, battery_config='2P6S', battery_e
  
 def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velocity_vectors, tangential_velocity_vectors, extra_points=None, extra_lines=None):
         plotter = pv.Plotter()
-        plotter.set_background("black") 
+        plotter.set_background("white") 
 
         if total_velocity_vectors is not None:
             poly_data = pv.PolyData(collocation_points)
@@ -138,7 +138,7 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
             magnitude = np.linalg.norm(total_velocity_vectors, axis=1)
             poly_data['magnitude'] = magnitude
             glyphs = poly_data.glyph(orient='vectors', scale='magnitude', factor=0.004)
-            plotter.add_mesh(glyphs, color="white")
+            plotter.add_mesh(glyphs, color="white", opacity=0.5)
 
         if axial_velocity_vectors is not None:
             poly_data = pv.PolyData(collocation_points) 
@@ -183,7 +183,7 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
         
             poly_data = pv.PolyData(np.array(all_points))
             poly_data.lines = np.array(all_lines)
-            plotter.add_mesh(poly_data, color=colors[j], line_width=2)
+            plotter.add_mesh(poly_data, color=colors[j], line_width=2, opacity=0.5)
             poly_data = pv.PolyData(np.array(coll_points))
             plotter.add_mesh(poly_data, color="red")
 

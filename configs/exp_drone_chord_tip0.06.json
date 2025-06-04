@@ -18,8 +18,8 @@
         "diameter": 2.0,
         "NB": 3,
         "chord_root": 0.1,
-        "chord_tip": 0.1,
-        "pitch_root": 20,
+        "chord_tip": 0.06,
+        "pitch_root": 30,
         "pitch_tip": 7,
         "OPERATION": "__",
         "rpm": 370,
@@ -30,8 +30,8 @@
         "uWake": 2,
         "optimal_AoA": 5.0,
         "distribution": "uniform",
-        "aspect_ratio": 10.0,
-        "rotor_solidity": 0.0955
+        "aspect_ratio": 12.5,
+        "rotor_solidity": 0.0764
     },
     "small_propellers": {
         "POSITIONING": "__",
@@ -64,8 +64,8 @@
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 89.01092543196697,
-        "Torque": 8.736023810978482,
-        "FM": 0.8422153493858112
+        "Thrust": 76.42866461028316,
+        "Torque": 8.234716772178338,
+        "FM": 0.7320572545461623
     }
 }

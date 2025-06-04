@@ -21,15 +21,17 @@
     "chord_tip": 0.1,
     "pitch_root": 15,
     "pitch_tip": 7,
-    "OPERATION": "__",  
+    "OPERATION": "__",
     "rpm": 370,
     "REFINEMENT": "__",
     "n": 80,
-    "wake_length": 2,
+    "wake_length": 6,
     "INITIAL": "__",
     "uWake": 2,
     "optimal_AoA": 5.0,
-    "distribution": "uniform"
+    "distribution": "uniform",
+    "aspect_ratio": 10.0,
+    "rotor_solidity": 0.0955
   },
   "small_propellers": {
     "POSITIONING": "__",
@@ -50,7 +52,9 @@
     "wake_length": 15,
     "INITIAL": "__",
     "uWake": 30,
-    "distribution": "uniform"
+    "distribution": "uniform",
+    "aspect_ratio": 3.75,
+    "rotor_solidity": 0.2546
   },
   "settings": {
     "contraction": false,

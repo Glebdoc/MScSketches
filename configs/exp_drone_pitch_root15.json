@@ -19,7 +19,7 @@
         "NB": 3,
         "chord_root": 0.1,
         "chord_tip": 0.1,
-        "pitch_root": 20,
+        "pitch_root": 15,
         "pitch_tip": 7,
         "OPERATION": "__",
         "rpm": 370,
@@ -64,8 +64,8 @@
         "wind_angle": 0
     },
     "results": {
-        "Thrust": 89.01092543196697,
-        "Torque": 8.736023810978482,
-        "FM": 0.8422153493858112
+        "Thrust": 79.36791103176435,
+        "Torque": 7.517391915539599,
+        "FM": 0.8183451347560002
     }
 }

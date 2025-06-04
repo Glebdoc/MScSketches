@@ -315,10 +315,6 @@ def solve(drone, updateConfig=True, case='main', save=False):
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print(f'Iteration: {iter}, Error: {err}, Weight: {weight}')
 
-    mean_axial_main = v_axial[:main_NB*(main_n-1)].mean()
-    mean_axial_small = v_axial[main_NB*(main_n-1):].mean()
-
-
     if not ReInfluence:
         Cd = np.interp(alpha, alphaPolar, cdPolar)
 
@@ -426,6 +422,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
     p_ideal = Thrust * np.sqrt(Thrust/(2*(drone.main_prop.diameter**2)*np.pi*1.225/4))
     FM = p_ideal/total_power
+    L_unitspan = Lift.flatten() / (chords.flatten() * r_steps.flatten())
 
     print(f"Main Blade Thrust {Thrust:.2f} Main Blade Torque {Torque:.2f} Main Blade Power {computed_power:.2f} T/Q: {Thrust/Torque:.2f} FM:{FM:.2f} Preq/Protor: {power_required/total_power:.2f}")
     print('----------------------------------')
@@ -482,6 +479,8 @@ def solve(drone, updateConfig=True, case='main', save=False):
                                 Cl.flatten(),
                                 Cd.flatten(),
                                 Re.flatten(),
+                                L_unitspan,
+                                chords.flatten(),
                                 misc))
 
         header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, v_rot_a, v_rot_t, u, v, w, Cl, Cd,  misc"
@@ -490,4 +489,4 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
     np.savetxt('./auxx/v_axial.txt', v_axial)
 
-    return abs(mean_axial_main), abs(mean_axial_small), None, Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial
+    return FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial
