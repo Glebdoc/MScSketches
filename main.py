@@ -23,19 +23,19 @@ FLAGS = {
 }
 
 # --- Inputs ---
-PATH = 'configs/base_helicopter.json'
+PATH = 'configs/base.json'
 MTOW = 100  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
-    "main_propeller.wake_length": [2,4,6]
+    "main_propeller.wake_length": [2]
 }
 
 ERR_VEL  = 1e-3
 ERR_MOMENT = 1e-1
 ERR_THRUST = 1e-1
 IT_MAX = 50
-WEIGHT_VEL = 0.5  # Weight for the velocity error correction
-TITLE= 'YourMomsHeli'  # Title for the plot
+WEIGHT_VEL = 0.3  # Weight for the velocity error correction
+TITLE= 'JustinRe'  # Title for the plot
 
 
 
@@ -136,6 +136,13 @@ def main():
     for config in configFiles:
         errThrust, iterThrust = 1, 0
         upperBoundMain, lowerBoundMain = 800, 250
+
+        if FLAGS["just_display"]:
+            # Define the drone
+            drone = defineDrone(config, main_RPM=RPM_MAIN, small_RPM=RPM_SMALL)
+            # Display the drone
+            drone.display(color_main='gray', color_small='green', extra_points=None, extra_lines=None)
+            break
         while errThrust > ERR_THRUST and iterThrust < IT_MAX:
 
             errMoment, iterMoment = 1, 0
@@ -209,6 +216,7 @@ def main():
 
 
     if FLAGS["plot_results"]:
+        plt.ioff()  # Turn off interactive mode
         for i in range(len(configFiles)):
             configFiles[i] = configFiles[i].replace('.json', '')
         myPlt.plot(configFiles, show = True, title=TITLE, helicopter=FLAGS['helicopter'], QBlade=False)

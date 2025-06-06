@@ -269,27 +269,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
         inflowangle = np.arctan(-v_axial/v_tangential)
 
-        # some bullshitting here to remove the oscillations in the inflow angle
-
-        # modified_inflowangle = np.zeros((collocN))
-        # window = 7
-        # threshold = 4*np.pi/180
-        # for i in range(npM- window):
-        #     local_inflow = inflowangle[i:i+window]
-        #     median_inflow = np.median(local_inflow)
-        #     for j in range(window):
-        #         #print(local_inflow[j] - median_inflow)
-        #         if np.abs(local_inflow[j] - median_inflow) > threshold:
-        #             modified_inflowangle[i+j] = median_inflow
-        #             #print('Modified inflow angle', i+j, 'from', local_inflow[j], 'to', median_inflow)
-        #         else:
-        #             modified_inflowangle[i+j] = local_inflow[j]
-        # inflowangle[:npM] = modified_inflowangle[:npM]
-
-
         alpha = twist.flatten() -  (inflowangle*180/np.pi).flatten()
-        # if not helicopter:
-        #     alpha[npM:] = 5.5
         alpha = np.reshape(alpha, (-1, 1))
 
         if ReInfluence:

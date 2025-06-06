@@ -439,7 +439,7 @@ class Drone:
         if helicopter==False:
             for i in range(main_NB):
                 shift = i*(2*np.pi/main_NB)
-                position = Point(main_R*np.cos(shift+np.pi/2), main_R*np.sin(shift+np.pi/2), 0.05) # try 0.05
+                position = Point(main_R*np.cos(shift+np.pi/2), main_R*np.sin(shift+np.pi/2), 0.0) # try 0.05
 
                 angles = np.array([0,-small_props_angle*np.pi/180, shift]) 
                 small_prop = Propeller(position, 

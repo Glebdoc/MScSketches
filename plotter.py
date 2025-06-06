@@ -462,5 +462,5 @@ def plotForces(files, misc=True):
 
     plt.show()
 
-plotForces(files=['exp_drone_chord_tip0.1', 'YourMomsHeli_chord_tip0.1', 'YourMomsHeli_wake_length2', 'YourMomsHeli_wake_length4', 'YourMomsHeli_wake_length6'], misc=True)
+#plotForces(files=['exp_drone_chord_tip0.1', 'YourMomsHeli_chord_tip0.1', 'YourMomsHeli_wake_length2', 'YourMomsHeli_wake_length4', 'YourMomsHeli_wake_length6'], misc=True)
 #plot(files=['exp_drone_chord_tip0.1'], show=True, title='no', misc=True, helicopter=False, QBlade=False)
