@@ -17,7 +17,7 @@ from scipy.interpolate import RegularGridInterpolator
 # airfoil polars for Various Re numbers
 ###
 
-airfoil_name = ["NACA 0012", "a18sm" ]
+airfoil_name = ["a18sm" ]
 directory = "./airfoil/dat_files"
 
 alpha_i = -2
