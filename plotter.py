@@ -231,7 +231,7 @@ def plot(files, show=True, title=False, misc=True, helicopter=False, QBlade=Fals
         area = chords[:n_main-1] * (r_main[1:] - r_main[:-1])  # assuming uniform chord length
 
         color = colors[count % len(colors)]
-        plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 1)
+        #plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 1)
 
         # plot Cl 
         axs[0, 0].plot(r_main, Cl[:n_main], label=f'm1{file}', marker='o', color=color)
@@ -577,7 +577,7 @@ def mainRotorForces(cfd_file, ll_files):
     ax1_err = axs[1].twinx()
     alpha=1
     for ll_file in ll_files:
-        alpha-=0.2 # Decrease alpha for each LL file to make them more transparent
+        alpha-=0.9/len(ll_files) # Decrease alpha for each LL file to make them more transparent
 
         # Load LL data
         ll_data = np.genfromtxt(f'./results/{ll_file}_res.csv', delimiter=',', skip_header=1)
@@ -644,6 +644,7 @@ def mainRotorForces(cfd_file, ll_files):
     plt.show()
 
     
-#tipRotorForces('drone8040_7445_CFD_1500.csv', 'drone8040_7445__blade1_angle0' )
+#tipRotorForces('drone8040_7445_CFD_1500.csv', 'drone8040_7445_n80_newNPZ_blade1_angle15' )
 #convergence(['drone8040_7445_CFD_1500','drone8040_7445_CFD_2000'])
-mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_7445_n80_blade1_angle0', 'drone8040_7445_n80_blade1_angle30', 'drone8040_7445_n80_blade1_angle45', 'drone8040_7445_n80_blade1_angle60'])
+#mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_7445_n80_newNPZ_blade1_angle15', 'drone8040_7445_n80_newNPZ_blade1_angle30', 'drone8040_7445_n80_newNPZ_blade1_angle45', 'drone8040_7445_n80_newNPZ_blade1_angle60', 'drone8040_7445_n80_newNPZ_blade1_angle85', 'drone8040_7445_n80_newNPZ_blade1_angle95'])
+mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_7445_SWE_blade1_angle0', 'drone8040_7445_SWE_wake_length5', 'drone8040_7445_SWE_wake_length10'])

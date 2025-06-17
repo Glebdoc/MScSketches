@@ -29,7 +29,8 @@ PATH = 'configs/base.json'
 MTOW = 100  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
-    "settings.blade1_angle":[15, 30, 45, 60],
+    #"small_propellers.wake_length":[7,],  # Main pro,peller angle
+    "settings.blade1_angle":[0],  # Main propeller angle
 
 }
 
@@ -38,8 +39,9 @@ ERR_MOMENT = 1e-2
 ERR_THRUST = 1e-1
 IT_MAX = 50
 WEIGHT_VEL = 0.995 # The heigher the more stable
-TITLE= 'drone8040_7445_n80'  # Title for the plot
+TITLE= 'drone8040_7445_SWE'  # Title for the plot
 
+#SWE - small wake effect
 
 
 # --- Functions ---
@@ -309,7 +311,7 @@ def main():
         for i in range(len(configFiles)):
             configFiles[i] = configFiles[i].replace('.json', '')
         myPlt.plot(configFiles, show = True, title=TITLE, helicopter=FLAGS['helicopter'], QBlade=False)
-        #drone.display(color_main='gray', color_small='green', extra_points=None, extra_lines=None)
+        drone.display(color_main='gray', color_small='green', extra_points=None, extra_lines=None)
 
     # clean up, delete the auxx files
     #os.remove('./auxx/v_axial.txt')

@@ -166,12 +166,14 @@ class Propeller():
     def bendSmallWake(self):
 
         tempR = np.sqrt(self.position.x**2 + self.position.y**2)
+        print('tempR', tempR)
 
         points = self.vortexTABLE[:, :6]
         points = points.reshape(-1, 3)
 
         points[:, 1] += tempR
-        theta= np.arctan(points[:, 2]/tempR)
+        #theta= np.arctan(points[:, 2]/tempR)
+        theta = points[:, 2]/tempR
 
         r_to_axis = np.sqrt(tempR**2 + points[:, 2]**2)
 
@@ -251,7 +253,9 @@ class Propeller():
                 lmbda = 4.0 *(Ct**0.5)
                 mult = A + (1-A)*np.exp(-lmbda*contTheta)
             else:
-                mult = bu.contraction_sigmoid(zw, contraction=0.78) ### this gives me my new R per level (replace) 
+                mult = bu.contraction_sigmoid(zw, contraction=1.) ### this gives me my new R per level (replace) 
+                #mult = np.ones(len(zw))
+                print('mult', mult)
 
             ##########
             # basically I need to replace zwl with pre computed coordinates, and I also need to feed Thrust to this function coordinates

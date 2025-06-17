@@ -27,7 +27,6 @@ n_iter = 300
 max_runtime = 20  # Max time (in seconds) allowed per XFOIL run
 
 # Let's find the best airfoil for each reynolds number
-re = np.linspace(50_000, 500_000, 3)
 
 # we will go through each file in dat_files 
 # and run xfoil on it
@@ -76,8 +75,10 @@ def genDataBase(airfoil_name, Re, max_runtime, dest_dir="./airfoil/data", pull=F
             except Exception as e:
                 print(f"XFOIL run for {airfoil} at Re = {re} failed.")
 
-# Re = np.linspace(50_000, 500_000, 3)
-# genDataBase(airfoil_name, Re, max_runtime, pull=True, dest_dir="./airfoil/playground")
+# Re = np.linspace(20_000, 300_000, 50)
+# print("Generating database for airfoil: ", airfoil_name)
+# time.sleep(2)  # Sleep for 2 seconds to allow XFOIL to finish writing the polar file
+# genDataBase(airfoil_name, Re, max_runtime, pull=False, dest_dir="./airfoil/playground")
 
 def computeCubicCoefficients(alpha0, alpha1,f0, f1, df0, df1):
     # solve a system 
@@ -89,9 +90,6 @@ def computeCubicCoefficients(alpha0, alpha1,f0, f1, df0, df1):
     b = np.array([f1, f0, df1, df0])
     coeffs = np.linalg.solve(A, b)
     return coeffs
-
-
-
 
 def extendPolarData(data):
     alpha = data[:, 0]
@@ -185,12 +183,12 @@ def updatePolar(airfoil_name):
     N = 720
     alpha = np.linspace(-180, 180, 720)
     for airfoil in airfoil_name:
-        for polar in os.listdir("./airfoil/data"):
+        for polar in os.listdir("./airfoil/playground"):
             Re = 0
             cl, cd = [], [] 
             if airfoil in polar:
                 Re =(float(polar.split("Re")[1].split(".txt")[0]))
-                data = np.genfromtxt(f"./airfoil/data/{polar}", skip_header=12)
+                data = np.genfromtxt(f"./airfoil/playground/{polar}", skip_header=12)
                 # # check if the polar file is valid
                 # if data.shape[1] != 3:
                 #     print(f"Polar file {polar} is not valid.")
@@ -225,7 +223,6 @@ def updatePolar(airfoil_name):
             f.close()
             print(f"Polar data for {airfoil} at Re = {Re} updated.")
  
-
 def getPolar(airfoil_name, Re, target_alpha, interpolate=True):
 
     # find Re above and below the target Re
@@ -303,6 +300,8 @@ def build_airfoil_npz(airfoil_name, source_dir="./airfoil/data/updated", output_
     np.savez_compressed(f"{output_dir}/{airfoil_name}.npz", Re=re_array, polar=polar_data)
 
     print(f"Saved {airfoil_name} data to {output_dir}/{airfoil_name}.npz")
+
+#build_airfoil_npz("a18sm", source_dir="./airfoil/data/updated", output_dir="./airfoil/data/numpy")
 
 def load_polar_npz(airfoil_name, npz_dir="./airfoil/numpy"):
     data = np.load(f"{npz_dir}/{airfoil_name}.npz")
