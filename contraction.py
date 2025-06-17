@@ -1,4 +1,5 @@
 import numpy as np 
+import matplotlib.pyplot as plt
 """"
 From: A Prescribed Wake Lifting Surface Hover Performance Analysis
       by J. David Kocurek James L. Tangler
@@ -24,3 +25,33 @@ def get_k2(B, C, C_T, NB, n ,m):
     C_T0 = (NB**n) * ((- B/C)**(1/m))
     k2 = - (C_T - C_T0)**0.5
     return k2
+
+
+"""
+
+r = A + (1-A)*np.exp(-lambda*theta) ; where A = 0.78
+
+assuming T = 70N 
+
+lambda = 4.0 * (C_T**0.5)
+
+"""
+
+def computeCt(T, Omega, R):
+    return T/(1.225*np.pi*R*R*(Omega*R)**2)
+
+def computeR(theta):
+    A = 0.78
+    Ct = computeCt(70, 100, 0.5)  # Example values for T, Omega, R
+    lmbda = 4.0 * (Ct**0.5)
+    return A + (1 - A) * np.exp(-lmbda * theta)
+
+theta = np.linspace(0, 4*360*np.pi/180, 100)  # Example theta values
+print("Theta values:", theta*180/np.pi)
+R_values = computeR(theta)
+plt.plot(theta, R_values)
+plt.grid()
+plt.xlabel('Theta')
+plt.ylabel('R values')
+plt.title('R values vs Theta')
+plt.show()

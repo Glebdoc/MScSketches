@@ -120,7 +120,8 @@ def median_filter(data, kernel_size=5, startFromTheEnd=True, times=1):
     return data
 
 class Propeller():
-    def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='cosine', bodyIndex=0, small=False, main_rotor=None, contraction=True):
+    def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='cosine', bodyIndex=0, small=False, main_rotor=None, 
+                 contraction=True, blade1_angle=0):
         self.diameter = diameter
         self.position = position
         self.small = small
@@ -133,10 +134,12 @@ class Propeller():
         self.wake_length = wake_length
         self.chord = chord
         self.v_axial = None
+        self.Ct = None
         self.distribution = distribution
         if self.distribution == 'cosine':
+            print('using cosine')
             R = diameter*0.5
-            theta = np.linspace(np.arccos(hub/R), np.pi/8,  n)
+            theta = np.linspace(np.arccos(hub/R), np.pi/10,  n)
             spacing = np.cos(0.5*theta)
             spacing = (spacing - np.min(spacing)) / (np.max(spacing) - np.min(spacing)) 
             spacing = spacing *(R - hub) + hub
@@ -151,9 +154,12 @@ class Propeller():
         self.bodyIndex = bodyIndex
         self.assemble(main_rotor=main_rotor, contraction=contraction)
         if self.small:
+            temp_angles = np.array([0, 0, blade1_angle*np.pi/180])
+            self.rotate(extra=True, a=temp_angles[0], b=temp_angles[1], c=temp_angles[2])
             self.bendSmallWake()
-        self.rotate(*self.angles)
-        self.translate(position)
+        #self.rotate(*self.angles)
+        self.rotate()
+        self.translate(position, main_rotor=main_rotor)
         
 
 
@@ -213,14 +219,11 @@ class Propeller():
                 end = main_NB*(n_main-1) + (self.n-1)*self.NB*self.bodyIndex
                 v_axial = v_axial_orig[start:end]
 
-            print('V_axial loaded')
 
         except:
             v_axial = None
-            print('V_axial not loaded')
 
         if v_axial is None:
-            print('V_axial is None')
             #my_U = np.linspace(-1, -3, self.n-1)
             omega = 2*np.pi*self.RPM/60
             solidity = self.NB*self.chord[:self.n-1].flatten()/(np.pi*self.r[:self.n-1])
@@ -234,12 +237,30 @@ class Propeller():
 
         
         else:
-            print('V_axial is not None')
             my_U = v_axial[:self.n-1]
         self.zw = zw
 
         if contraction:
-            mult = bu.contraction_sigmoid(zw, contraction=0.55)
+            if self.bodyIndex == 0:
+                contTheta = np.linspace(0, 2*np.pi*nrevs, total_steps)
+                if self.Ct is None:
+                    Ct = 0.01
+                else:
+                    Ct = self.Ct
+                A = 0.78
+                lmbda = 4.0 *(Ct**0.5)
+                mult = A + (1-A)*np.exp(-lmbda*contTheta)
+            else:
+                mult = bu.contraction_sigmoid(zw, contraction=0.78) ### this gives me my new R per level (replace) 
+
+            ##########
+            # basically I need to replace zwl with pre computed coordinates, and I also need to feed Thrust to this function coordinates
+            # i can start with a thrust computed from the momentum theory 
+            #  total time steps 
+
+            # theta = np.linspace(0, 2*np.pi*nrevs, total_steps)
+
+            ###########
         else:
             mult = np.ones(len(zw))
         
@@ -323,7 +344,14 @@ class Propeller():
 
         self.vortexTABLE = np.vstack(table)
 
-    def translate(self, translation):
+    def translate(self, translation, main_rotor=None):
+        if self.small:
+            addition  =  self.azimuth*(0.05)
+            translation.x += addition[0]
+            translation.y += addition[1]
+            translation.z += addition[2]
+
+
         table = self.vortexTABLE
         table[:,0] += translation.x
         table[:,1] += translation.y
@@ -343,12 +371,14 @@ class Propeller():
         self.vortexTABLE = table
                 
 
-    def rotate(self, delta_x=0, delta_y=0, delta_z=0):
+    def rotate(self, extra=False, a = None, b=None, c=None):    
         
+        if not extra:
 
-        self.angles = np.array([delta_x, delta_y, delta_z])
+            R = bu.rotation_matrix(*self.angles)
+        else:
+            R = bu.rotation_matrix(a, b, c)
 
-        R = bu.rotation_matrix(*self.angles)
 
         table = self.vortexTABLE
 
@@ -364,6 +394,30 @@ class Propeller():
 
         self.azimuth = R @ self.azimuth
 
+#####################################################################
+
+    # def rotate(self, delta_x=0, delta_y=0, delta_z=0, extra=False):
+        
+    #     if not extra:
+    #         self.angles = np.array([delta_x, delta_y, delta_z])
+
+    #     R = bu.rotation_matrix(*self.angles)
+
+    #     table = self.vortexTABLE
+
+    #     points = table[:, :6].reshape(-1, 3) 
+    #     points = (R @ points.T).T 
+    #     table[:, :6] = points.reshape(-1, 6)
+    #     self.vortexTABLE = table
+
+
+    #     for i in range(self.NB):
+    #         self.collocationPoints[i] = R @ self.collocationPoints[i]
+
+
+    #     self.azimuth = R @ self.azimuth
+
+####################################################################
 
 
 
@@ -403,7 +457,7 @@ class Drone:
                  small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
                  mainWakeLength, smallWakeLength, main_U, small_U, main_distribution, 
                  small_distribution, 
-                 helicopter=False, contraction=True, wind=None, reynolds=False, core_size = 1e-5):
+                 helicopter=False, contraction=True, wind=None, reynolds=False, core_size = 1e-5, blade1_angle=0):
         # Main propeller
 
         self.main_prop = Propeller(main_position, 
@@ -439,7 +493,7 @@ class Drone:
         if helicopter==False:
             for i in range(main_NB):
                 shift = i*(2*np.pi/main_NB)
-                position = Point(main_R*np.cos(shift+np.pi/2), main_R*np.sin(shift+np.pi/2), 0.0) # try 0.05
+                position = Point(main_R*np.cos(shift+np.pi/2), main_R*np.sin(shift+np.pi/2), 0.0)
 
                 angles = np.array([0,-small_props_angle*np.pi/180, shift]) 
                 small_prop = Propeller(position, 
@@ -455,7 +509,7 @@ class Drone:
                                     wake_length=smallWakeLength,
                                     distribution=small_distribution,
                                     bodyIndex=i+1,
-                                    small=True, main_rotor=self.main_prop, contraction=contraction)
+                                    small=True, main_rotor=self.main_prop, contraction=contraction, blade1_angle =blade1_angle)
                 
                 table = small_prop.vortexTABLE
                 table[:, -2] += addHSN+1
@@ -552,6 +606,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             small_props_pitch = np.linspace(small_pitch_root, small_pitch_tip, small_props_n-1)
             small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
             small_distribution = config['small_propellers']['distribution']
+            blade1_angle = config['settings']['blade1_angle']
         else:
             small_props_angle = None
             small_props_diameter = None
@@ -562,6 +617,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             small_props_chord = None
             small_props_pitch = None
             small_distribution = 'cosine'
+            blade1_angle = 0
 
 
         contraction = config['settings']['contraction']
@@ -584,6 +640,6 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
                                     mainWakeLength=main_wake_length, smallWakeLength=small_wake_length, main_U=main_U, small_U = small_U, 
                                     main_distribution=main_distribution, small_distribution=small_distribution, 
-                                    contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size, helicopter=helicopter)
+                                    contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size, helicopter=helicopter, blade1_angle=blade1_angle)
 
         return drone

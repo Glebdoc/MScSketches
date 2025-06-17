@@ -231,8 +231,8 @@ def computeVelocityField(plane='YZ', shift=0, discretization=50, plotting=False)
         points = np.column_stack((X.flatten(), np.ones(N_points)*shift, Z.flatten()))
 
     elif plane == 'XY':
-        x_range = np.linspace(-1.5, 1.5, discretization)
-        y_range = np.linspace(-1.5, 1.5, discretization)
+        x_range = np.linspace(-0.5, 1.0, discretization)
+        y_range = np.linspace(0.5, 1.3, discretization)
 
         X, Y = np.meshgrid(x_range, y_range)
         N_points = len(X.flatten())

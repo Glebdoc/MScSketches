@@ -1,28 +1,53 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.interpolate import make_interp_spline
 
-def median_filter(data, kernel_size=5, startFromTheEnd=True):
-    if startFromTheEnd:
-        data = data[::-1]
-    for i in range(len(data)):
-        if i < kernel_size // 2 or i >= len(data) - kernel_size // 2:
-            continue
-        data[i] = np.median(data[i - kernel_size // 2:i + kernel_size // 2 + 1])
-    if startFromTheEnd:
-        data = data[::-1]
-    return data
+data_main = np.loadtxt('./A18_(smoothed)_Re0.191_M0.00_N9.0.txt', skiprows=12)
+data_small = np.loadtxt('./A18 (smoothed)_A18_(smoothed)_Re0.050_M0.00_N9.0.txt',skiprows=12)
 
-x = np.linspace(0, 1, 100)
-data = np.sin(2 * np.pi * x) + 0.1 * np.random.normal(size=x.shape)
-filtered_data = median_filter(data.copy(), kernel_size=10)
-plt.plot(x, data, label='Original Data', alpha=0.5)
-plt.plot(x, filtered_data, label='Filtered Data', color='red')
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.title('Median Filter Example')
-plt.legend()
+spline = make_interp_spline(data_main[:, 0], data_main[:, 1], k=3)
+alpha_smooth = np.linspace(data_main[:, 0].min(), data_main[:, 0].max(), 300)
+cl_smooth = spline(alpha_smooth)
+
+spline2 = make_interp_spline(data_small[::3, 0], data_small[::3, 1], k=2)
+
+
+alpha_smooth_small = np.linspace(data_small[::3, 0].min(), data_small[::3, 0].max(), 300)
+cl_smooth_small = spline2(alpha_smooth_small)
+
+plt.plot(data_main[:, 0], data_main[:, 1], label='A18 (smoothed) Re0.191', marker='o')
+plt.plot(alpha_smooth, cl_smooth, label='A18 (smoothed) Re0.191 (spline)', linestyle='--')
+plt.plot(data_small[:, 0], data_small[:, 1], label='A18 (smoothed) Re0.050', marker='x')
+plt.plot(alpha_smooth_small, cl_smooth_small, label='A18 (smoothed) Re0.050 (spline)', linestyle='--')
+plt.xlabel('Alpha [deg]')
+plt.ylabel('Cl')
+plt.title('A18 Airfoil Cl Comparison')
 plt.grid()
+plt.legend()
 plt.show()
+
+# def median_filter(data, kernel_size=5, startFromTheEnd=True):
+#     if startFromTheEnd:
+#         data = data[::-1]
+#     for i in range(len(data)):
+#         if i < kernel_size // 2 or i >= len(data) - kernel_size // 2:
+#             continue
+#         data[i] = np.median(data[i - kernel_size // 2:i + kernel_size // 2 + 1])
+#     if startFromTheEnd:
+#         data = data[::-1]
+#     return data
+
+# x = np.linspace(0, 1, 100)
+# data = np.sin(2 * np.pi * x) + 0.1 * np.random.normal(size=x.shape)
+# filtered_data = median_filter(data.copy(), kernel_size=10)
+# plt.plot(x, data, label='Original Data', alpha=0.5)
+# plt.plot(x, filtered_data, label='Filtered Data', color='red')
+# plt.xlabel('X-axis')
+# plt.ylabel('Y-axis')
+# plt.title('Median Filter Example')
+# plt.legend()
+# plt.grid()
+# plt.show()
 
 # plot QBlade corrections 
 # data = np.loadtxt('QBlade_3D_correction_0.txt', skiprows=3)
