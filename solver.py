@@ -282,7 +282,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
     v_rotational = computeVrotational(drone, total_colloc_points, Omega, n_azimuth, n_origin, npM, npS, main_NB, helicopter=helicopter)
     twist[npM:] = 90 - twist[npM:]  # for small props, the twist is shifted by 90 degrees
 
-    weight = 0.1
+    weight = 0.05
     err = 1.0
     iter = 0
     while (err > 1e-8 and iter<1_000):
@@ -290,7 +290,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
         if iter % 200 == 0:
             print('Weight:', weight, 'Iter:', iter, 'Error:', err)
             weight -= weight*0.01
-            weight = max(weight, 0.05)
+            weight = max(weight, 0.03)
         u = u_influences@Gammas
         v = v_influences@Gammas
         w = w_influences@Gammas
@@ -365,6 +365,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
         # Gammas_tip = np.concatenate((Gammas_blade1, Gammas_blade2, Gammas_blade3))
         # Gammas[npM:] = np.tile(Gammas_tip, main_NB)
         Gammas[Gammas> 3] = 3 # limit the maximum value of Gammas to 10
+        Gammas[Gammas< -0.5] = -0.5 # limit the minimum value of Gammas to 0
 
         
           # apply median filter to main prop Gammas to remove spikes if any

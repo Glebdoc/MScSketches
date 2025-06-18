@@ -29,8 +29,7 @@ PATH = 'configs/base.json'
 MTOW = 100  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
-    #"small_propellers.wake_length":[7,],  # Main pro,peller angle
-    "settings.blade1_angle":[0],  # Main propeller angle
+    "small_propellers.wake_length":[8],  # Main pro,peller angle
 
 }
 
@@ -39,10 +38,10 @@ ERR_MOMENT = 1e-2
 ERR_THRUST = 1e-1
 IT_MAX = 50
 WEIGHT_VEL = 0.995 # The heigher the more stable
-TITLE= 'drone8040_7445_SWE'  # Title for the plot
+TITLE= 'drone8040_7445_ppr60'  # Title for the plot
 
 #SWE - small wake effect
-
+#MWE - main wake effect : no effect
 
 # --- Functions ---
 def loadConfig(path):
@@ -85,7 +84,7 @@ def initializeVaxial(drone, helicopter):
         v_axial_old_main = np.linspace(0, -1, int(drone.nPoints)+1)
         return v_axial_old_main, None, main_prop_NB, None, None, main_prop_n, None
     
-def computeVelocityError(v, vOldMain, vOldSmall, helicopter, nsm, mainNB, smallNB, weight, im1, cbar1, im2, cbar2, line3, line4, Gammas, k=0.1, mainN=None, smallN=None, ax=None):
+def computeVelocityError(v, vOldMain, vOldSmall, helicopter, nsm, mainNB, smallNB, weight, im1, cbar1, im2, cbar2, line3, line4, Gammas, k=0.05, mainN=None, smallN=None, ax=None):
     if not helicopter:
         vMain = v[:nsm]
         vSmall = v[nsm:]
@@ -303,7 +302,7 @@ def main():
         
         if FLAGS["save_results"]:
             _, FM, created_moment, Torque, Thrust, power_required, _,_, _= solve(drone, case=f'{config}', updateConfig=False, save=True)
-            #u, v, w = computeVelocityField(plane='XY', shift=0.0, discretization=100, plotting=True)
+            u, v, w = computeVelocityField(plane='XY', shift=0.0, discretization=100, plotting=True)
 
         #os.remove('./auxx/v_axial.txt')
     if FLAGS["plot_results"]:

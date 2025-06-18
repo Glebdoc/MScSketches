@@ -647,4 +647,4 @@ def mainRotorForces(cfd_file, ll_files):
 #tipRotorForces('drone8040_7445_CFD_1500.csv', 'drone8040_7445_n80_newNPZ_blade1_angle15' )
 #convergence(['drone8040_7445_CFD_1500','drone8040_7445_CFD_2000'])
 #mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_7445_n80_newNPZ_blade1_angle15', 'drone8040_7445_n80_newNPZ_blade1_angle30', 'drone8040_7445_n80_newNPZ_blade1_angle45', 'drone8040_7445_n80_newNPZ_blade1_angle60', 'drone8040_7445_n80_newNPZ_blade1_angle85', 'drone8040_7445_n80_newNPZ_blade1_angle95'])
-mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_7445_SWE_blade1_angle0', 'drone8040_7445_SWE_wake_length5', 'drone8040_7445_SWE_wake_length10'])
+mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_7445_SWE_blade1_angle0', 'drone8040_7445_SWE_wake_length5', 'drone8040_7445_ppr60_wake_length8'])

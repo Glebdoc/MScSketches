@@ -199,7 +199,7 @@ class Propeller():
             n_main = main_rotor.n
             main_NB = main_rotor.NB
 
-        ppr = 30 
+        ppr = 60 
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
         total_time = length/self.U
