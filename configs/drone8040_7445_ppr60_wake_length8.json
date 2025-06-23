@@ -48,7 +48,7 @@
     "OPERATION": "__",
     "rpm": 10000,
     "REFINEMENT": "__",
-    "n": 25,
+    "n": 5,
     "wake_length": 8,
     "INITIAL": "__",
     "uWake": 30,

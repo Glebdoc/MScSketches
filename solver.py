@@ -243,6 +243,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
     total_colloc_points = computeCollocationPoints(drone, npM, npS, main_NB, small_NB, main_n, small_n, helicopter=helicopter)
 
     table = np.array(drone.vortexTABLE)
+    np.savez(f'./auxx/{case}_table.npz', table=table[:,:6])
 
     if os.name == 'nt':
         mylib = ctypes.CDLL("./mylib.dll")  
@@ -260,7 +261,12 @@ def solve(drone, updateConfig=True, case='main', save=False):
     wInfluence_ptr = w_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     # Call the C function
 
+
+
     res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr, core_size)
+    # save the influence matrices to csv
+    #np.savez(f'./results/influence_matrices_{case}.npz', u_influences=u_influences, v_influences=v_influences, w_influences=w_influences)
+
 
     # n_azimuth, n_origin 
     n_azimuth, n_origin = computeAzimuthAndOrigin(drone, npM, npS, main_NB, collocN, helicopter=helicopter)
@@ -364,10 +370,9 @@ def solve(drone, updateConfig=True, case='main', save=False):
         # Gammas_blade3 = conditional_median_filter_1d(Gammas[npM+2*small_n-2:npM+3*small_n-3], kernel_size=5, std_thresh=treshold)
         # Gammas_tip = np.concatenate((Gammas_blade1, Gammas_blade2, Gammas_blade3))
         # Gammas[npM:] = np.tile(Gammas_tip, main_NB)
-        Gammas[Gammas> 3] = 3 # limit the maximum value of Gammas to 10
+        Gammas[Gammas> 3] = 2 # limit the maximum value of Gammas to 10
         Gammas[Gammas< -0.5] = -0.5 # limit the minimum value of Gammas to 0
 
-        
           # apply median filter to main prop Gammas to remove spikes if any
         # plt.plot(Gammas[:npM], marker='x', label='Gammas post')
         # plt.legend()
@@ -571,5 +576,6 @@ def solve(drone, updateConfig=True, case='main', save=False):
         np.savetxt(f'./results/{case}_res.csv', results, delimiter=',', header=header, comments='')
 
     np.savetxt('./auxx/v_axial.txt', v_axial)
+    drone.main_prop.v_axial = v_axial[:main_n]
 
     return Gammas.flatten(), FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial

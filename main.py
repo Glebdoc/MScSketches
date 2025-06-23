@@ -29,7 +29,7 @@ PATH = 'configs/base.json'
 MTOW = 100  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
-    "small_propellers.wake_length":[8],  # Main pro,peller angle
+    "settings.downwash":[0, 2, 4],  # Main pro,peller angle
 
 }
 
@@ -38,10 +38,11 @@ ERR_MOMENT = 1e-2
 ERR_THRUST = 1e-1
 IT_MAX = 50
 WEIGHT_VEL = 0.995 # The heigher the more stable
-TITLE= 'drone8040_7445_ppr60'  # Title for the plot
+TITLE= 'drone8040_mp'  # Title for the plot
 
 #SWE - small wake effect
 #MWE - main wake effect : no effect
+#DSW - downwash on a small propeller
 
 # --- Functions ---
 def loadConfig(path):
@@ -302,15 +303,15 @@ def main():
         
         if FLAGS["save_results"]:
             _, FM, created_moment, Torque, Thrust, power_required, _,_, _= solve(drone, case=f'{config}', updateConfig=False, save=True)
-            u, v, w = computeVelocityField(plane='XY', shift=0.0, discretization=100, plotting=True)
+            #u, v, w = computeVelocityField(plane='XY', shift=0.0, discretization=100, plotting=True)
 
-        #os.remove('./auxx/v_axial.txt')
+        os.remove('./auxx/v_axial.txt')
     if FLAGS["plot_results"]:
         plt.ioff()  # Turn off interactive mode
         for i in range(len(configFiles)):
             configFiles[i] = configFiles[i].replace('.json', '')
         myPlt.plot(configFiles, show = True, title=TITLE, helicopter=FLAGS['helicopter'], QBlade=False)
-        drone.display(color_main='gray', color_small='green', extra_points=None, extra_lines=None)
+        #drone.display(color_main='gray', color_small='green', extra_points=None, extra_lines=None)
 
     # clean up, delete the auxx files
     #os.remove('./auxx/v_axial.txt')

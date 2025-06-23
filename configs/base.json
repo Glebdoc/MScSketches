@@ -24,8 +24,8 @@
         "OPERATION": "__",
         "rpm": 370,
         "REFINEMENT": "__",
-        "n": 80,
-        "wake_length": 2,
+        "n": 40,
+        "wake_length": 50,
         "INITIAL": "__",
         "uWake": 2,
         "optimal_AoA": 5.0,
@@ -47,18 +47,20 @@
         "rpm": 10000,
         "REFINEMENT": "__",
         "n": 25,
-        "wake_length": 8,
+        "wake_length": 10,
         "INITIAL": "__",
-        "uWake": 30,
+        "uWake": 45,
         "distribution": "uniform"
     },
     "settings": {
         "contraction": true,
         "core_size": 1e-7,
-        "reynolds": true,
+        "reynolds": false,
         "wind_speed": 0,
         "wind_angle": 0,
-        "blade1_angle": 30
+        "blade1_angle": 0,
+        "downwash": 2,
+        "wake_bend":true
     },
     "results": {
         "Thrust": 6.228903687486652,

@@ -353,6 +353,9 @@ def tipRotorForces(cfd_file, ll_files):
     # plot 2 subplots for faxial and Ftan
     fig, axs = plt.subplots(2, 1, figsize=(10, 8))
 
+    ax0_err = axs[0].twinx()
+    ax1_err = axs[1].twinx()
+
     # plot cfd data
     r_cfd = cfd_data[:, 4]
     area_cfd = cfd_data[:, 5]
@@ -400,12 +403,11 @@ def tipRotorForces(cfd_file, ll_files):
 
 
 
-    axs[0].legend()
-    axs[1].legend()
+    axs[0].legend(loc='upper left')
+    axs[1].legend(loc='upper left')
 
     # add a second axis for the relative error
-    ax0_err = axs[0].twinx()
-    ax1_err = axs[1].twinx()
+    
 
     # compute relative error
     # interpolate f_axial
@@ -434,13 +436,20 @@ def tipRotorForces(cfd_file, ll_files):
     ax1_err.plot(r_small, rel_err_tan_b2, '--', label='RelErr Blade 2', color='red', alpha=0.3)
     ax1_err.plot(r_small, rel_err_tan_b3, '--', label='RelErr Blade 3', color='green', alpha=0.3)
 
-    ax0_err.yaxis.set_major_formatter(mtick.PercentFormatter())
-    ax1_err.yaxis.set_major_formatter(mtick.PercentFormatter())
+    # ax0_err.yaxis.set_major_formatter(mtick.PercentFormatter())
+    # ax1_err.yaxis.set_major_formatter(mtick.PercentFormatter())
 
-    ax0_err.legend(loc='upper right')
-    ax1_err.legend(loc='upper right')
+    ax0_err.legend(loc='lower right')
+    ax1_err.legend(loc='lower right')
 
-    plt.legend()
+    ax0_err.set_ylabel("Relative Error (Axial) [%]")
+    ax1_err.set_ylabel("Relative Error (Tangential) [%]")
+
+    axs[0].set_ylabel("Axial Force / Area ")
+    axs[1].set_ylabel("Tangential Force / Area ")
+
+    axs[1].set_xlabel("Radius [m]")
+
     plt.show()
 
 
@@ -490,7 +499,9 @@ def convergence(files):
     # Optional: show both legends (use a common one if needed)
     lines, labels = axs[1].get_legend_handles_labels()
     lines2, labels2 = ax1_err.get_legend_handles_labels()
-    axs[1].legend(lines + lines2, labels + labels2)
+    ax0_err.legend(loc='upper right')
+    ax1_err.legend(loc='upper right')
+    axs[1].legend()
 
     plt.tight_layout()
     plt.show()
@@ -577,7 +588,7 @@ def mainRotorForces(cfd_file, ll_files):
     ax1_err = axs[1].twinx()
     alpha=1
     for ll_file in ll_files:
-        alpha-=0.9/len(ll_files) # Decrease alpha for each LL file to make them more transparent
+         # Decrease alpha for each LL file to make them more transparent
 
         # Load LL data
         ll_data = np.genfromtxt(f'./results/{ll_file}_res.csv', delimiter=',', skip_header=1)
@@ -621,6 +632,8 @@ def mainRotorForces(cfd_file, ll_files):
 
         ax1_err.axhline(avg_rel_err_tan, color='black', linestyle='--',
                 label=f'Avg RelErr {ll_file.split("_")[-1]}: {avg_rel_err_tan:.2f}%', alpha=0.5)
+        
+        alpha-=0.9/len(ll_files)
 
 
     ax0_err.legend(loc='upper center')
@@ -643,8 +656,187 @@ def mainRotorForces(cfd_file, ll_files):
     plt.tight_layout()
     plt.show()
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+def compareInfluenceMatrices(file1, file2):
+    """
+    Compare influence matrices of 2 files with color scaling, cell borders,
+    and highlighting min/max differences.
+    """
+    # Define 3 subplots
+    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+
+    # Load data
+    data = np.load(f'./results/{file1}.npz')
+    data2 = np.load(f'./results/{file2}.npz')
+
+    # Get matrices
+    u1, v1, w1 = data['u_influences'], data['v_influences'], data['w_influences']
+    u2, v2, w2 = data2['u_influences'], data2['v_influences'], data2['w_influences']
+
+    # Differences
+    diff_u, diff_v, diff_w = u1 - u2, v1 - v2, w1 - w2
+
+    # Compute global min/max for consistent color scale
+    all_diffs = np.concatenate([diff_u.flatten(), diff_v.flatten(), diff_w.flatten()])
+    vmin, vmax = np.min(all_diffs), np.max(all_diffs)
+
+    def plot_diff(ax, diff, title):
+        im = ax.imshow(diff, cmap='coolwarm', vmin=vmin/20, vmax=vmax/20, aspect='auto')
+        ax.set_title(title)
+
+        # Add cell borders
+        ax.set_xticks(np.arange(-.5, diff.shape[1], 1), minor=True)
+        ax.set_yticks(np.arange(-.5, diff.shape[0], 1), minor=True)
+        ax.grid(which='minor', color='black', linewidth=0.05)
+        ax.tick_params(which='minor', bottom=False, left=False)
+
+        # Highlight min and max
+        min_val, max_val = np.min(diff), np.max(diff)
+        min_pos = np.unravel_index(np.argmin(diff), diff.shape)
+        max_pos = np.unravel_index(np.argmax(diff), diff.shape)
+        ax.plot(min_pos[1], min_pos[0], 'ko', label='Min')
+        ax.plot(max_pos[1], max_pos[0], 'wo', label='Max')
+        ax.text(min_pos[1], min_pos[0], f'{min_val:.2f}', color='black', ha='center', va='center')
+        ax.text(max_pos[1], max_pos[0], f'{max_val:.2f}', color='white', ha='center', va='center')
+
+        print(f"{title}")
+        print(f"  Mean: {np.mean(diff):.2f} ± {np.std(diff):.2f}")
+        print(f"  Max: {max_val:.2f} at {max_pos}, Min: {min_val:.2f} at {min_pos}\n")
+
+    plot_diff(axs[0], diff_u, f'U Influence: {file1} - {file2}')
+    plot_diff(axs[1], diff_v, f'V Influence: {file1} - {file2}')
+    plot_diff(axs[2], diff_w, f'W Influence: {file1} - {file2}')
+
+    plt.tight_layout()
+    plt.colorbar(axs[0].images[0], ax=axs, orientation='vertical', fraction=0.015, pad=0.04, label='Difference')
+    plt.show()
+
+
+def plotInfluenceMatrices(file):
+    # Define 3 subplots
+    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+
+    # Load data
+    data = np.load(f'./results/{file}.npz')
+
+    # Get matrices
+    u, v, w = data['u_influences'], data['v_influences'], data['w_influences']
+
+    def plot_matrix(ax, matrix, title):
+        im = ax.imshow(matrix, cmap='coolwarm', vmin=np.min(matrix)/100, vmax=np.max(matrix)/100, aspect='auto')
+        ax.set_title(title)
+
+        # Add cell borders
+        ax.set_xticks(np.arange(-.5, matrix.shape[1], 1), minor=True)
+        ax.set_yticks(np.arange(-.5, matrix.shape[0], 1), minor=True)
+        ax.grid(which='minor', color='black', linewidth=0.05)
+        ax.tick_params(which='minor', bottom=False, left=False)
+
+        # Highlight min and max
+        min_val, max_val = np.min(matrix), np.max(matrix)
+        min_pos = np.unravel_index(np.argmin(matrix), matrix.shape)
+        max_pos = np.unravel_index(np.argmax(matrix), matrix.shape)
+        ax.plot(min_pos[1], min_pos[0], 'ko', label='Min')
+        ax.plot(max_pos[1], max_pos[0], 'wo', label='Max')
+        ax.text(min_pos[1], min_pos[0], f'{min_val:.2f}', color='black', ha='center', va='center')
+        ax.text(max_pos[1], max_pos[0], f'{max_val:.2f}', color='white', ha='center', va='center')
+        print(f"{title}")
+
+    plot_matrix(axs[0], u, f'U Influence: {file}')
+    plot_matrix(axs[1], v, f'V Influence: {file}')
+    plot_matrix(axs[2], w, f'W Influence: {file}')
+
+    plt.tight_layout()
+    plt.colorbar(axs[0].images[0], ax=axs, orientation='vertical', fraction=0.015, pad=0.04, label='Influence')
+    plt.show()
+
+def plotPoints(file1, file2):
+    data = np.load(f'./auxx/{file1}.npz')
+    data2 = np.load(f'./auxx/{file2}.npz')
+
+    table1 = data['table']
+    table2 = data2['table']
+
+    fig, ax = plt.subplots(1,2, figsize=(10, 6))
+    ax[0].imshow(table1, cmap='viridis', aspect='auto')
+    ax[1].imshow(table1-table2, cmap='coolwarm', vmin=-0.1, vmax=0.1, aspect='auto')
+
+    plt.title(f'Point Differences: {file1} - {file2}')
+
+    plt.show()
+
+def compareCFD(files):
+    # reference file 
+    ref_file = files[0]
+    ref_data = np.genfromtxt(f'./cfdResults/{ref_file}.csv', delimiter=',', skip_header=1)
+    area_ref = ref_data[:, 3]
+    f_axial_ref = ref_data[:, 1]/ area_ref
+    f_tan_ref = ref_data[:, 2]/ area_ref
+    # add a second axis fot relative error
+    fig, ax = plt.subplots(2,1, figsize=(10, 6))
+    ax[1].set_xlabel('Radius')
+    ax[1].set_ylabel('Force / Area')
+    ax[0].set_ylabel('Force / Area')
+    ax[0].grid(True, linestyle='--', linewidth=0.5)
+
+    # add a second vertical axis 
+    ax_err1 = ax[0].twinx()
+    ax_err2 = ax[1].twinx()
+
+    colors = plt.cm.viridis(np.linspace(0., 0.8, len(files)))
+    count = 0
+    for file in files:
+        data = np.genfromtxt(f'./cfdResults/{file}.csv', delimiter=',', skip_header=1)
+        r = data[:, 0]
+        area = data[:, 3]
+        f_axial = data[:, 1] / area
+        f_tan = data[:, 2] / area
+
+        # compute relative error
+        rel_err_axial = np.abs((f_axial - f_axial_ref) / np.maximum(np.abs(f_axial_ref), 1e-12)) * 100
+        rel_err_tan = np.abs((f_tan - f_tan_ref) / np.maximum(np.abs(f_tan_ref), 1e-12)) * 100
+        # Plotting
+        ax[0].plot(r, f_axial, label=f'{file} Axial', marker='o', color=colors[count])
+        ax[1].plot(r, f_tan, label=f'{file} Tangential', marker='x', color=colors[count])
+
+        # Plot relative error
+        ax_err1.plot(r, rel_err_axial, label=f'RelErr {file} Axial', alpha=0.5, color=colors[count])
+        ax_err2.plot(r, rel_err_tan, '--', label=f'RelErr {file} Tangential', alpha=0.5, color=colors[count])
+        
+
+        count+=1
+
+
+
+        # plt.plot(r, f_axial, label=f'{file} Axial', marker='o')
+        # plt.plot(r, f_tan, label=f'{file} Tangential', marker='x')
+    ax[0].legend(loc='upper left')
+    ax[1].legend(loc='upper left')
+    ax_err1.legend(loc='upper right')
+    ax_err2.legend(loc='upper right')
+    ax_err1.set_ylabel('Relative Error (%)')
+    ax_err2.set_ylabel('Relative Error (%)')
     
-#tipRotorForces('drone8040_7445_CFD_1500.csv', 'drone8040_7445_n80_newNPZ_blade1_angle15' )
-#convergence(['drone8040_7445_CFD_1500','drone8040_7445_CFD_2000'])
-#mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_7445_n80_newNPZ_blade1_angle15', 'drone8040_7445_n80_newNPZ_blade1_angle30', 'drone8040_7445_n80_newNPZ_blade1_angle45', 'drone8040_7445_n80_newNPZ_blade1_angle60', 'drone8040_7445_n80_newNPZ_blade1_angle85', 'drone8040_7445_n80_newNPZ_blade1_angle95'])
-mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_7445_SWE_blade1_angle0', 'drone8040_7445_SWE_wake_length5', 'drone8040_7445_ppr60_wake_length8'])
+    plt.title('CFD Forces Comparison')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+    
+#tipRotorForces('drone8040_7445_CFD_2000.csv', 'drone8040_7445_SWE_blade1_angle0' )
+#convergence(['drone8040_7445_CFD_1500','drone8040_7445_CFD_2000', 'drone8040_7445_CFD_3000'])
+#mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_200625_downwash2', 'drone8040_7445_n80_newNPZ_blade1_angle30', 'drone8040_7445_n80_newNPZ_blade1_angle45', 'drone8040_7445_n80_newNPZ_blade1_angle60', 'drone8040_7445_n80_newNPZ_blade1_angle85', 'drone8040_7445_n80_newNPZ_blade1_angle95'])
+#mainRotorForces('drone8040_7445_CFD_fine_3000.csv', ['drone8040_mp_blade1_angle0', 'drone8040_mp_blade1_angle15', 'drone8040_mp_blade1_angle0'])
+#compareInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json', 'influence_matrices_drone8040_7445_DSW_downwash2_wake_length100.json')
+#compareInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json', 'influence_matrices_drone8040_7445_DSW_downwash4_wake_length5.json')
+#plotInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json')
+#plotPoints('drone8040_influencestudy_n20_n10_downwash2.json_table', 'drone8040_influencestudy_n20_n10_downwash4.json_table')#
+#compareCFD(['drone8040_7445_CFD_fine_3000', 'drone8040_7445_CFD_3000'])
+#mainRotorForces('heli_CFD_2000.csv', ['Heli_contractionTrue'])
+
+# data = np.genfromtxt(f'./results/Heli_contractionTrue_res.csv', delimiter=',', skip_header=1)
+# print(data[:,-1])
+
+# data = np.genfromtxt(f'./results/drone8040_7445_SWE_blade1_angle0_res.csv', delimiter=',', skip_header=1)
+# print(data[:,-1])

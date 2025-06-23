@@ -121,7 +121,7 @@ def median_filter(data, kernel_size=5, startFromTheEnd=True, times=1):
 
 class Propeller():
     def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='cosine', bodyIndex=0, small=False, main_rotor=None, 
-                 contraction=True, blade1_angle=0):
+                 contraction=True, blade1_angle=0, downwash=None, wake_bend = False):
         self.diameter = diameter
         self.position = position
         self.small = small
@@ -131,6 +131,8 @@ class Propeller():
         self.RPM = RPM
         self.n = n
         self.U = U
+        self.wake_bend = wake_bend
+        self.downwash = downwash
         self.wake_length = wake_length
         self.chord = chord
         self.v_axial = None
@@ -148,26 +150,46 @@ class Propeller():
             self.r = np.linspace(hub, diameter*0.5 , n)
         self.azimuth = np.array([0, 0, 1])
         self.origin = position
+
+
+            # modified_pitch_array = np.zeros(self.n)
+            # modified_pitch_array[:-1] = self.pitch[:self.n-1]
+            # modified_pitch_array[-1] = self.pitch[-1]  # Ensure the last element is included
+            
+            # if self.small:
+            #     z_0 = np.zeros(self.n) + self.chord[:self.n] * np.sin(modified_pitch_array* np.pi/180) 
+            #     print('z_0', z_0.shape) 
+            #     print('z_0', z_0)
+            # else:
+            #     z_0 = np.zeros(self.n) + self.chord[:self.n] * np.sin(modified_pitch_array * np.pi/180)
+        
+        
         self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
+        # if self.small:
+        #         self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, + 0.1*self.chord[:n-1]*np.sin(np.radians(self.pitch[:n-1]))))]
+        # else:
+        #     self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5,  0.1*self.chord[:n-1]*np.sin(np.radians(self.pitch[:n-1]))))]
         self.vortexTABLE = []
         self.horseShoes = None
+        self.ppr=20
         self.bodyIndex = bodyIndex
         self.assemble(main_rotor=main_rotor, contraction=contraction)
         if self.small:
             temp_angles = np.array([0, 0, blade1_angle*np.pi/180])
             self.rotate(extra=True, a=temp_angles[0], b=temp_angles[1], c=temp_angles[2])
-            self.bendSmallWake()
+            if self.wake_bend:
+                self.bendSmallWake(main_rotor, downwash=True)
         #self.rotate(*self.angles)
         self.rotate()
         self.translate(position, main_rotor=main_rotor)
         
+    def downwash(self):
+        points = self.vortexTABLE[:, :6]
+        points = points.reshape(-1, 3)
 
-
-    def bendSmallWake(self):
+    def bendSmallWake(self, main_rotor, downwash=False):
 
         tempR = np.sqrt(self.position.x**2 + self.position.y**2)
-        print('tempR', tempR)
-
         points = self.vortexTABLE[:, :6]
         points = points.reshape(-1, 3)
 
@@ -190,7 +212,38 @@ class Propeller():
         points[:, 2] = dz
         points[:, 1] = dy
         points = points.reshape(-1, 6)
+
+        if downwash:
+            omega = 2*np.pi*self.RPM/60
+            length = self.diameter*self.wake_length
+            total_time = length/self.U
+            nrevs = total_time*omega/(2*np.pi)
+            total_steps = int(nrevs*self.ppr)
+            # total_time = length/self.U
+            # nrevs = total_time*omega/(2*np.pi)
+            # total_steps = int(nrevs*ppr)
+
+            length = self.diameter*self.wake_length
+            t1rev = 60 /self.RPM
+            dt_step = t1rev/ self.ppr
+            u_local = np.average(self.U)
+            time = np.linspace(0, length/u_local, total_steps)
+            time = np.tile(time, 2*(self.n-1))  
+            start = 0
+            for i in range(self.NB):
+                end = start+ 2*(self.n-1)*total_steps 
+
+                points[start:end, 0] += time*(-self.downwash)
+                points[start:end, 3] += time*(-self.downwash)
+                start = end+(self.n-1)
+                # if i == 0:
+                #     start += (self.n-1) # this is to avoid the first collocation point to be moved
+            #points[7152:7152*2, 0] += time*(-20)
+
+
+
         self.vortexTABLE[:,:6] = points
+
 
 
 
@@ -199,7 +252,7 @@ class Propeller():
             n_main = main_rotor.n
             main_NB = main_rotor.NB
 
-        ppr = 60 
+        ppr = self.ppr 
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
         total_time = length/self.U
@@ -253,18 +306,7 @@ class Propeller():
                 lmbda = 4.0 *(Ct**0.5)
                 mult = A + (1-A)*np.exp(-lmbda*contTheta)
             else:
-                mult = bu.contraction_sigmoid(zw, contraction=1.) ### this gives me my new R per level (replace) 
-                #mult = np.ones(len(zw))
-                print('mult', mult)
-
-            ##########
-            # basically I need to replace zwl with pre computed coordinates, and I also need to feed Thrust to this function coordinates
-            # i can start with a thrust computed from the momentum theory 
-            #  total time steps 
-
-            # theta = np.linspace(0, 2*np.pi*nrevs, total_steps)
-
-            ###########
+                mult = np.ones(len(zw))
         else:
             mult = np.ones(len(zw))
         
@@ -281,15 +323,23 @@ class Propeller():
             
             hn = np.arange((j+0)*(self.n-1), (j+1)*(self.n-1))
 
+            modified_pitch_array = np.zeros(self.n)
+            modified_pitch_array[:-1] = self.pitch[:self.n-1]
+            modified_pitch_array[-1] = self.pitch[-1]  # Ensure the last element is included
+
             x_0 = np.zeros(self.n)
-            xwl_m = np.outer(self.r[:-1], np.sin(omega*dt)*mult) + self.chord[:self.n-1].reshape(-1, 1)
-            xwl = np.hstack([x_0[:-1].reshape(-1, 1), xwl_m])
+            x_1 = self.chord[:self.n] * np.cos(np.radians(modified_pitch_array))  # chord length in x direction
+
+            #xwl_m = np.outer(self.r[:-1], np.sin(omega*dt)*mult) + self.chord[:self.n-1].reshape(-1, 1)
+            xwl_m = np.outer(self.r[:-1], np.sin(omega*dt[1:])*mult[:-1]) + self.chord[:self.n-1].reshape(-1, 1)
+            xwl = np.hstack([x_0[:-1].reshape(-1, 1), x_1[:-1].reshape(-1,1), xwl_m])
             xwl = np.stack((xwl[:, 1:], xwl[:, :-1]), axis=2).reshape(-1, 2)
 
             hnl = np.repeat(hn, xwl.shape[0]//(self.n-1))
 
-            xwr_m = np.outer(self.r[1:], np.sin(omega*dt)*mult) + self.chord[1:self.n].reshape(-1, 1)
-            xwr = np.hstack([x_0[1:].reshape(-1, 1), xwr_m])
+            #xwr_m = np.outer(self.r[1:], np.sin(omega*dt)*mult) + self.chord[1:self.n].reshape(-1, 1)
+            xwr_m = np.outer(self.r[1:], np.sin(omega*dt[1:])*mult[:-1]) + self.chord[1:self.n].reshape(-1, 1)
+            xwr = np.hstack([x_0[1:].reshape(-1, 1), x_1[1:].reshape(-1,1), xwr_m])
             xwr = np.stack((xwr[:, :-1], xwr[:, 1:]), axis=2).reshape(-1, 2)
             hnr = np.repeat(hn, xwr.shape[0]//(self.n-1))
 
@@ -312,20 +362,23 @@ class Propeller():
             yc = np.stack((y_0[:-1], y_0[1:]), axis=1)
 
             y_coord = np.vstack([ywl, ywr, yc]).reshape(-1, 1)
+            
+            
+            
 
-            z_0 = np.zeros(self.n)
-            #zwl = np.outer(np.ones(self.n-1), zw)
-            zwl = np.outer(my_U, dt)
-            # plt.imshow(zwl)
-            # plt.gca().set_aspect(20)
-            # plt.show()
-            zwl  = np.hstack([z_0[:-1].reshape(-1, 1), zwl])
+            z_0 = np.zeros(self.n) 
+            z_1 = -self.chord[:self.n] * np.sin(np.radians(modified_pitch_array))
+            zwl = np.outer(my_U, dt[1:]) + z_1[:-1].reshape(-1, 1)  # subtract the chord length to get the correct position 
+            # insert first column of zeros
+
+            zwl  = np.hstack([z_0[:-1].reshape(-1, 1), z_1[:-1].reshape(-1, 1), zwl])
             zwl = np.stack((zwl[:, 1:], zwl[:, :-1]), axis=2).reshape(-1, 2)
             
 
             #zwr = np.outer(np.ones(self.n-1), zw)
-            zwr = np.outer(my_U, dt)
-            zwr  = np.hstack([z_0[1:].reshape(-1, 1), zwr])
+            zwr = np.outer(my_U, dt[1:])  + z_1[1:].reshape(-1, 1) #+ self.chord[1:self.n].reshape(-1, 1)
+            #zwr  = np.hstack([z_0[1:].reshape(-1, 1), zwr])
+            zwr  = np.hstack([z_0[1:].reshape(-1, 1), z_1[1:].reshape(-1,1), zwr])
             zwr = np.stack((zwr[:, :-1], zwr[:, 1:]), axis=2).reshape(-1, 2)
 
             zc = np.stack((z_0[:-1], z_0[1:]), axis=1)
@@ -461,7 +514,8 @@ class Drone:
                  small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
                  mainWakeLength, smallWakeLength, main_U, small_U, main_distribution, 
                  small_distribution, 
-                 helicopter=False, contraction=True, wind=None, reynolds=False, core_size = 1e-5, blade1_angle=0):
+                 helicopter=False, contraction=True, wind=None, reynolds=False, core_size = 1e-5, 
+                 blade1_angle=0, downwash=None, wake_bend=False):
         # Main propeller
 
         self.main_prop = Propeller(main_position, 
@@ -513,7 +567,8 @@ class Drone:
                                     wake_length=smallWakeLength,
                                     distribution=small_distribution,
                                     bodyIndex=i+1,
-                                    small=True, main_rotor=self.main_prop, contraction=contraction, blade1_angle =blade1_angle)
+                                    small=True, main_rotor=self.main_prop, contraction=contraction, blade1_angle =blade1_angle,
+                                    downwash=downwash, wake_bend=wake_bend)
                 
                 table = small_prop.vortexTABLE
                 table[:, -2] += addHSN+1
@@ -611,6 +666,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
             small_distribution = config['small_propellers']['distribution']
             blade1_angle = config['settings']['blade1_angle']
+            downwash = config['settings']['downwash']
         else:
             small_props_angle = None
             small_props_diameter = None
@@ -622,11 +678,13 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             small_props_pitch = None
             small_distribution = 'cosine'
             blade1_angle = 0
+            downwash = None
 
 
         contraction = config['settings']['contraction']
         wind_speed = config['settings']['wind_speed']
         wind_angle = config['settings']['wind_angle']
+        wake_bend = config['settings']['wake_bend']
 
         wind = np.array([wind_speed*np.cos(wind_angle*np.pi/180),
                         0,
@@ -644,6 +702,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
                                     mainWakeLength=main_wake_length, smallWakeLength=small_wake_length, main_U=main_U, small_U = small_U, 
                                     main_distribution=main_distribution, small_distribution=small_distribution, 
-                                    contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size, helicopter=helicopter, blade1_angle=blade1_angle)
+                                    contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size, helicopter=helicopter, blade1_angle=blade1_angle, 
+                                    downwash=downwash, wake_bend=wake_bend)
 
         return drone
