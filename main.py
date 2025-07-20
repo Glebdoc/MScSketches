@@ -21,7 +21,7 @@ FLAGS = {
     "run_optimization": False,
     "thrust_optimization": False,
     "helicopter": False,
-    "rpm_optimization": False
+    "rpm_optimization": True
 }
 
 # --- Inputs ---
@@ -29,7 +29,8 @@ PATH = 'configs/base.json'
 MTOW = 100  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
-    "settings.downwash":[0, 2, 4],  # Main pro,peller angle
+    #"small_propellers.diameter":[0.14,0.15,0.16],  # Main pro,peller angle
+    "small_propellers.pitch_tip":[35,40,45],  # Main pro,peller angle
 
 }
 
@@ -38,7 +39,7 @@ ERR_MOMENT = 1e-2
 ERR_THRUST = 1e-1
 IT_MAX = 50
 WEIGHT_VEL = 0.995 # The heigher the more stable
-TITLE= 'drone8040_mp'  # Title for the plot
+TITLE= 'drone8040_mp_spitch'  # Title for the plot
 
 #SWE - small wake effect
 #MWE - main wake effect : no effect
@@ -205,7 +206,7 @@ def bisectingMethod(createdMoment, torque, upperBound, lowerBound, RPM_small):
 
 def main():
     RPM_MAIN = 400  # RPM of the main propeller
-    RPM_SMALL = 7445  # RPM of the small propeller
+    RPM_SMALL = 8500  # RPM of the small propeller
     LOWER = 5000
     # Load base config 
     baseConfig = loadConfig(PATH)

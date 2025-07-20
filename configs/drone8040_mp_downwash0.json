@@ -25,7 +25,7 @@
     "rpm": 370,
     "REFINEMENT": "__",
     "n": 40,
-    "wake_length": 50,
+    "wake_length": 2,
     "INITIAL": "__",
     "uWake": 2,
     "optimal_AoA": 5.0,
@@ -59,7 +59,7 @@
   "settings": {
     "contraction": true,
     "core_size": 1e-07,
-    "reynolds": false,
+    "reynolds": true,
     "wind_speed": 0,
     "wind_angle": 0,
     "blade1_angle": 0,
