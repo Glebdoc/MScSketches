@@ -230,6 +230,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
         print('Reynolds influence')
     else:
         data_main = np.loadtxt('./A18_(smoothed)_Re0.191_M0.00_N9.0.txt', skiprows=12)
+        data_main = np.loadtxt('./polar_fileFX_63_137_tr0.3_tr1.0.txt', skiprows=12)
         data_small = np.loadtxt('./A18 (smoothed)_A18_(smoothed)_Re0.050_M0.00_N9.0.txt',skiprows=12)
         #data = np.loadtxt('./NACA0012_Re0.191_M0.00_N9.0.txt', skiprows=12)
         alpha_main, clP_main, cdP_main = smoothSpline(data_main, step=2)
@@ -331,7 +332,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
         # ################
 
         alpha = twist.flatten() -  (inflowangle*180/np.pi).flatten()
-        alpha[alpha>8] = 8
+        alpha[alpha>12] = 12
         alpha[alpha<-5] = -5
         #alpha[alpha>alpha_cl_max_main] = alpha_cl_max_main
 

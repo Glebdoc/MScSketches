@@ -21,7 +21,7 @@ FLAGS = {
     "run_optimization": False,
     "thrust_optimization": False,
     "helicopter": False,
-    "rpm_optimization": True
+    "rpm_optimization": False
 }
 
 # --- Inputs ---
@@ -30,11 +30,11 @@ MTOW = 100  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
     #"small_propellers.diameter":[0.14,0.15,0.16],  # Main pro,peller angle
-    "small_propellers.pitch_tip":[35,40,45],  # Main pro,peller angle
+    "main_propeller.pitch_tip":[12, 15],  # Main pro,peller angle
 
 }
 
-ERR_VEL  = 1e-5
+ERR_VEL  = 1e-3
 ERR_MOMENT = 1e-2
 ERR_THRUST = 1e-1
 IT_MAX = 50
