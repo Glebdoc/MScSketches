@@ -834,7 +834,7 @@ def compareCFD(files):
 #tipRotorForces('drone8040_7445_CFD_2000.csv', 'drone8040_7445_SWE_blade1_angle0' )
 #convergence(['drone8040_7445_CFD_1500','drone8040_7445_CFD_2000', 'drone8040_7445_CFD_3000'])
 #mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_200625_downwash2', 'drone8040_7445_n80_newNPZ_blade1_angle30', 'drone8040_7445_n80_newNPZ_blade1_angle45', 'drone8040_7445_n80_newNPZ_blade1_angle60', 'drone8040_7445_n80_newNPZ_blade1_angle85', 'drone8040_7445_n80_newNPZ_blade1_angle95'])
-mainRotorForces('drone8040_7445_CFD_fine_3000.csv', ['drone8040_mp_blade1_angle0', 'drone8040_mp_blade1_angle15', 'drone8040_mp_blade1_angle0'])
+#mainRotorForces('drone8040_7445_CFD_fine_3000.csv', ['drone8040_mp_blade1_angle0', 'drone8040_mp_blade1_angle15', 'drone8040_mp_blade1_angle0'])
 #compareInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json', 'influence_matrices_drone8040_7445_DSW_downwash2_wake_length100.json')
 #compareInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json', 'influence_matrices_drone8040_7445_DSW_downwash4_wake_length5.json')
 #plotInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json')

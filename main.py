@@ -21,7 +21,7 @@ FLAGS = {
     "run_optimization": False,
     "thrust_optimization": False,
     "helicopter": False,
-    "rpm_optimization": True
+    "rpm_optimization": False
 }
 
 # --- Inputs ---
@@ -30,11 +30,11 @@ MTOW = 100  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
     #"small_propellers.diameter":[0.14,0.15,0.16],  # Main pro,peller angle
-    "small_propellers.pitch_tip":[35,40,45],  # Main pro,peller angle
+    "settings.reynolds":[True],  # Reynolds number
 
 }
 
-ERR_VEL  = 1e-5
+ERR_VEL  = 1e-2
 ERR_MOMENT = 1e-2
 ERR_THRUST = 1e-1
 IT_MAX = 50
@@ -206,7 +206,7 @@ def bisectingMethod(createdMoment, torque, upperBound, lowerBound, RPM_small):
 
 def main():
     RPM_MAIN = 400  # RPM of the main propeller
-    RPM_SMALL = 8500  # RPM of the small propeller
+    RPM_SMALL = 7000  # RPM of the small propeller
     LOWER = 5000
     # Load base config 
     baseConfig = loadConfig(PATH)

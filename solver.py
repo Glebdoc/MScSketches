@@ -9,9 +9,23 @@ import ctypes
 from matplotlib.colors import BoundaryNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.interpolate import make_interp_spline
-
+import glob
 
 import numpy as np
+
+def preload_airfoil_data(data_folder="./airfoil/data/numpy"):
+    """
+    Preload all airfoil npz files into a dictionary.
+    """
+    file_paths = glob.glob(os.path.join(data_folder, "*.npz"))
+    preloaded_data = {}
+    
+    for file_path in file_paths:
+        data = np.load(file_path, allow_pickle=True)
+        airfoil_name = os.path.splitext(os.path.basename(file_path))[0].replace("numpy_", "")
+        preloaded_data[airfoil_name] = {key: data[key] for key in data.files}
+    
+    return preloaded_data
 
 def conditional_median_filter_1d(signal, kernel_size=3, std_thresh=1.0):
     """Applies a conditional median filter to a 1D signal.
@@ -207,6 +221,7 @@ def smoothSpline(data, step=2):
     return alpha_smooth, cl_smooth, cd_smooth
 
 def solve(drone, updateConfig=True, case='main', save=False):
+    preloaded_data = preload_airfoil_data()
     helicopter = drone.helicopter
     U = drone.main_prop.U
     ReInfluence = drone.reynolds
@@ -344,7 +359,8 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
         if ReInfluence:
             airfoil_array = np.array([main_airfoil]*collocN)
-            cl, cd = xf.getPolar_batch(Re, alpha, airfoil_array, npz_dir="./airfoil/data/numpy")
+            #cl, cd = xf.getPolar_batch(Re, alpha, airfoil_array, npz_dir="./airfoil/data/numpy")
+            cl, cd = xf.getPolar_batch(Re, alpha, airfoil_array, preloaded_data)
             Cl[:] = cl.reshape(-1, 1)
             Cd[:] = cd.reshape(-1, 1)
             #Cl, Cd = db.get_cl_cd(main_airfoil, Re, alpha.flatten())
@@ -478,7 +494,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
     # # Compute the profile power for the main rotor
     #Cd0 = xf.getCd0_batch(Re, airfoil_array, npz_dir="./airfoil/data/numpy")
     if ReInfluence:
-        Cd0 = xf.getCd0_batch(Re, airfoil_array, npz_dir="./airfoil/data/numpy")
+        _, Cd0 = xf.getPolar_batch(Re, np.zeros((alpha.shape[0], 1)), airfoil_array, preloaded_data)
     else:
         Cd0 = np.ones((collocN)) * 0.01
     NB_arr = np.ones((collocN))

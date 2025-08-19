@@ -307,46 +307,6 @@ def load_polar_npz(airfoil_name, npz_dir="./airfoil/numpy"):
     data = np.load(f"{npz_dir}/{airfoil_name}.npz")
     return data["Re"], data["polar"]  # polar: (n_re, n_alpha, 3)
 
-def getPolar_batch(Re_array, alpha_array, airfoil_array, npz_dir="./airfoil/data/numpy"):
-    unique_airfoils = np.unique(airfoil_array)
-    polar_cache = {}
-
-    # Load all airfoils once
-    for af in unique_airfoils:
-        Re_vals, polar_vals = load_polar_npz(af, npz_dir)
-        polar_cache[af] = (Re_vals, polar_vals)
-
-    Cl = np.zeros_like(Re_array)
-    Cd = np.zeros_like(Re_array)
-
-    for i, (Re, alpha, af_name) in enumerate(zip(Re_array, alpha_array, airfoil_array)):
-        Re_vals, polar = polar_cache[af_name]
-        n_re, n_alpha, _ = polar.shape
-
-        # Find bounding Re indices
-        if Re <= Re_vals[0]:
-            idx_below = idx_above = 0
-        elif Re >= Re_vals[-1]:
-            idx_below = idx_above = -1
-        else:
-            idx_above = np.searchsorted(Re_vals, Re)
-            idx_below = idx_above - 1
-
-        t = (Re - Re_vals[idx_below]) / (Re_vals[idx_above] - Re_vals[idx_below]) if idx_above != idx_below else 0
-
-        alpha_b = polar[idx_below, :, 0]
-        cl_b = np.interp(alpha, alpha_b, polar[idx_below, :, 1])
-        cd_b = np.interp(alpha, alpha_b, polar[idx_below, :, 2])
-
-        alpha_a = polar[idx_above, :, 0]
-        cl_a = np.interp(alpha, alpha_a, polar[idx_above, :, 1])
-        cd_a = np.interp(alpha, alpha_a, polar[idx_above, :, 2])
-
-        Cl[i] = (1 - t) * cl_b + t * cl_a
-        Cd[i] = (1 - t) * cd_b + t * cd_a
-
-    return Cl, Cd
-
 def getCd0_batch(Re_array, airfoil_array, npz_dir="./airfoil/data/numpy"):
     unique_airfoils = np.unique(airfoil_array)
     polar_cache = {}
@@ -379,6 +339,40 @@ def getCd0_batch(Re_array, airfoil_array, npz_dir="./airfoil/data/numpy"):
         # print(f"cd0_b: {cd0_b}, cd0_a: {cd0_a}")
     return cd0
 
+
+def getPolar_batch(Re_array, alpha_array, airfoil_array, preloaded_data):
+    """
+    Returns cl and cd arrays using preloaded data.
+    """
+    cl_out = np.zeros_like(Re_array, dtype=float)
+    cd_out = np.zeros_like(Re_array, dtype=float)
+    
+    unique_airfoils = np.unique(airfoil_array)
+    
+    for airfoil in unique_airfoils:
+        mask = airfoil_array == airfoil
+        data = preloaded_data[airfoil]
+        
+        Re_grid = data['Re']
+        polar = data['polar']
+        
+        alpha_grid = polar[0, :, 0]
+        cl_grid = polar[:, :, 1].T
+        cd_grid = polar[:, :, 2].T
+        
+        cl_interp = RegularGridInterpolator((alpha_grid, Re_grid), cl_grid, bounds_error=False, fill_value=None)
+        cd_interp = RegularGridInterpolator((alpha_grid, Re_grid), cd_grid, bounds_error=False, fill_value=None)
+        
+        alpha_query = alpha_array[mask]
+        Re_query = Re_array[mask]
+        query_points = np.column_stack((alpha_query, Re_query))
+        
+        cl_out[mask] = cl_interp(query_points)
+        cd_out[mask] = cd_interp(query_points)
+    
+    return cl_out, cd_out
+
+
 # Re_array = np.array([1e5, 2e5, 3e5])
 # airfoil_array = np.array(["NACA 0012", "NACA 0012", "NACA 0012"])
 
@@ -388,3 +382,4 @@ def getCd0_batch(Re_array, airfoil_array, npz_dir="./airfoil/data/numpy"):
 # airfoil_name = ["NACA 0012", "a18sm" ]
 # for airfoil in airfoil_name:
 #     build_airfoil_npz(airfoil, source_dir="./airfoil/data/updated", output_dir="./airfoil/data/numpy")
+
