@@ -15,7 +15,7 @@
         "GEOMETRY": "__",
         "airfoil": "NACA 0012",
         "hub": 0.1,
-        "diameter": 2.0,
+        "diameter": 1.9585625789258019,
         "NB": 3,
         "chord_root": 0.1,
         "chord_tip": 0.1,
@@ -24,16 +24,16 @@
         "OPERATION": "__",
         "rpm": 370,
         "REFINEMENT": "__",
-        "n": 80,
+        "n": 30,
         "wake_length": 2,
         "INITIAL": "__",
-        "uWake": 2,
+        "uWake": 1.5,
         "optimal_AoA": 5.0,
-        "distribution": "uniform"
+        "distribution": "cosine"
     },
     "small_propellers": {
         "POSITIONING": "__",
-        "angle": 70,
+        "angle": 90,
         "GEOMETRY": "__",
         "diameter": 0.15,
         "NB": 3,
@@ -46,7 +46,7 @@
         "OPERATION": "__",
         "rpm": 10000,
         "REFINEMENT": "__",
-        "n": 25,
+        "n": 20,
         "wake_length": 2,
         "INITIAL": "__",
         "uWake": 5,
@@ -54,13 +54,13 @@
     },
     "settings": {
         "contraction": true,
-        "core_size": 1e-7,
+        "core_size": 1e-07,
         "reynolds": true,
         "wind_speed": 0,
         "wind_angle": 0,
         "blade1_angle": 15,
-        "downwash": 8,
-        "wake_bend":true
+        "downwash": 2,
+        "wake_bend": true
     },
     "results": {
         "Thrust": 6.228903687486652,

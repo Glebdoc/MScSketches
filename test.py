@@ -2,29 +2,138 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import make_interp_spline
 
-data_main = np.loadtxt('./A18_(smoothed)_Re0.191_M0.00_N9.0.txt', skiprows=12)
-data_small = np.loadtxt('./A18 (smoothed)_A18_(smoothed)_Re0.050_M0.00_N9.0.txt',skiprows=12)
 
-spline = make_interp_spline(data_main[:, 0], data_main[:, 1], k=3)
-alpha_smooth = np.linspace(data_main[:, 0].min(), data_main[:, 0].max(), 300)
-cl_smooth = spline(alpha_smooth)
+"""
 
-spline2 = make_interp_spline(data_small[::3, 0], data_small[::3, 1], k=2)
+Plot a helical line depending on a starting angle 
+
+"""
+
+# # input: 
+# v_mag = 10 
+# angle = 30*np.pi/180  # convert to radians
+# R = 1.0
+# phi_0 = 0.0  # starting angle in radians
+# t = np.linspace(0, 1, 100)  # time vector
+
+# # Velocity components
+# vz = -v_mag * np.cos(angle)  # vertical component
+# vtan = v_mag * np.sin(angle)  # tangential component
+# omega = vtan / R  # angular velocity
+
+# # Helical coordinates
+# phi = phi_0 + omega * t  # angle around the helix
+# z = vz * t  # vertical position
+# x = R * np.cos(phi)  # x-coordinate
+# y = R * np.sin(phi)  # y-coordinate
+
+# # Plotting the helical line
+# fig = plt.figure(figsize=(10, 6))
+# ax = fig.add_subplot(111, projection='3d')
+# ax.plot(x, y, z, label='Helical Line', color='blue')
+# ax.set_xlabel('X-axis')
+# ax.set_ylabel('Y-axis')
+# ax.set_zlabel('Z-axis')
+# ax.set_title('Helical Line in 3D Space')
+# ax.legend()
+# plt.grid()
+# plt.show()
 
 
-alpha_smooth_small = np.linspace(data_small[::3, 0].min(), data_small[::3, 0].max(), 300)
-cl_smooth_small = spline2(alpha_smooth_small)
 
-plt.plot(data_main[:, 0], data_main[:, 1], label='A18 (smoothed) Re0.191', marker='o')
-plt.plot(alpha_smooth, cl_smooth, label='A18 (smoothed) Re0.191 (spline)', linestyle='--')
-plt.plot(data_small[:, 0], data_small[:, 1], label='A18 (smoothed) Re0.050', marker='x')
-plt.plot(alpha_smooth_small, cl_smooth_small, label='A18 (smoothed) Re0.050 (spline)', linestyle='--')
-plt.xlabel('Alpha [deg]')
-plt.ylabel('Cl')
-plt.title('A18 Airfoil Cl Comparison')
-plt.grid()
-plt.legend()
+
+# Parameters
+R = 1.0       # helix radius
+h = 0.5       # helix pitch per radian (vertical rise per unit angle)
+a = 0.05       # radius around the helix axis (distance from centerline)
+Omega = 40.0  # spin rate around helix axis
+phi0 = 0.0    # initial spin phase
+
+# Parametric variable (angle along helix)
+t = np.linspace(0, 8*np.pi, 2000)
+s = np.sqrt(R**2 + h**2)
+
+# Helix centerline
+cx = R*np.cos(t)
+cy = R*np.sin(t)
+cz = h*t
+
+# Frenet frame (normal and binormal)
+Nx = -np.cos(t)
+Ny = -np.sin(t)
+Nz = np.zeros_like(t)
+
+Bx = (h*np.sin(t))/s
+By = (-h*np.cos(t))/s
+Bz = R/s*np.ones_like(t)
+
+# Spinning angle
+phi = Omega*t + phi0
+
+# Full trajectory
+px = cx + a*(np.cos(phi)*Nx + np.sin(phi)*Bx)
+py = cy + a*(np.cos(phi)*Ny + np.sin(phi)*By)
+pz = cz + a*(np.cos(phi)*Nz + np.sin(phi)*Bz)
+
+# Plot
+fig = plt.figure(figsize=(8,6))
+ax = fig.add_subplot(111, projection='3d')
+
+# Helix axis (centerline)
+ax.plot(cx, cy, cz, 'k--', linewidth=1, label='Helix axis')
+
+# Spinning trajectory
+ax.plot(px, py, pz, 'b', linewidth=2, label='Spinning point')
+
+ax.set_xlabel("X")
+ax.set_ylabel("Y")
+ax.set_zlabel("Z")
+ax.set_title("Point Spinning Around a Helix Axis")
+ax.legend()
+ax.set_aspect('equal')
+
 plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# data_main = np.loadtxt('./A18_(smoothed)_Re0.191_M0.00_N9.0.txt', skiprows=12)
+# data_small = np.loadtxt('./A18 (smoothed)_A18_(smoothed)_Re0.050_M0.00_N9.0.txt',skiprows=12)
+
+# spline = make_interp_spline(data_main[:, 0], data_main[:, 1], k=3)
+# alpha_smooth = np.linspace(data_main[:, 0].min(), data_main[:, 0].max(), 300)
+# cl_smooth = spline(alpha_smooth)
+
+# spline2 = make_interp_spline(data_small[::3, 0], data_small[::3, 1], k=2)
+
+
+# alpha_smooth_small = np.linspace(data_small[::3, 0].min(), data_small[::3, 0].max(), 300)
+# cl_smooth_small = spline2(alpha_smooth_small)
+
+# plt.plot(data_main[:, 0], data_main[:, 1], label='A18 (smoothed) Re0.191', marker='o')
+# plt.plot(alpha_smooth, cl_smooth, label='A18 (smoothed) Re0.191 (spline)', linestyle='--')
+# plt.plot(data_small[:, 0], data_small[:, 1], label='A18 (smoothed) Re0.050', marker='x')
+# plt.plot(alpha_smooth_small, cl_smooth_small, label='A18 (smoothed) Re0.050 (spline)', linestyle='--')
+# plt.xlabel('Alpha [deg]')
+# plt.ylabel('Cl')
+# plt.title('A18 Airfoil Cl Comparison')
+# plt.grid()
+# plt.legend()
+# plt.show()
 
 # def median_filter(data, kernel_size=5, startFromTheEnd=True):
 #     if startFromTheEnd:

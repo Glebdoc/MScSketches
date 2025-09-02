@@ -15,7 +15,7 @@
     "GEOMETRY": "__",
     "airfoil": "NACA 0012",
     "hub": 0.1,
-    "diameter": 2.0,
+    "diameter": 1.9,
     "NB": 3,
     "chord_root": 0.1,
     "chord_tip": 0.1,
@@ -30,14 +30,14 @@
     "uWake": 2,
     "optimal_AoA": 5.0,
     "distribution": "uniform",
-    "aspect_ratio": 10.0,
-    "rotor_solidity": 0.0955
+    "aspect_ratio": 9.5,
+    "rotor_solidity": 0.1005
   },
   "small_propellers": {
     "POSITIONING": "__",
-    "angle": 70,
+    "angle": 90,
     "GEOMETRY": "__",
-    "diameter": 0.15,
+    "diameter": 0.14,
     "NB": 3,
     "chord_root": 0.02,
     "chord_tip": 0.01,
@@ -53,8 +53,8 @@
     "INITIAL": "__",
     "uWake": 5,
     "distribution": "uniform",
-    "aspect_ratio": 5.0,
-    "rotor_solidity": 0.191
+    "aspect_ratio": 4.6667,
+    "rotor_solidity": 0.2046
   },
   "settings": {
     "contraction": true,

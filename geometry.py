@@ -1,8 +1,6 @@
 import numpy as np
 import pyvista as pv
 import bemUtils as bu
-import timeit
-import time
 import json
 import xfoilUtil as xfu
 import matplotlib.pyplot as plt
@@ -60,7 +58,6 @@ class HorseShoe(Vortex):
         self.centre = centre
         self.rightset = right
         
-    
     def get_plot_data(self, start_index=0):
 
         points = []
@@ -96,8 +93,6 @@ class HorseShoe(Vortex):
             vortex.translate(translation)
 
         self.centre.translate(translation)
-
-        
 
     def rotate(self, R):
         for vortex in self.leftset:
@@ -150,36 +145,23 @@ class Propeller():
             self.r = np.linspace(hub, diameter*0.5 , n)
         self.azimuth = np.array([0, 0, 1])
         self.origin = position
-
-
-            # modified_pitch_array = np.zeros(self.n)
-            # modified_pitch_array[:-1] = self.pitch[:self.n-1]
-            # modified_pitch_array[-1] = self.pitch[-1]  # Ensure the last element is included
-            
-            # if self.small:
-            #     z_0 = np.zeros(self.n) + self.chord[:self.n] * np.sin(modified_pitch_array* np.pi/180) 
-            #     print('z_0', z_0.shape) 
-            #     print('z_0', z_0)
-            # else:
-            #     z_0 = np.zeros(self.n) + self.chord[:self.n] * np.sin(modified_pitch_array * np.pi/180)
-        
-        
         self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
-        # if self.small:
-        #         self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, + 0.1*self.chord[:n-1]*np.sin(np.radians(self.pitch[:n-1]))))]
-        # else:
-        #     self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5,  0.1*self.chord[:n-1]*np.sin(np.radians(self.pitch[:n-1]))))]
         self.vortexTABLE = []
         self.horseShoes = None
+        self.sigma = np.average(self.NB*self.chord[:n]/(np.pi*self.r))
         self.ppr=20
         self.bodyIndex = bodyIndex
         self.assemble(main_rotor=main_rotor, contraction=contraction)
         if self.small:
+            """
+            We first need to rotate around Z to pic a desired blade position with respect to the main rotor.
+            Then we rotate around Y - simulating the naccelle incline 
+            Then we bend the wake modifying 
+            """
             temp_angles = np.array([0, 0, blade1_angle*np.pi/180])
             self.rotate(extra=True, a=temp_angles[0], b=temp_angles[1], c=temp_angles[2])
             if self.wake_bend:
                 self.bendSmallWake(main_rotor, downwash=True)
-        #self.rotate(*self.angles)
         self.rotate()
         self.translate(position, main_rotor=main_rotor)
         
@@ -236,11 +218,6 @@ class Propeller():
                 points[start:end, 0] += time*(-self.downwash)
                 points[start:end, 3] += time*(-self.downwash)
                 start = end+(self.n-1)
-                # if i == 0:
-                #     start += (self.n-1) # this is to avoid the first collocation point to be moved
-            #points[7152:7152*2, 0] += time*(-20)
-
-
 
         self.vortexTABLE[:,:6] = points
 
@@ -431,7 +408,6 @@ class Propeller():
     def rotate(self, extra=False, a = None, b=None, c=None):    
         
         if not extra:
-
             R = bu.rotation_matrix(*self.angles)
         else:
             R = bu.rotation_matrix(a, b, c)
@@ -648,11 +624,15 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             small_props_angle = config['small_propellers']['angle']
             small_props_diameter = config['small_propellers']['diameter']
             small_props_NB = config['small_propellers']['NB']
+            small_props_radius = small_props_diameter/2
             
             small_chord_root = config['small_propellers']['chord_root']
             small_chord_tip = config['small_propellers']['chord_tip']
             small_props_n = config['small_propellers']['n']
             small_props_hub = config['small_propellers']['hub']
+
+            
+
             
             small_pitch_root = config['small_propellers']['pitch_root']
             small_pitch_tip = config['small_propellers']['pitch_tip']
@@ -661,8 +641,17 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
 
             small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
 
+            # Pitch distribution
+            A = [[small_props_hub**2, small_props_hub, 1],
+                 [small_props_radius**2, small_props_radius, 1],
+                 [small_props_radius*2, 1, 0]]
+            Y = [small_pitch_root, small_pitch_tip, 0]
+            a, b, c = np.linalg.solve(A, Y)
+            x = np.linspace(small_props_hub, small_props_radius, small_props_n-1)
+            small_props_pitch = a*x**2 + b*x + c
+
             #small_props_pitch = bu.twistGen(small_pitch_root, small_pitch_tip, small_r, small_AoA)
-            small_props_pitch = np.linspace(small_pitch_root, small_pitch_tip, small_props_n-1)
+            #small_props_pitch = np.linspace(small_pitch_root, small_pitch_tip, small_props_n-1)
             small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
             small_distribution = config['small_propellers']['distribution']
             blade1_angle = config['settings']['blade1_angle']

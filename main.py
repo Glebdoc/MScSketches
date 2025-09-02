@@ -18,26 +18,27 @@ FLAGS = {
     "just_display": False,
     "plot_results": True,
     "save_results": True,
-    "run_optimization": False,
+    "run_optimization": True,
     "thrust_optimization": False,
     "helicopter": False,
-    "rpm_optimization": False
+    "rpm_optimization": False, 
+    "display_convergence": True
 }
 
 # --- Inputs ---
 PATH = 'configs/base.json'
-MTOW = 100  # Max Take-Off Weight in N
+MTOW = 60  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
     #"small_propellers.diameter":[0.14,0.15,0.16],  # Main pro,peller angle
-    "settings.reynolds":[True],  # Reynolds number
+    "small_propellers.pitch_root":[85],  # Reynolds number
 
 }
 
-ERR_VEL  = 1e-2
-ERR_MOMENT = 1e-2
+ERR_VEL  = 1e-3
+ERR_MOMENT = 1e-1
 ERR_THRUST = 1e-1
-IT_MAX = 50
+IT_MAX = 15
 WEIGHT_VEL = 0.995 # The heigher the more stable
 TITLE= 'drone8040_mp_spitch'  # Title for the plot
 
@@ -86,7 +87,7 @@ def initializeVaxial(drone, helicopter):
         v_axial_old_main = np.linspace(0, -1, int(drone.nPoints)+1)
         return v_axial_old_main, None, main_prop_NB, None, None, main_prop_n, None
     
-def computeVelocityError(v, vOldMain, vOldSmall, helicopter, nsm, mainNB, smallNB, weight, im1, cbar1, im2, cbar2, line3, line4, Gammas, k=0.05, mainN=None, smallN=None, ax=None):
+def computeVelocityError(v, vOldMain, vOldSmall, helicopter, nsm, mainNB, smallNB, weight, im1, cbar1, im2, cbar2, line3, line4, Gammas, k=0.05, mainN=None, smallN=None, ax=None, updateVisualizationFLAG=False):
     if not helicopter:
         vMain = v[:nsm]
         vSmall = v[nsm:]
@@ -104,75 +105,32 @@ def computeVelocityError(v, vOldMain, vOldSmall, helicopter, nsm, mainNB, smallN
         topMainIndices = np.argsort(errMain)[-kMain:]
         topSmallIndices = np.argsort(errSmall)[-kSmall:]
 
-        # print(f'Top {kMain} errors in main propeller: {topMainIndices}')
-        # print(f'Top {kSmall} errors in small propeller: {topSmallIndices}')
-
         # Create cpies 
         vMainNewNorm = np.copy(vMainNorm)
         vSmallNewNorm = np.copy(vSmallNorm)
 
+        if updateVisualizationFLAG:
+            if im1 is not None:
+                updateVisualization(vMainNorm, vOldMain, mainNB, im1, cbar1, smallNB=None)
+            if im2 is not None:
+                updateVisualization(vSmallNorm, vOldSmall, mainNB, im2, cbar2, smallNB)
 
-        if im1 is not None:
-            updateVisualization(vMainNorm, vOldMain, mainNB, im1, cbar1, smallNB=None)
-        if im2 is not None:
-            updateVisualization(vSmallNorm, vOldSmall, mainNB, im2, cbar2, smallNB)
-
-        if line3 is not None:
-            line3.set_ydata(Gammas[:mainN])
-            line4.set_ydata(Gammas[nsm: nsm + smallN])
-            ax[2].relim()
-            ax[2].autoscale_view()
+            if line3 is not None:
+                line3.set_ydata(Gammas[:mainN])
+                line4.set_ydata(Gammas[nsm: nsm + smallN])
+                ax[2].relim()
+                ax[2].autoscale_view()
 
 
         errMain = np.linalg.norm(vOldMain - vMainNorm)
         errSmall = np.linalg.norm(vOldSmall - vSmallNorm)
 
         err = errMain + errSmall
-
-        # vMainNew[topMainIndices] = (1 - weight) * vMain[topMainIndices] + weight * vOldMain[topMainIndices] * np.linalg.norm(vMain[topMainIndices])
-        # vSmallNew[topSmallIndices] = (1 - weight) * vSmall[topSmallIndices] + weight * vOldSmall[topSmallIndices] * np.linalg.norm(vSmall[topSmallIndices])
         vMainNewNorm[topMainIndices] = (1 - weight) * vMainNorm[topMainIndices] + weight * vOldMain[topMainIndices] 
         vSmallNewNorm[topSmallIndices] = (1 - weight) * vSmallNorm[topSmallIndices] + weight * vOldSmall[topSmallIndices] 
 
         vMainNew = vMainNewNorm * np.linalg.norm(vMain)
         vSmallNew = vSmallNewNorm * np.linalg.norm(vSmall)
-
-        # start = int(mainN * 0.6) 
-
-        # x_tip = np.linspace(0, 1, len(vMainNew[start:mainN]))
-        # print(f'Starting smoothing from index 0 to {mainN}')
-
-        # y_start = vMainNew[start-1]
-        # y_tip_shifted = vMainNew[start:mainN] - vMainNew[start] + y_start
-        # x_shifted = x_tip - x_tip[0] + 1e-6  # Avoid division by zero
-        # # Fit a polynomial to the last 30% of the data
-        # #p = Polynomial.fit(x_tip, vMainNew[start:mainN], deg=3)
-        # p = Polynomial.fit(x_tip, y_tip_shifted, deg=2)
-        # smoothed_values = p(x_tip)
-        # # Replace the last 30% of the data with the smoothed values
-        # vMainNew[start:mainN] = smoothed_values
-        # vMainNew = np.tile(vMainNew[:mainN], mainNB)
-
-        # plt.plot(x_tip, smoothed_values, label='Smoothed', color='red')
-        
-        
-    
-        # vMainNew = moving_average(vMainNew.copy(), w=3)
-        # vSmallNew = moving_average(vSmallNew.copy(), w=3)
-        # line3.set_ydata(vMainNew[:mainN])
-        # vMainNew = low_pass_filter(vMainNew.copy(), cutoff_ratio=0.4)
-
-        # vSmallNew = low_pass_filter(vSmallNew.copy(), cutoff_ratio=0.1)
-
-        #vMainNew
-
-        # filter results 
-        # vMainNew[1:] = (vMainNew[:-1] + 2*vMainNew[1:]  + vMainNew[:-1])/4
-        # print('vmainNew', vMainNew.shape)
-
-
-        # vMainNew = (1 - weight) * vMain + weight * vOldMain * np.linalg.norm(vMain)
-        # vSmallNew = (1 - weight) * vSmall + weight * vOldSmall * np.linalg.norm(vSmall)
 
         vMainOld = vMainNorm
         vSmallOld = vSmallNorm
@@ -204,19 +162,22 @@ def bisectingMethod(createdMoment, torque, upperBound, lowerBound, RPM_small):
 
     return RPM_small, upperBound, lowerBound
 
-def main():
-    RPM_MAIN = 400  # RPM of the main propeller
-    RPM_SMALL = 7000  # RPM of the small propeller
+def main(config=None):
+    RPM_MAIN = 480  # RPM of the main propeller
+    RPM_SMALL = 9000  # RPM of the small propeller
     LOWER = 5000
-    # Load base config 
-    baseConfig = loadConfig(PATH)
-    # Generate test configurations
-    configFiles = generate_flexible_configs(baseConfig, VARIABLE_SPACE, case=TITLE)
-    #
+    if config is None:
+        # Load base config 
+        baseConfig = loadConfig(PATH)
+        # Generate test configurations
+        configFiles = generate_flexible_configs(baseConfig, VARIABLE_SPACE, case=TITLE)
+        #
+    else:
+        configFiles = [config]
 
     for config in configFiles:
         errThrust, iterThrust = 1, 0
-        upperBoundMain, lowerBoundMain = 800, 250
+        upperBoundMain, lowerBoundMain = 480, 350
 
         if FLAGS["just_display"]:
             # Define the drone
@@ -240,28 +201,37 @@ def main():
                         # Initialize the axial velocities
                         vOldMain, vOldSmall, mainNB, nsm, smallNB, mainN, smallN= initializeVaxial(drone, FLAGS["helicopter"])
                         # initialize convergence plot
-                        plt.close()
-                        fig, ax = plt.subplots(1,3, figsize=(12, 6))
+                        if FLAGS['display_convergence']:
+                            plt.close()
+                            fig, ax = plt.subplots(1,3, figsize=(12, 6))
 
-                        ax[0].set_title('Velocity Error Main Propeller')
-                        im1 = ax[0].imshow(vOldMain.reshape(mainNB, -1), cmap='viridis')
-                        cbar1 = plt.colorbar(im1, ax=ax[0])
-                        if smallNB is not None:
-                            ax[1].set_title('Velocity Error Small Propeller')
-                            im2 = ax[1].imshow(vOldSmall.reshape(mainNB*smallNB, -1), cmap='viridis')
-                            cbar2 = plt.colorbar(im2, ax=ax[1])
-                            (line3,) = ax[2].plot(np.linspace(0,1, mainN), label='Gammas', marker='o')
-                            (line4,) = ax[2].plot(vOldMain[:smallN], label='Small Gammas', marker='x')
-                            ax[2].set_title('Gamma Distribution')
-                            ax[2].legend()
+                            ax[0].set_title('Velocity Error Main Propeller')
+                            im1 = ax[0].imshow(vOldMain.reshape(mainNB, -1), cmap='viridis')
+                            cbar1 = plt.colorbar(im1, ax=ax[0])
+                            if smallNB is not None:
+                                ax[1].set_title('Velocity Error Small Propeller')
+                                im2 = ax[1].imshow(vOldSmall.reshape(mainNB*smallNB, -1), cmap='viridis')
+                                cbar2 = plt.colorbar(im2, ax=ax[1])
+                                (line3,) = ax[2].plot(np.linspace(0,1, mainN), label='Gammas', marker='o')
+                                (line4,) = ax[2].plot(vOldMain[:smallN], label='Small Gammas', marker='x')
+                                ax[2].set_title('Gamma Distribution')
+                                ax[2].legend()
+                            else:
+                                im2 = None
+                                cbar2 = None
+                                line3 = None
+                                line4 = None
                         else:
+                            im1 = None
+                            cbar1 = None
                             im2 = None
                             cbar2 = None
                             line3 = None
                             line4 = None
+                            ax = None
 
                     # Solve the LL problem 
-                    Gammas, _, createdMoment, torque, thrust, power_required, _,_, v = solve(drone, case=f'{config}', updateConfig=True)
+                    Gammas, _, createdMoment, torque, thrust, power_required, _,_, v, STALL_FACTOR = solve(drone, case=f'{config}', updateConfig=True)
 
                     # compute velocity error
                     v, errVel, vOldMain, vOldSmall, im1, im2, line3, line4 = computeVelocityError(v, 
@@ -274,10 +244,10 @@ def main():
                                                                            WEIGHT_VEL, 
                                                                            im1, cbar1,
                                                                            im2, cbar2, line3, line4, 
-                                                                           Gammas, mainN=mainN, smallN=smallN, ax=ax)
+                                                                           Gammas, mainN=mainN, smallN=smallN, ax=ax, updateVisualizationFLAG=FLAGS['display_convergence'])
                     np.savetxt('./auxx/v_axial.txt', v)
                     iterVel += 1
-                    print(f'Iteration: {iterVel}, Error: {errVel}, weight: {WEIGHT_VEL}')
+                    print(f'Iteration: {iterVel}, Error: {errVel}, weight: {WEIGHT_VEL}, Stall Factor: {STALL_FACTOR:.4f}')
                 os.remove('./auxx/v_axial.txt')
                 if FLAGS['helicopter']:
                     errMoment = 0
@@ -288,7 +258,7 @@ def main():
                         # upadate RPM_small based on the moment error
                         RPM_SMALL, upperBoundSmall, lowerBoundSmall = bisectingMethod(createdMoment, torque, upperBoundSmall, lowerBoundSmall, RPM_SMALL)
                         iterMoment += 1
-                        print(f'Iteration: {iterMoment}, Moment Error: {errMoment}, RPM_small: {RPM_SMALL}')
+                        print(f'Iteration: {iterMoment}, Moment Error: {errMoment:.2f}, RPM_small: {RPM_SMALL:.1f}, RPM_main: {RPM_MAIN:.1f}, Stall Factor: {STALL_FACTOR:.4f}')
                     else:
                         errMoment = 0
                 iterMoment += 1
@@ -299,16 +269,49 @@ def main():
             else:
                 errThrust = np.abs(thrust - MTOW)
                 RPM_MAIN, upperBoundMain, lowerBoundMain = bisectingMethod(thrust, MTOW, upperBoundMain,  lowerBoundMain,  RPM_MAIN)
-            print(f'Iteration: {iterThrust}, Thrust Error: {errThrust}, RPM_main: {RPM_MAIN}')
+
+                ###############
+                # Guess RPM_SMALL based on the new RPM_MAIN
+                if not FLAGS['helicopter']:
+                    guessed_Ct_small = 0.4  # initial guess for small propeller thrust coefficient
+                    thrust_required = abs(torque) / (0.5*drone.main_prop.diameter) / drone.main_prop.NB  # thrust required from each small propeller to counteract the torque
+
+                    n = np.sqrt(thrust_required / (guessed_Ct_small * 1.225 * drone.small_props[0].diameter**4))
+                    LOWER = n * 60
+                    guessed_Ct_small = 0.05
+                    n = np.sqrt(thrust_required / (guessed_Ct_small * 1.225 * drone.small_props[0].diameter**4))
+                    RPM_SMALL = n * 60
+                    if RPM_SMALL > 25_000:
+                    #     print('WARNING: RPM_SMALL is too high, setting to 25,000 RPM')
+                    #     decision = input('Do you want to continue? (y/n): ')
+                    #     if decision.lower() != 'y':
+                    #         print('Exiting...')
+                    #         exit()
+                        RPM_SMALL = 25_000
+
+                    print('Lower bound for small propeller RPM', LOWER)
+                    print('Guessed RPM small', RPM_SMALL)
+                    # k = 1.15  # empirical factor to account for non-idealities
+                    # Cd0 = 0.01  # profile drag coefficient, typical value for small rotors
+                    # nrev_main = RPM_MAIN / 60
+                    # Ct_main = thrust/ (drone.main_prop.rho * nrev_main**2 * drone.main_prop.diameter**4)
+                    # Cp = k* Ct_main**(3/2) / np.sqrt(2) + drone.main_prop.sigma * Cd0 / 8
+                    # P 
+                    # print('sigma',drone.main_prop.sigma)
+
+                ##############
+
+            print(f'Iteration: {iterThrust}, Thrust Error: {errThrust:.2f}, RPM_main: {RPM_MAIN:.1f}, RPM_small: {RPM_SMALL:.1f}')
             iterThrust += 1
         
         if FLAGS["save_results"]:
-            _, FM, created_moment, Torque, Thrust, power_required, _,_, _= solve(drone, case=f'{config}', updateConfig=False, save=True)
+            _, FM, created_moment, Torque, Thrust, power_required, _,_, _,_= solve(drone, case=f'{config}', updateConfig=False, save=True)
             #u, v, w = computeVelocityField(plane='XY', shift=0.0, discretization=100, plotting=True)
 
         os.remove('./auxx/v_axial.txt')
     if FLAGS["plot_results"]:
-        plt.ioff()  # Turn off interactive mode
+        if FLAGS['display_convergence']:
+            plt.ioff()  # Turn off interactive mode
         for i in range(len(configFiles)):
             configFiles[i] = configFiles[i].replace('.json', '')
         myPlt.plot(configFiles, show = True, title=TITLE, helicopter=FLAGS['helicopter'], QBlade=False)
@@ -316,6 +319,8 @@ def main():
 
     # clean up, delete the auxx files
     #os.remove('./auxx/v_axial.txt')
+    if FLAGS["rpm_optimization"]:
+        return Thrust, power_required, RPM_MAIN, RPM_SMALL, STALL_FACTOR
 
 if __name__ == "__main__":
     start_time = time.time()

@@ -274,14 +274,9 @@ def solve(drone, updateConfig=True, case='main', save=False):
     uInfluence_ptr = u_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     vInfluence_ptr = v_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     wInfluence_ptr = w_influences.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+
     # Call the C function
-
-
-
     res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr, core_size)
-    # save the influence matrices to csv
-    #np.savez(f'./results/influence_matrices_{case}.npz', u_influences=u_influences, v_influences=v_influences, w_influences=w_influences)
-
 
     # n_azimuth, n_origin 
     n_azimuth, n_origin = computeAzimuthAndOrigin(drone, npM, npS, main_NB, collocN, helicopter=helicopter)
@@ -309,7 +304,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
     while (err > 1e-8 and iter<1_000):
         iter+=1
         if iter % 200 == 0:
-            print('Weight:', weight, 'Iter:', iter, 'Error:', err)
+            print(f'Weight: {weight} Iter:{iter} Error:{err:.4f}')
             weight -= weight*0.01
             weight = max(weight, 0.03)
         u = u_influences@Gammas
@@ -327,35 +322,35 @@ def solve(drone, updateConfig=True, case='main', save=False):
         tan_direction = np.cross(total_colloc_points - n_origin, n_azimuth)
         tan_direction = tan_direction / np.linalg.norm(tan_direction, axis=1)[:, np.newaxis]
         v_tangential = np.sum(vel_total * tan_direction, axis=1)
-
-        # plt.plot(v_tangential, marker='o', label='v_tangential')
-        # plt.legend()
-        # plt.show()
-
         v_mag = np.sqrt(v_axial**2 + v_tangential**2)
         Re = 1.225*v_mag.flatten()*chords.flatten()/1.81e-5
-
-        
-
         inflowangle = np.arctan(-v_axial/v_tangential)
 
         # ################
-        
-        inflowangle[npM:] = np.pi/2 - inflowangle[npM:] # for small props, the inflow angle is shifted by 90 degrees
+        if not helicopter:
+            # Adjust inflow angle for small props
+            small_prop_angle = -drone.small_props[0].angles[1]
+            inflowangle[npM:] = small_prop_angle - inflowangle[npM:] # for small props, the inflow angle is shifted by 90 degrees
         
         # ################
 
         alpha = twist.flatten() -  (inflowangle*180/np.pi).flatten()
-        alpha[alpha>8] = 8
+        # Try catching stall
+
+        alpha[alpha>12] = 12
         alpha[alpha<-5] = -5
         #alpha[alpha>alpha_cl_max_main] = alpha_cl_max_main
-
+        
         alpha_small_temp = inflowangle[npM:]*180/np.pi - twist[npM:].flatten()# for small props, the alpha is shifted by 90 degrees
         #alpha_small_temp[alpha_small_temp>alpha_cl_max_small] = alpha_cl_max_small
 
         alpha[npM:] = alpha_small_temp
 
         alpha = np.reshape(alpha, (-1, 1))
+
+        # count number of alpha > 10 
+        stall_count = np.sum(alpha[:npM]>10) + np.sum(alpha[:npM]<-4) + np.sum(alpha[npM:npM+npS]>10) + np.sum(alpha[npM:npM+npS]<-4)
+        STALL_FACTOR = stall_count/(npM+npS)
 
         if ReInfluence:
             airfoil_array = np.array([main_airfoil]*collocN)
@@ -375,30 +370,10 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
         Gammas_old = Gammas
         Gammas  = weight * Cl.flatten() * 0.5 * chords.flatten()* v_mag.flatten() + (1-weight)*Gammas_old.flatten()
-        # plt.close()
-        # plt.ioff()
-        # plt.plot(Gammas[:npM], marker='o', label='Gammas pre')
-        # treshold = 0.5
-        # Gammas[:npM] = np.tile(conditional_median_filter_1d(Gammas[:main_n-1], kernel_size=3, std_thresh=treshold), main_NB)
-        
-        # Gammas_blade1 = conditional_median_filter_1d(Gammas[npM:npM+small_n-1], kernel_size=5, std_thresh=treshold)
-        # Gammas_blade2 = conditional_median_filter_1d(Gammas[npM+small_n-1:npM+2*small_n-2], kernel_size=5, std_thresh=treshold)
-        # Gammas_blade3 = conditional_median_filter_1d(Gammas[npM+2*small_n-2:npM+3*small_n-3], kernel_size=5, std_thresh=treshold)
-        # Gammas_tip = np.concatenate((Gammas_blade1, Gammas_blade2, Gammas_blade3))
-        # Gammas[npM:] = np.tile(Gammas_tip, main_NB)
-        Gammas[Gammas> 3] = 2 # limit the maximum value of Gammas to 10
-        Gammas[Gammas< -0.5] = -0.5 # limit the minimum value of Gammas to 0
 
-          # apply median filter to main prop Gammas to remove spikes if any
-        # plt.plot(Gammas[:npM], marker='x', label='Gammas post')
-        # plt.legend()
-        # plt.show()
-        # delay 
-        # apply median filter to Gammas to remove spikes if any 
-        
-
-        
         # reshape Gammas to (collocN, 1)
+        Gammas[Gammas<-1] = -1
+        Gammas[Gammas>3] = 3
         Gammas = np.reshape(Gammas, (collocN, 1))
 
 
@@ -413,7 +388,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         print('Max iterations reached')
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-    print(f'Iteration: {iter}, Error: {err}, Weight: {weight}')
+    print(f'Iteration: {iter}, Error: {err:.4f}, Weight: {weight}')
 
     if not ReInfluence:
         #Cd = np.interp(alpha, alphaPolar, cdPolar)
@@ -475,21 +450,21 @@ def solve(drone, updateConfig=True, case='main', save=False):
         Thrust_small = Faxial[npM:].sum() 
         created_moment = Thrust_small*drone.main_prop.diameter/2
         power_required = Torque_small*drone.small_props[0].RPM*2*np.pi/60
-        print("computing power required, used RPM: ", drone.small_props[0].RPM , "Torque_small:", Torque_small, "Thrust_small:", Thrust_small, "created_moment:", created_moment, "power_required:", power_required)
+        print(f"Small RPM: {drone.small_props[0].RPM:.2f} Torque_small:{Torque_small:.2f} Thrust_small: {Thrust_small:.2f} created_moment: {created_moment:.2f} power_required:{power_required:.2f}")
     else:
         Torque_small = 0
         Thrust_small = 0
         created_moment = 0
         power_required = 0
 
-    print("Small engines Thrust", Thrust_small)
+    print(f"Small engines Thrust {Thrust_small:.2f}")
     
 
     
 
     # Compute the induced power for the main rotor
     induced_power = (-v_axial[:npM].flatten() * Faxial[:npM].flatten()).sum()
-    print("Induced power main rotor", induced_power)    
+    print(f"Induced power main rotor {induced_power:.2f}")    
 
     # # Compute the profile power for the main rotor
     #Cd0 = xf.getCd0_batch(Re, airfoil_array, npz_dir="./airfoil/data/numpy")
@@ -518,7 +493,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
 
 
 
-    print("Profile power main rotor", profile_power)
+    print(f"Profile power main rotor {profile_power:.2f}")
     total_power = induced_power + profile_power
     print(f"Total Power: {total_power:.2f}")
 
@@ -594,4 +569,4 @@ def solve(drone, updateConfig=True, case='main', save=False):
     np.savetxt('./auxx/v_axial.txt', v_axial)
     drone.main_prop.v_axial = v_axial[:main_n]
 
-    return Gammas.flatten(), FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial
+    return Gammas.flatten(), FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial, STALL_FACTOR
