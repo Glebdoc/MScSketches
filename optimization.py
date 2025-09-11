@@ -5,6 +5,7 @@ import os, json
 import numpy as np
 import csv
 import plotter as myPlt
+from bemUtils import computeVelocityField
 
 
 PATH = 'configs/base.json'
@@ -466,3 +467,15 @@ propellerAzimuthalAnimation(
 # propellerAzimuthalStudy('propeller_azimuth_8032_AH-79100B_pitchtip', 'small_propellers', 'pitch_tip', 32.5, 38, 4, updatedata=True, twist=True)
 
 #design_map(refine=3)
+
+def velocity_field_around_propeller(angle_1, angle_2, steps):
+   # for every available azimuthal position produce a velocity field plot
+   # stack them together as a gif
+   batch = 'propeller_azimuth_8032_5_AH-791'
+   batch_path = f'./DesignSpace/{batch}'
+
+   for i in range(steps):
+      path =f'./DesignSpace/{batch}/DP{i}'
+      u, v, w = computeVelocityField(plane='YZ', shift=0, discretization=50, plotting=False)
+
+
