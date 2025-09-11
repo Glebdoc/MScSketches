@@ -1,6 +1,6 @@
 import numpy as np
 import pyvista as pv
-import os, json
+import os, json, csv
 from bemUtils import*
 import time
 import matplotlib.pyplot as plt
@@ -16,13 +16,13 @@ plt.ion()
 # --- Configuration ---
 FLAGS = {
     "just_display": False,
-    "plot_results": True,
+    "plot_results": False,
     "save_results": True,
-    "run_optimization": True,
+    "run_optimization": False,
     "thrust_optimization": False,
     "helicopter": False,
     "rpm_optimization": False, 
-    "display_convergence": True
+    "display_convergence": False
 }
 
 # --- Inputs ---
@@ -35,11 +35,12 @@ VARIABLE_SPACE = {
 
 }
 
-ERR_VEL  = 1e-3
+ERR_VEL  = 1e-4
 ERR_MOMENT = 1e-1
 ERR_THRUST = 1e-1
-IT_MAX = 15
+IT_MAX = 30
 WEIGHT_VEL = 0.995 # The heigher the more stable
+STALL_TRESHOLD = 0.2
 TITLE= 'drone8040_mp_spitch'  # Title for the plot
 
 #SWE - small wake effect
@@ -162,10 +163,9 @@ def bisectingMethod(createdMoment, torque, upperBound, lowerBound, RPM_small):
 
     return RPM_small, upperBound, lowerBound
 
-def main(config=None):
-    RPM_MAIN = 480  # RPM of the main propeller
-    RPM_SMALL = 9000  # RPM of the small propeller
-    LOWER = 5000
+
+
+def main(RPM_MAIN, RPM_SMALL, config=None, savePath=None):
     if config is None:
         # Load base config 
         baseConfig = loadConfig(PATH)
@@ -176,8 +176,6 @@ def main(config=None):
         configFiles = [config]
 
     for config in configFiles:
-        errThrust, iterThrust = 1, 0
-        upperBoundMain, lowerBoundMain = 480, 350
 
         if FLAGS["just_display"]:
             # Define the drone
@@ -185,145 +183,196 @@ def main(config=None):
             # Display the drone
             drone.display(color_main='gray', color_small='green', extra_points=None, extra_lines=None)
             break
-        while errThrust > ERR_THRUST and iterThrust < IT_MAX:
 
-            errMoment, iterMoment = 1, 0
-            upperBoundSmall, lowerBoundSmall = RPM_SMALL, LOWER
 
-            while errMoment > ERR_MOMENT and iterMoment < IT_MAX:
-              
-                errVel, iterVel = 1, 0
-                while errVel > ERR_VEL and iterVel < IT_MAX: 
-                    drone = defineDrone(config, main_RPM=RPM_MAIN, small_RPM=RPM_SMALL)
-                    FLAGS["helicopter"] = drone.helicopter
+        errVel, iterVel = 1, 0
+        while errVel > ERR_VEL and iterVel < IT_MAX: 
+            drone = defineDrone(config, main_RPM=RPM_MAIN, small_RPM=RPM_SMALL)
+            FLAGS["helicopter"] = drone.helicopter
 
-                    if iterVel == 0:
-                        # Initialize the axial velocities
-                        vOldMain, vOldSmall, mainNB, nsm, smallNB, mainN, smallN= initializeVaxial(drone, FLAGS["helicopter"])
-                        # initialize convergence plot
-                        if FLAGS['display_convergence']:
-                            plt.close()
-                            fig, ax = plt.subplots(1,3, figsize=(12, 6))
+            if iterVel == 0:
+                # Initialize the axial velocities
+                vOldMain, vOldSmall, mainNB, nsm, smallNB, mainN, smallN= initializeVaxial(drone, FLAGS["helicopter"])
+                # initialize convergence plot
+                if FLAGS['display_convergence']:
+                    plt.close()
+                    fig, ax = plt.subplots(1,3, figsize=(12, 6))
 
-                            ax[0].set_title('Velocity Error Main Propeller')
-                            im1 = ax[0].imshow(vOldMain.reshape(mainNB, -1), cmap='viridis')
-                            cbar1 = plt.colorbar(im1, ax=ax[0])
-                            if smallNB is not None:
-                                ax[1].set_title('Velocity Error Small Propeller')
-                                im2 = ax[1].imshow(vOldSmall.reshape(mainNB*smallNB, -1), cmap='viridis')
-                                cbar2 = plt.colorbar(im2, ax=ax[1])
-                                (line3,) = ax[2].plot(np.linspace(0,1, mainN), label='Gammas', marker='o')
-                                (line4,) = ax[2].plot(vOldMain[:smallN], label='Small Gammas', marker='x')
-                                ax[2].set_title('Gamma Distribution')
-                                ax[2].legend()
-                            else:
-                                im2 = None
-                                cbar2 = None
-                                line3 = None
-                                line4 = None
-                        else:
-                            im1 = None
-                            cbar1 = None
-                            im2 = None
-                            cbar2 = None
-                            line3 = None
-                            line4 = None
-                            ax = None
-
-                    # Solve the LL problem 
-                    Gammas, _, createdMoment, torque, thrust, power_required, _,_, v, STALL_FACTOR = solve(drone, case=f'{config}', updateConfig=True)
-
-                    # compute velocity error
-                    v, errVel, vOldMain, vOldSmall, im1, im2, line3, line4 = computeVelocityError(v, 
-                                                                           vOldMain, 
-                                                                           vOldSmall, 
-                                                                           FLAGS['helicopter'], 
-                                                                           nsm, 
-                                                                           mainNB, 
-                                                                           smallNB,
-                                                                           WEIGHT_VEL, 
-                                                                           im1, cbar1,
-                                                                           im2, cbar2, line3, line4, 
-                                                                           Gammas, mainN=mainN, smallN=smallN, ax=ax, updateVisualizationFLAG=FLAGS['display_convergence'])
-                    np.savetxt('./auxx/v_axial.txt', v)
-                    iterVel += 1
-                    print(f'Iteration: {iterVel}, Error: {errVel}, weight: {WEIGHT_VEL}, Stall Factor: {STALL_FACTOR:.4f}')
-                os.remove('./auxx/v_axial.txt')
-                if FLAGS['helicopter']:
-                    errMoment = 0
-                else:
-                    if FLAGS['rpm_optimization']:
-                        # compute moment error
-                        errMoment = np.abs(abs(createdMoment) - torque)
-                        # upadate RPM_small based on the moment error
-                        RPM_SMALL, upperBoundSmall, lowerBoundSmall = bisectingMethod(createdMoment, torque, upperBoundSmall, lowerBoundSmall, RPM_SMALL)
-                        iterMoment += 1
-                        print(f'Iteration: {iterMoment}, Moment Error: {errMoment:.2f}, RPM_small: {RPM_SMALL:.1f}, RPM_main: {RPM_MAIN:.1f}, Stall Factor: {STALL_FACTOR:.4f}')
+                    ax[0].set_title('Velocity Error Main Propeller')
+                    im1 = ax[0].imshow(vOldMain.reshape(mainNB, -1), cmap='viridis')
+                    cbar1 = plt.colorbar(im1, ax=ax[0])
+                    if smallNB is not None:
+                        ax[1].set_title('Velocity Error Small Propeller')
+                        im2 = ax[1].imshow(vOldSmall.reshape(mainNB*smallNB, -1), cmap='viridis')
+                        cbar2 = plt.colorbar(im2, ax=ax[1])
+                        (line3,) = ax[2].plot(np.linspace(0,1, mainN), label='Gammas', marker='o')
+                        (line4,) = ax[2].plot(vOldMain[:smallN], label='Small Gammas', marker='x')
+                        ax[2].set_title('Gamma Distribution')
+                        ax[2].legend()
                     else:
-                        errMoment = 0
-                iterMoment += 1
+                        im2 = None
+                        cbar2 = None
+                        line3 = None
+                        line4 = None
+                else:
+                    im1 = None
+                    cbar1 = None
+                    im2 = None
+                    cbar2 = None
+                    line3 = None
+                    line4 = None
+                    ax = None
 
-            # exit outer while loop if thrust is not taken into account
-            if not FLAGS["thrust_optimization"]:
-                errThrust = 0
-            else:
-                errThrust = np.abs(thrust - MTOW)
-                RPM_MAIN, upperBoundMain, lowerBoundMain = bisectingMethod(thrust, MTOW, upperBoundMain,  lowerBoundMain,  RPM_MAIN)
+            # Solve the LL problem 
+            Gammas, _, createdMoment, torque, thrust, power_required, _,_, v, STALL_FACTOR = solve(drone, case=f'{config}', updateConfig=True, save=True, savePath=savePath)
 
-                ###############
-                # Guess RPM_SMALL based on the new RPM_MAIN
-                if not FLAGS['helicopter']:
-                    guessed_Ct_small = 0.4  # initial guess for small propeller thrust coefficient
-                    thrust_required = abs(torque) / (0.5*drone.main_prop.diameter) / drone.main_prop.NB  # thrust required from each small propeller to counteract the torque
-
-                    n = np.sqrt(thrust_required / (guessed_Ct_small * 1.225 * drone.small_props[0].diameter**4))
-                    LOWER = n * 60
-                    guessed_Ct_small = 0.05
-                    n = np.sqrt(thrust_required / (guessed_Ct_small * 1.225 * drone.small_props[0].diameter**4))
-                    RPM_SMALL = n * 60
-                    if RPM_SMALL > 25_000:
-                    #     print('WARNING: RPM_SMALL is too high, setting to 25,000 RPM')
-                    #     decision = input('Do you want to continue? (y/n): ')
-                    #     if decision.lower() != 'y':
-                    #         print('Exiting...')
-                    #         exit()
-                        RPM_SMALL = 25_000
-
-                    print('Lower bound for small propeller RPM', LOWER)
-                    print('Guessed RPM small', RPM_SMALL)
-                    # k = 1.15  # empirical factor to account for non-idealities
-                    # Cd0 = 0.01  # profile drag coefficient, typical value for small rotors
-                    # nrev_main = RPM_MAIN / 60
-                    # Ct_main = thrust/ (drone.main_prop.rho * nrev_main**2 * drone.main_prop.diameter**4)
-                    # Cp = k* Ct_main**(3/2) / np.sqrt(2) + drone.main_prop.sigma * Cd0 / 8
-                    # P 
-                    # print('sigma',drone.main_prop.sigma)
-
-                ##############
-
-            print(f'Iteration: {iterThrust}, Thrust Error: {errThrust:.2f}, RPM_main: {RPM_MAIN:.1f}, RPM_small: {RPM_SMALL:.1f}')
-            iterThrust += 1
+            if STALL_FACTOR[2] > STALL_TRESHOLD:
+                print('WARNING: The tip small propeller is stalling, reduce RPM_SMALL')
+                break
+            if STALL_FACTOR[3] > STALL_TRESHOLD:
+                print('WARNING: The root small propeller is stalling, increase RPM_SMALL')
+                break
+            # compute velocity error
+            v, errVel, vOldMain, vOldSmall, im1, im2, line3, line4 = computeVelocityError(v, 
+                                                                    vOldMain, 
+                                                                    vOldSmall, 
+                                                                    FLAGS['helicopter'], 
+                                                                    nsm, 
+                                                                    mainNB, 
+                                                                    smallNB,
+                                                                    WEIGHT_VEL, 
+                                                                    im1, cbar1,
+                                                                    im2, cbar2, line3, line4, 
+                                                                    Gammas, mainN=mainN, smallN=smallN, ax=ax, updateVisualizationFLAG=FLAGS['display_convergence'])
+            np.savetxt('./auxx/v_axial.txt', v)
+            iterVel += 1
+            print(f'Iteration: {iterVel}, Error: {errVel}, weight: {WEIGHT_VEL}')
         
-        if FLAGS["save_results"]:
-            _, FM, created_moment, Torque, Thrust, power_required, _,_, _,_= solve(drone, case=f'{config}', updateConfig=False, save=True)
-            #u, v, w = computeVelocityField(plane='XY', shift=0.0, discretization=100, plotting=True)
-
         os.remove('./auxx/v_axial.txt')
-    if FLAGS["plot_results"]:
-        if FLAGS['display_convergence']:
-            plt.ioff()  # Turn off interactive mode
-        for i in range(len(configFiles)):
-            configFiles[i] = configFiles[i].replace('.json', '')
-        myPlt.plot(configFiles, show = True, title=TITLE, helicopter=FLAGS['helicopter'], QBlade=False)
-        #drone.display(color_main='gray', color_small='green', extra_points=None, extra_lines=None)
 
-    # clean up, delete the auxx files
-    #os.remove('./auxx/v_axial.txt')
-    if FLAGS["rpm_optimization"]:
-        return Thrust, power_required, RPM_MAIN, RPM_SMALL, STALL_FACTOR
+        return thrust, torque, power_required, createdMoment, STALL_FACTOR, iterVel
+
+
+def nested_optimization(config, x_0, bounds, results=False, savePlots=False, saveInnerLog=None):   
+    """
+    Hardoced optimization of RPM_MAIN and RPM_SMALL using double bisection and the STALL check. 
+
+    """
+    # Initial guess + initialbounds 
+    RPM_MAIN, RPM_SMALL = x_0
+    lowerBoundMain, upperBoundMain = bounds[0]
+    lowerBoundSmall, upperBoundSmall = bounds[1]
+
+    # define errors
+    err_moment = 1
+    err_thrust = 1
+
+    print(saveInnerLog)
+
+    # Create log file
+    if saveInnerLog is not None:
+        log_file = saveInnerLog + "/trim_log.csv"
+        print('Im here')
+    with open(log_file, "w") as f:
+            f.write("RPM_MAIN,RPM_SMALL,thrust,torque,power_required,createdMoment,STALL_FACTOR,RPM_MAIN_bound,RPM_SMALL_bound, iterVel\n")
+
+    # optimize for equilibrium of thrust
+    iter_T = 0
+    IT_MAX_T = 10
+    while err_thrust > ERR_THRUST and iter_T < IT_MAX_T:
+        # optimize for equilibrium of moments
+        iter = 0
+        IT_MAX_M = 10
+        err_moment = 1
+        lowerBoundSmall, upperBoundSmall = bounds[1]
+        while err_moment > ERR_MOMENT and iter < IT_MAX_M:
+            
+            # Run the case and check if tip-propeller stalls 
+
+            thrust, torque, power_required, createdMoment, STALL_FACTOR, iterVel = main(RPM_MAIN, RPM_SMALL, config=config, savePath=saveInnerLog)
+
+            with open(log_file, "a") as f:
+                f.write(f"{RPM_MAIN},{RPM_SMALL},{thrust},{torque},{power_required},{createdMoment},{STALL_FACTOR},{(lowerBoundMain, upperBoundMain)},{(lowerBoundSmall, upperBoundSmall)},{iterVel}\n")
+            
+            if STALL_FACTOR[2] > STALL_TRESHOLD :
+                if createdMoment < torque:
+                    # log warning
+                    with open(log_file, "a") as f:
+                        f.write('WARNING: The tip small propeller is stalling, reduce RPM_SMALL\n')
+                    break
+                # The tip rotor experiences too high AoA 
+                upperBoundSmall = RPM_SMALL
+                midpoint = (upperBoundSmall + lowerBoundSmall)/2
+                RPM_SMALL = midpoint 
+                thrust, torque, power_required, createdMoment, STALL_FACTOR, iterVel = main(RPM_MAIN, RPM_SMALL, config=config, savePath=saveInnerLog)
+
+                with open(log_file, "a") as f:
+                    f.write(f"{RPM_MAIN},{RPM_SMALL},{thrust},{torque},{power_required},{createdMoment},{STALL_FACTOR},{(lowerBoundMain, upperBoundMain)},{(lowerBoundSmall, upperBoundSmall)},{iterVel}\n")
+            
+            
+            if STALL_FACTOR[3] > STALL_TRESHOLD :
+                if createdMoment > torque:
+                    break
+                # The tip rotor experiences too low AoA
+                lowerBoundSmall = RPM_SMALL
+                midpoint = (upperBoundSmall + lowerBoundSmall)/2
+                RPM_SMALL = midpoint
+                thrust, torque, power_required, createdMoment, STALL_FACTOR, iterVel = main(RPM_MAIN, RPM_SMALL, config=config, savePath=saveInnerLog)
+
+                with open(log_file, "a") as f:
+                    f.write(f"{RPM_MAIN},{RPM_SMALL},{thrust},{torque},{power_required},{createdMoment},{STALL_FACTOR},{(lowerBoundMain, upperBoundMain)},{(lowerBoundSmall, upperBoundSmall)}, {iterVel}\n")
+            
+            if torque < 0:
+                torque = 0
+            err_moment = abs(createdMoment - torque)
+            RPM_SMALL, upperBoundSmall, lowerBoundSmall = bisectingMethod(createdMoment, torque, upperBoundSmall, lowerBoundSmall, RPM_SMALL)
+            iter += 1
+        if err_moment > ERR_MOMENT and createdMoment < torque:
+            print('WARNING: createdMoment is less than torque, unfeasible solution')
+        
+
+
+        with open(log_file, "a") as f:
+                f.write(f"{RPM_MAIN},{RPM_SMALL},{thrust},{torque},{power_required},{createdMoment},{STALL_FACTOR},{(lowerBoundMain, upperBoundMain)},{(lowerBoundSmall, upperBoundSmall)}, {iterVel}\n")
+                # add empty line to separate iterations
+                f.write("\n")
+        # optimize for thrust equilibrium
+        # check if main-rotor stalls 
+        if STALL_FACTOR[0] > STALL_TRESHOLD :
+            # The tip rotor experiences too high AoA 
+            upperBoundMain = RPM_MAIN
+            midpoint = (upperBoundMain + lowerBoundMain)/2
+            RPM_MAIN = midpoint 
+            thrust, torque, power_required, createdMoment, STALL_FACTOR, iterVel = main(RPM_MAIN, RPM_SMALL, config=config, savePath=saveInnerLog)
+
+            with open(log_file, "a") as f:
+                f.write(f"{RPM_MAIN},{RPM_SMALL},{thrust},{torque},{power_required},{createdMoment},{STALL_FACTOR},{(lowerBoundMain, upperBoundMain)},{(lowerBoundSmall, upperBoundSmall)},{iterVel}\n")
+        
+        if STALL_FACTOR[1] > STALL_TRESHOLD :
+            # The tip rotor experiences too low AoA
+            lowerBoundMain = RPM_MAIN
+            midpoint = (upperBoundMain + lowerBoundMain)/2
+            RPM_MAIN = midpoint
+            thrust, torque, power_required, createdMoment, STALL_FACTOR, iterVel = main(RPM_MAIN, RPM_SMALL, config=config, savePath=saveInnerLog)
+
+            with open(log_file, "a") as f:
+                f.write(f"{RPM_MAIN},{RPM_SMALL},{thrust},{torque},{power_required},{createdMoment},{STALL_FACTOR},{(lowerBoundMain, upperBoundMain)},{(lowerBoundSmall, upperBoundSmall)},{iterVel}\n")
+        
+        err_thrust = abs(thrust - MTOW)
+        RPM_MAIN, upperBoundMain, lowerBoundMain = bisectingMethod(thrust, MTOW, upperBoundMain,  lowerBoundMain,  RPM_MAIN)
+        iter_T += 1
+        
+    if savePlots:
+        if FLAGS['display_convergence']:
+            plt.ioff()
+        myPlt.plot([f'{saveInnerLog}/_res.csv'], show=False, title=TITLE, helicopter=FLAGS["helicopter"], QBlade=False, path=saveInnerLog)
+        
+    return RPM_MAIN, RPM_SMALL, thrust, torque, power_required, createdMoment, STALL_FACTOR
 
 if __name__ == "__main__":
     start_time = time.time()
-    main()
+    x_0 = [400, 9500]  # Initial guess for RPM_MAIN and RPM_SMALL
+    bounds = [(300, 500), (7000, 12000)]  # Bounds for RPM_MAIN and RPM_SMALL
+    nested_optimization(x_0=x_0, bounds=bounds, config=None, results=False, savePlots=False, saveInnerLog='./results/one_shot', )
     end_time = time.time()
     print(f"Execution time: {end_time - start_time:.2f} seconds")

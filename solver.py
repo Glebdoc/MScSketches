@@ -220,12 +220,15 @@ def smoothSpline(data, step=2):
     cd_smooth = spline_cd(alpha_smooth)
     return alpha_smooth, cl_smooth, cd_smooth
 
-def solve(drone, updateConfig=True, case='main', save=False):
+def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
+
+    print(savePath)
     preloaded_data = preload_airfoil_data()
     helicopter = drone.helicopter
     U = drone.main_prop.U
     ReInfluence = drone.reynolds
     main_airfoil = drone.main_prop.airfoil
+    small_airfoil = drone.small_airfoil
     npM, npS, collocN, main_NB, small_NB, main_n, small_n = computeNumberOfPoints(drone, helicopter)
 
     v_axial = np.zeros((collocN, 1))
@@ -258,7 +261,6 @@ def solve(drone, updateConfig=True, case='main', save=False):
     total_colloc_points = computeCollocationPoints(drone, npM, npS, main_NB, small_NB, main_n, small_n, helicopter=helicopter)
 
     table = np.array(drone.vortexTABLE)
-    np.savez(f'./auxx/{case}_table.npz', table=table[:,:6])
 
     if os.name == 'nt':
         mylib = ctypes.CDLL("./mylib.dll")  
@@ -293,10 +295,11 @@ def solve(drone, updateConfig=True, case='main', save=False):
     if not helicopter:
         Omega[npM:] = drone.small_props[0].RPM*2*np.pi/60
         twist[npM:, 0] = np.tile(drone.small_props[0].pitch, (main_NB*small_NB))
-    
     # V rotational main prop 
     v_rotational = computeVrotational(drone, total_colloc_points, Omega, n_azimuth, n_origin, npM, npS, main_NB, helicopter=helicopter)
-    twist[npM:] = 90 - twist[npM:]  # for small props, the twist is shifted by 90 degrees
+    angle_small = drone.small_props[0].angles[1]
+    twist[npM:] = -np.rad2deg(angle_small)- twist[npM:]  # for small props, the twist is shifted by 90 degrees
+
 
     weight = 0.05
     err = 1.0
@@ -330,30 +333,42 @@ def solve(drone, updateConfig=True, case='main', save=False):
         if not helicopter:
             # Adjust inflow angle for small props
             small_prop_angle = -drone.small_props[0].angles[1]
-            inflowangle[npM:] = small_prop_angle - inflowangle[npM:] # for small props, the inflow angle is shifted by 90 degrees
+            inflowangle[npM:] = small_prop_angle - inflowangle[npM:] 
         
         # ################
 
         alpha = twist.flatten() -  (inflowangle*180/np.pi).flatten()
         # Try catching stall
 
-        alpha[alpha>12] = 12
+        alpha[alpha>11] = 11
         alpha[alpha<-5] = -5
         #alpha[alpha>alpha_cl_max_main] = alpha_cl_max_main
         
         alpha_small_temp = inflowangle[npM:]*180/np.pi - twist[npM:].flatten()# for small props, the alpha is shifted by 90 degrees
         #alpha_small_temp[alpha_small_temp>alpha_cl_max_small] = alpha_cl_max_small
-
+        alpha_small_temp[alpha_small_temp>11] = 11
+        alpha_small_temp[alpha_small_temp<-5] = -5
         alpha[npM:] = alpha_small_temp
 
         alpha = np.reshape(alpha, (-1, 1))
 
         # count number of alpha > 10 
-        stall_count = np.sum(alpha[:npM]>10) + np.sum(alpha[:npM]<-4) + np.sum(alpha[npM:npM+npS]>10) + np.sum(alpha[npM:npM+npS]<-4)
-        STALL_FACTOR = stall_count/(npM+npS)
+        STALL_MAIN_UPPER = np.sum(alpha[:npM]>10)/npM
+        STALL_MAIN_LOWER = np.sum(alpha[:npM]<-4)/npM
+
+        STALL_SMALL_UPPER = np.sum(alpha[npM:npM+npS]>10)/npS
+        STALL_SMALL_LOWER = np.sum(alpha[npM:npM+npS]<-4)/npS
+
+        STALL_TUPLE = (STALL_MAIN_UPPER, STALL_MAIN_LOWER, STALL_SMALL_UPPER, STALL_SMALL_LOWER)
+
+
+        # stall_count = np.sum(alpha[:npM]>10) + np.sum(alpha[:npM]<-4) + np.sum(alpha[npM:npM+npS]>10) + np.sum(alpha[npM:npM+npS]<-4)
+        # STALL_FACTOR = stall_count/(npM+npS)
 
         if ReInfluence:
-            airfoil_array = np.array([main_airfoil]*collocN)
+            #airfoil_array = np.array([main_airfoil]*collocN)
+            airfoil_array = np.array([main_airfoil]*npM + [small_airfoil]*(collocN - npM))
+
             #cl, cd = xf.getPolar_batch(Re, alpha, airfoil_array, npz_dir="./airfoil/data/numpy")
             cl, cd = xf.getPolar_batch(Re, alpha, airfoil_array, preloaded_data)
             Cl[:] = cl.reshape(-1, 1)
@@ -438,7 +453,9 @@ def solve(drone, updateConfig=True, case='main', save=False):
         r = r_main
 
     Torque = np.sum(Ftan[:npM] * r[:npM].flatten())
-    Thrust = Faxial[:npM].sum() 
+    angle_small = drone.small_props[0].angles[1]
+
+    Thrust = Faxial[:npM].sum() + Faxial[npM:].sum()*np.sin(np.pi/2 + angle_small)
     print('----------------------------------')
 
     computed_power = Torque*drone.main_prop.RPM*2*np.pi/60
@@ -448,7 +465,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
         
         Torque_small = np.sum(Ftan[npM:] * r[npM:].flatten())
         Thrust_small = Faxial[npM:].sum() 
-        created_moment = Thrust_small*drone.main_prop.diameter/2
+        created_moment = Thrust_small*np.cos(np.pi/2 + angle_small)*drone.main_prop.diameter/2
         power_required = Torque_small*drone.small_props[0].RPM*2*np.pi/60
         print(f"Small RPM: {drone.small_props[0].RPM:.2f} Torque_small:{Torque_small:.2f} Thrust_small: {Thrust_small:.2f} created_moment: {created_moment:.2f} power_required:{power_required:.2f}")
     else:
@@ -521,7 +538,7 @@ def solve(drone, updateConfig=True, case='main', save=False):
         else:
             table[i][-1] = Gammas[hsN]
             
-        np.savetxt('table_final.txt', table_final)
+        #np.savetxt('table_final.txt', table_final)
 
         misc  = np.zeros((collocN, 1))
         misc[0] = Thrust
@@ -560,13 +577,14 @@ def solve(drone, updateConfig=True, case='main', save=False):
                                 Re.flatten(),
                                 L_unitspan,
                                 chords.flatten(),
+                                twist.flatten(),
                                 misc))
 
         header = "r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, v_rot_a, v_rot_t, u, v, w, Cl, Cd,  misc"
         case = case.replace('.json', '')
-        np.savetxt(f'./results/{case}_res.csv', results, delimiter=',', header=header, comments='')
+        np.savetxt(f'./{savePath}/_res.csv', results, delimiter=',', header=header, comments='')
 
     np.savetxt('./auxx/v_axial.txt', v_axial)
     drone.main_prop.v_axial = v_axial[:main_n]
 
-    return Gammas.flatten(), FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial, STALL_FACTOR
+    return Gammas.flatten(), FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial, STALL_TUPLE

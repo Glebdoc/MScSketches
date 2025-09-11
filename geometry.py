@@ -117,41 +117,74 @@ def median_filter(data, kernel_size=5, startFromTheEnd=True, times=1):
 class Propeller():
     def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='cosine', bodyIndex=0, small=False, main_rotor=None, 
                  contraction=True, blade1_angle=0, downwash=None, wake_bend = False):
+        
+        """
+        This is the initialization of a propeller object. For both main and small rotors.
+
+
+        """
         self.diameter = diameter
         self.position = position
-        self.small = small
+        self.azimuth = np.array([0, 0, 1])
+        self.origin = position
         self.angles = np.array(angles)
         self.NB = NB
         self.pitch = pitch
         self.RPM = RPM
         self.n = n
         self.U = U
-        self.wake_bend = wake_bend
-        self.downwash = downwash
         self.wake_length = wake_length
+        self.ppr=20                         # number of points per revolution in the wake
         self.chord = chord
         self.v_axial = None
         self.Ct = None
-        self.distribution = distribution
+        self.vortexTABLE = []
+        self.horseShoes = None
+        self.bodyIndex = bodyIndex          # Index of the body: 0 for main rotor, 1,2,3... for small rotors (useful for orientation within element domain)
+        self.dt = None
+        # flags
+        self.small = small                  # Unnecessary as bodyIndex can be used
+        self.wake_bend = wake_bend          # Flag to enable wake bending for small rotors : currently used by default, so might be removed
+        self.downwash = downwash            # Downwash value to be subtracted from the freestream velocity in the wake bending function (poor implementation for now, severe simplification, yet sensitivity showed that it has close to no effect on the results)
+        self.distribution = distribution    # Type of radial distribution of the blade elements
+
+
+        """
+        Current implementation only supports cosine and uniform spacing of the elements
+
+        """
+
         if self.distribution == 'cosine':
-            print('using cosine')
             R = diameter*0.5
-            theta = np.linspace(np.arccos(hub/R), np.pi/10,  n)
+            theta = np.linspace(np.arccos(hub/R), np.pi/20,  n) # used 10   1( - close to no effect)   20 - more effect
             spacing = np.cos(0.5*theta)
             spacing = (spacing - np.min(spacing)) / (np.max(spacing) - np.min(spacing)) 
             spacing = spacing *(R - hub) + hub
             self.r = spacing
         else:
             self.r = np.linspace(hub, diameter*0.5 , n)
-        self.azimuth = np.array([0, 0, 1])
-        self.origin = position
+
+
+        
         self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
-        self.vortexTABLE = []
-        self.horseShoes = None
         self.sigma = np.average(self.NB*self.chord[:n]/(np.pi*self.r))
-        self.ppr=20
-        self.bodyIndex = bodyIndex
+                              
+        
         self.assemble(main_rotor=main_rotor, contraction=contraction)
+
+        # if self.small:
+        #     """
+        #     We first need to rotate around Z to pic a desired blade position with respect to the main rotor.
+        #     Then we rotate around Y - simulating the naccelle incline 
+        #     Then we bend the wake modifying 
+        #     """
+        #     temp_angles = np.array([0, 0, blade1_angle*np.pi/180])
+        #     self.rotate(extra=True, a=temp_angles[0], b=temp_angles[1], c=temp_angles[2])
+        #     if self.wake_bend:
+        #         self.bendSmallWake(downwash=True)
+        # self.rotate()
+        # self.translate(position)
+
         if self.small:
             """
             We first need to rotate around Z to pic a desired blade position with respect to the main rotor.
@@ -160,16 +193,101 @@ class Propeller():
             """
             temp_angles = np.array([0, 0, blade1_angle*np.pi/180])
             self.rotate(extra=True, a=temp_angles[0], b=temp_angles[1], c=temp_angles[2])
-            if self.wake_bend:
-                self.bendSmallWake(main_rotor, downwash=True)
+            
         self.rotate()
-        self.translate(position, main_rotor=main_rotor)
-        
-    def downwash(self):
-        points = self.vortexTABLE[:, :6]
-        points = points.reshape(-1, 3)
+        self.translate(position)
 
-    def bendSmallWake(self, main_rotor, downwash=False):
+        if self.wake_bend:
+                self.bendSmallWake_new(main_rotor)
+
+    def bendSmallWake_new(self, main_rotor):
+
+        points = self.vortexTABLE[:, :6]
+
+        # Define helix parameters
+        R = np.sqrt(self.position.x**2 + self.position.y**2)
+        omega = -2*np.pi*main_rotor.RPM/60  # <--- spin: +CCW, -CW (looking from +Z toward origin)
+        a = R
+        #b = self.angles[1]  # pitch of the helix (rise per radian)
+        b= -a*omega*np.tan(np.pi/2 - self.angles[1])
+
+
+        angle_addition = np.arctan2(0.05, R)
+
+        phi0 = self.angles[2] + np.pi/2  + angle_addition      # phase shift (radians)
+
+        t = self.dt
+        theta = omega*t + phi0 
+        
+
+        # arclength (speed * t); speed = ||r'(t)||
+        s = np.sqrt((a*omega)**2 + b**2) * t
+
+                # --- Frenet frame (vectorized) for r(t) = (a cos θ, a sin θ, b t) ---
+        # Unit tangent T = r'(t)/||r'(t)|| with ω
+        speed_inv = 1.0 / np.sqrt((a*omega)**2 + b**2)
+        T = np.zeros((len(t), 3))
+        T[:,0] = -a*omega*np.sin(theta) * speed_inv
+        T[:,1] =  a*omega*np.cos(theta) * speed_inv
+        T[:,2] =  b * speed_inv
+
+        # Unit normal N (points radially inward)
+        N = np.vstack((-np.cos(theta), -np.sin(theta), np.zeros_like(t))).T
+
+        # Unit binormal B = T × N
+        B = np.cross(T, N)
+
+        # Curve points
+        rx = a*np.cos(theta)
+        ry = a*np.sin(theta)
+        rz = b*t
+
+        # tile
+        T = np.tile(T, (2*(self.n-1), 1))
+        N = np.tile(N, (2*(self.n-1), 1))
+        B = np.tile(B, (2*(self.n-1), 1))
+        rx = np.tile(rx, 2*(self.n-1))
+        ry = np.tile(ry, 2*(self.n-1))
+        rz = np.tile(rz, 2*(self.n-1))
+
+        # Original axis 
+        origin = np.array([self.position.x, self.position.y, self.position.z])
+        direction = -self.azimuth / np.linalg.norm(self.azimuth)
+        start = 0
+        for i in range(self.NB):
+                end = start+ 2*(self.n-1)*len(t) 
+
+                for i in range(1,3):
+                    ##################################################################
+                    v = points[start:end, 3*(i-1):3*i] - origin
+                    dir2 = direction @ direction
+                    d = v - ((v @ direction)[:, None] / dir2) * direction
+                    
+                    d_T = np.einsum('ij,ij->i', d, T)
+                    d_N = np.einsum('ij,ij->i', d, N)
+                    d_B = np.einsum('ij,ij->i', d, B)
+                    
+                    points[start:end, 3*(i-1): 3*(i-1)+3] = d_T[:, None]*T + d_N[:, None]*N + d_B[:, None]*B + np.vstack((rx, ry, rz)).T 
+
+
+
+
+
+                start = end+(self.n-1)
+
+        self.vortexTABLE[:,:6] = points
+
+        
+
+
+    def bendSmallWake(self, downwash=False):
+
+        """
+        The current implementation essentially only works for a 90 inclined naccelle.
+
+
+        
+        """
 
         tempR = np.sqrt(self.position.x**2 + self.position.y**2)
         points = self.vortexTABLE[:, :6]
@@ -225,6 +343,15 @@ class Propeller():
 
 
     def assemble(self, main_rotor=None, contraction=True):
+
+        """
+        This function generates the vortex table for the propeller object. 
+        Essentially it creates the wake geometry based on the input parameters.
+
+
+        """
+
+
         if main_rotor is not None:
             n_main = main_rotor.n
             main_NB = main_rotor.NB
@@ -377,8 +504,9 @@ class Propeller():
             table.append(chunk)
 
         self.vortexTABLE = np.vstack(table)
+        self.dt = dt
 
-    def translate(self, translation, main_rotor=None):
+    def translate(self, translation):
         if self.small:
             addition  =  self.azimuth*(0.05)
             translation.x += addition[0]
@@ -485,7 +613,7 @@ class Propeller():
 
 class Drone:
     def __init__(self, main_position, main_angles, main_hub, main_diameter,
-                 main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
+                 main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil, small_airfoil,
                  small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                  small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
                  mainWakeLength, smallWakeLength, main_U, small_U, main_distribution, 
@@ -512,6 +640,7 @@ class Drone:
         # Small propellers
         self.core_size = core_size
         self.main_prop.airfoil = main_airfoil
+        self.small_airfoil = small_airfoil
         self.small_props = []
         self.wind = wind
         self.helicopter = helicopter
@@ -577,7 +706,7 @@ class Drone:
         
 
 def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=None):
-    with open(f'./configs/{filename}', 'r') as f:
+    with open(f'./{filename}', 'r') as f:
         config = json.load(f)
 
         aircraft_type = config['main_propeller']['AIRCRAFT']
@@ -642,20 +771,32 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
 
             # Pitch distribution
+            pitch_incline = config['settings']['pitch_incline']
             A = [[small_props_hub**2, small_props_hub, 1],
                  [small_props_radius**2, small_props_radius, 1],
                  [small_props_radius*2, 1, 0]]
-            Y = [small_pitch_root, small_pitch_tip, 0]
+            Y = [small_pitch_root, small_pitch_tip, pitch_incline]
             a, b, c = np.linalg.solve(A, Y)
             x = np.linspace(small_props_hub, small_props_radius, small_props_n-1)
             small_props_pitch = a*x**2 + b*x + c
 
             #small_props_pitch = bu.twistGen(small_pitch_root, small_pitch_tip, small_r, small_AoA)
             #small_props_pitch = np.linspace(small_pitch_root, small_pitch_tip, small_props_n-1)
-            small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
+            #small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
+
+            # cmall chord distribution
+            small_chord_a = config['settings']['small_chord_a']
+            c = small_chord_root
+            locR = small_props_radius - small_props_hub
+            b = (small_chord_root - small_chord_tip - small_chord_a*locR*locR)/ locR
+            x = np.linspace(0, locR, small_props_n)
+            small_props_chord = small_chord_a*x**2 + b*x + c
+
+
             small_distribution = config['small_propellers']['distribution']
             blade1_angle = config['settings']['blade1_angle']
             downwash = config['settings']['downwash']
+            small_airfoil = config['small_propellers']['airfoil']
         else:
             small_props_angle = None
             small_props_diameter = None
@@ -686,7 +827,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         main_distribution = config['main_propeller']['distribution']
         
         drone = Drone(main_position, main_angles, main_hub, main_diameter, 
-                                    main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil,
+                                    main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil, small_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
                                     mainWakeLength=main_wake_length, smallWakeLength=small_wake_length, main_U=main_U, small_U = small_U, 

@@ -1,103 +1,145 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import make_interp_spline
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
+# -----------------------------
+# Geometry helpers
+# -----------------------------
+def unit(v):
+    v = np.asarray(v, dtype=float)
+    n = np.linalg.norm(v, axis=-1, keepdims=True)
+    return v / np.clip(n, 1e-12, None)
 
-"""
+def decompose_about_axis(points, axis_origin, axis_dir):
+    """
+    For each point p, compute:
+      s  = axial coordinate along axis_dir from axis_origin (signed)
+      r  = radial distance to axis
+      th = azimuth around the axis (in the plane normal to axis_dir),
+           measured from a reference normal basis (ref_x, ref_y)
+    Returns s, r, th and the reference basis (ref_x, ref_y) used.
+    """
+    axis_dir = unit(axis_dir)[0]
+    P = np.atleast_2d(points).astype(float)
+    # Build a fixed orthonormal basis (ref_x, ref_y) for the original normal plane
+    guess = np.array([1.0, 0.0, 0.0])
+    if abs(np.dot(guess, axis_dir)) > 0.9:
+        guess = np.array([0.0, 1.0, 0.0])
+    ref_x = unit(guess - np.dot(guess, axis_dir)*axis_dir)[0]
+    ref_y = np.cross(axis_dir, ref_x)
 
-Plot a helical line depending on a starting angle 
+    # Axial coordinate s (projection onto axis)
+    v = P - axis_origin
+    s = v @ axis_dir  # shape (N,)
 
-"""
+    # Radial offset vector in the normal plane
+    proj = axis_origin + np.outer(s, axis_dir)
+    off = P - proj
+    ox = off @ ref_x
+    oy = off @ ref_y
+    r = np.sqrt(ox**2 + oy**2)
+    th0 = np.arctan2(oy, ox)  # initial azimuth
+    return s, r, th0, ref_x, ref_y
 
-# # input: 
-# v_mag = 10 
-# angle = 30*np.pi/180  # convert to radians
-# R = 1.0
-# phi_0 = 0.0  # starting angle in radians
-# t = np.linspace(0, 1, 100)  # time vector
+# Helix centerline and Frenet–Serret frame (parameterized by theta_h)
+def helix_center(theta_h, R, h):
+    return np.stack([R*np.sin(theta_h), R*np.cos(theta_h), h*theta_h], axis=-1)
 
-# # Velocity components
-# vz = -v_mag * np.cos(angle)  # vertical component
-# vtan = v_mag * np.sin(angle)  # tangential component
-# omega = vtan / R  # angular velocity
+def frenet_serret_helix(theta_h, R, h):
+    s = np.sqrt(R**2 + h**2)  # constant speed ||C'(theta)||
+    T = np.stack([R*np.cos(theta_h)/s, -R*np.sin(theta_h)/s, np.full_like(theta_h, h/s)], axis=-1)
+    N = np.stack([-np.sin(theta_h), -np.cos(theta_h), np.zeros_like(theta_h)], axis=-1)  # already unit
+    B = np.stack([(h/s)*np.cos(theta_h), -(h/s)*np.sin(theta_h), -np.full_like(theta_h, R/s)], axis=-1)
+    return T, N, B
 
-# # Helical coordinates
-# phi = phi_0 + omega * t  # angle around the helix
-# z = vz * t  # vertical position
-# x = R * np.cos(phi)  # x-coordinate
-# y = R * np.sin(phi)  # y-coordinate
-
-# # Plotting the helical line
-# fig = plt.figure(figsize=(10, 6))
-# ax = fig.add_subplot(111, projection='3d')
-# ax.plot(x, y, z, label='Helical Line', color='blue')
-# ax.set_xlabel('X-axis')
-# ax.set_ylabel('Y-axis')
-# ax.set_zlabel('Z-axis')
-# ax.set_title('Helical Line in 3D Space')
-# ax.legend()
-# plt.grid()
-# plt.show()
-
-
-
-
+# -----------------------------
 # Parameters
-R = 1.0       # helix radius
-h = 0.5       # helix pitch per radian (vertical rise per unit angle)
-a = 0.05       # radius around the helix axis (distance from centerline)
-Omega = 40.0  # spin rate around helix axis
-phi0 = 0.0    # initial spin phase
+# -----------------------------
+# Original straight axis
+axis_origin = np.array([0.0, 1.0, 0.0])   # arbitrary origin
+axis_dir    = np.array([1.0, 0.0, 0.0])   # straight axis along +x
 
-# Parametric variable (angle along helix)
-t = np.linspace(0, 8*np.pi, 2000)
-s = np.sqrt(R**2 + h**2)
+# Example: arbitrary 3D points around the straight axis (note non-zero z)
+points = np.array([
+    [ 0.00,  0.05,  0.00],
+    [ 0.00,  0.20,  0.10],
+    [ 0.20, -0.15, -0.08],
+    [ 0.40,  0.30,  0.25],
+])
 
-# Helix centerline
-cx = R*np.cos(t)
-cy = R*np.sin(t)
-cz = h*t
+# Helix geometry
+R = 1.0        # helix radius
+h = -0.2       # vertical advance per radian (pitch per turn = 2*pi*h)
 
-# Frenet frame (normal and binormal)
-Nx = -np.cos(t)
-Ny = -np.sin(t)
-Nz = np.zeros_like(t)
+# Time and angular speeds
+t_end = 4*np.pi
+Npts  = 600
+time  = np.linspace(0.0, t_end, Npts)
 
-Bx = (h*np.sin(t))/s
-By = (-h*np.cos(t))/s
-Bz = R/s*np.ones_like(t)
+omega_helix  = 0.5   # rad/s: how fast we move along the helix (slower)
+omega_points = 1.5   # rad/s: how fast points spin around the local (N,B) plane
 
-# Spinning angle
-phi = Omega*t + phi0
+# -----------------------------
+# Cylindrical state of original points
+# -----------------------------
+s_i, r_i, th0_i, ref_x, ref_y = decompose_about_axis(points, axis_origin, axis_dir)
 
-# Full trajectory
-px = cx + a*(np.cos(phi)*Nx + np.sin(phi)*Bx)
-py = cy + a*(np.cos(phi)*Ny + np.sin(phi)*By)
-pz = cz + a*(np.cos(phi)*Nz + np.sin(phi)*Bz)
+# Map axial coordinate s_i to a helix parameter offset.
+# For the circular helix C(theta) = [R sin, R cos, h theta], arc-length per unit theta is L' = sqrt(R^2 + h^2) = const.
+Lprime = np.sqrt(R**2 + h**2)
+theta_offset_i = s_i / Lprime  # each point's "starting" theta on the helix
 
+# Global helix parameter over time
+theta_h = omega_helix * time  # shape (T,)
+
+# -----------------------------
+# Place each point over time on the helix
+# -----------------------------
+traj = []  # list of arrays (T,3) per point
+for (r, th0, th_off) in zip(r_i, th0_i, theta_offset_i):
+    # centerline parameter for this point at each time
+    th_center = theta_h + th_off                      # (T,)
+    C = helix_center(th_center, R, h)                 # (T,3)
+    _, N, B = frenet_serret_helix(th_center, R, h)    # (T,3) each
+
+    # azimuth evolution around local (N,B) plane
+    theta_p = th0 + omega_points * time               # keep initial azimuth th0
+    P = C + (r*np.cos(theta_p))[:, None]*N + (r*np.sin(theta_p))[:, None]*B
+    traj.append(P)
+
+# -----------------------------
 # Plot
-fig = plt.figure(figsize=(8,6))
+# -----------------------------
+fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111, projection='3d')
 
-# Helix axis (centerline)
-ax.plot(cx, cy, cz, 'k--', linewidth=1, label='Helix axis')
+# axes
+ax.quiver(0, 0, 0, 1, 0, 0, length=1.0, color='r', arrow_length_ratio=0.08)
+ax.quiver(0, 0, 0, 0, 1, 0, length=1.0, color='g', arrow_length_ratio=0.08)
+ax.quiver(0, 0, 0, 0, 0, 1, length=1.0, color='b', arrow_length_ratio=0.08)
 
-# Spinning trajectory
-ax.plot(px, py, pz, 'b', linewidth=2, label='Spinning point')
+# helix axis curve at the global theta_h (for context)
+C_global = helix_center(theta_h, R, h)
+ax.plot(C_global[:,0], C_global[:,1], C_global[:,2], 'k--', lw=2, label='Helix axis')
 
-ax.set_xlabel("X")
-ax.set_ylabel("Y")
-ax.set_zlabel("Z")
-ax.set_title("Point Spinning Around a Helix Axis")
-ax.legend()
-ax.set_aspect('equal')
+# trajectories
+colors = ['tab:orange', 'tab:green', 'tab:purple', 'tab:blue']
+for P, c in zip(traj, colors):
+    ax.plot(P[:,0], P[:,1], P[:,2], color=c, lw=2)
 
+# initial point markers (original positions)
+ax.scatter(points[:,0], points[:,1], points[:,2], c='k', s=30, marker='o', label='Original points')
+
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+ax.set_title(f'Points mapped to helix (ω_h={omega_helix}, ω_p={omega_points})')
+ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1.0))
+ax.set_box_aspect([1,1,0.7])
+plt.tight_layout()
 plt.show()
 
-
-
-
-
+#############################################################
 
 
 

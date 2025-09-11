@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as mtick
+import seaborn as sns
 
         # results = np.column_stack((r.flatten(),              0
         #                         v_axial.flatten(),           1
@@ -73,15 +74,15 @@ def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 
     axs[1, 0].set_title('r vs v_rot_small')
     axs[1, 0].legend()
 
-    axs[1,1].plot(r_small, -data[npM+2*n_small:npM+3*n_small,i], label=f's31{file}', marker='o')
-    axs[1, 1].plot(r_small, -data[npM + 2*n_small+ npS:npM+npS + 3*n_small, i], label=f's32{file}', marker='o')
-    axs[1, 1].plot(r_small, -data[npM+ 2*npS + 2*n_small:npM+2*npS + 3*n_small, i], label=f's33{file}', marker='o')
+    axs[1, 1].plot(r_small, data[npM:npM+n_small, i], label=f's11{file}', marker='o')
+    axs[1, 1].plot(r_small, data[npM + n_small:npM + 2*n_small, i], label=f's12{file}', marker='o')
+    axs[1, 1].plot(r_small, data[npM+ 2*n_small:npM+3*n_small, i], label=f's13{file}', marker='o')
 
     # axs[0, 0].plot(r_small, -data_small[:, 1], label=f'{file} small', marker='o', linestyle="--")
     axs[1, 1].set_title('r vs v_rot_small')
     axs[1, 1].legend()
 
-def plot(files, show=True, title=False, misc=True, helicopter=False, QBlade=False):
+def plot(files, show=False, title=False, misc=True, helicopter=False, QBlade=False, path=None):
     plt.close()
     # cfd_faxial_heli = np.array([	13.857112,
     #                         36.955533,
@@ -196,7 +197,7 @@ def plot(files, show=True, title=False, misc=True, helicopter=False, QBlade=Fals
     count = 0
     for file in files:
 
-        data = np.genfromtxt(f'./results/{file}_res.csv', delimiter=',', skip_header=1)
+        data = np.genfromtxt(f'{file}', delimiter=',', skip_header=1)
         file = file.replace("_res.csv", "")
 
         npM = int(data[9, -1])  # number of points in the main rotor
@@ -231,7 +232,7 @@ def plot(files, show=True, title=False, misc=True, helicopter=False, QBlade=Fals
         area = chords[:n_main-1] * (r_main[1:] - r_main[:-1])  # assuming uniform chord length
 
         color = colors[count % len(colors)]
-        #plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 1)
+        plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 4)
 
         # plot Cl 
         axs[0, 0].plot(r_main, Cl[:n_main], label=f'm1{file}', marker='o', color=color)
@@ -340,7 +341,7 @@ def plot(files, show=True, title=False, misc=True, helicopter=False, QBlade=Fals
     fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.84, 0.5), fontsize='large')
     if title:
         plt.tight_layout(rect=[0.05, 0, 0.9, 1])
-        plt.savefig(f'./plots/fig_{title}.png', dpi = 500)
+        plt.savefig(f'{path}/plots.png', dpi = 500)
     
     if show:
         plt.show()
@@ -506,6 +507,7 @@ def convergence(files):
     plt.tight_layout()
     plt.show()
 
+plot(['./DesignSpace/DP2/_res.csv'], True, path="/DesignSpace/DP2")
 
 # def mainRotorForces(cfd_file, ll_files):
 #     cfd_data = np.genfromtxt(f'./cfdResults/{cfd_file}', delimiter=',', skip_header=1)
@@ -662,9 +664,6 @@ def mainRotorForces(cfd_file, ll_files):
 
     plt.tight_layout()
     plt.show()
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 def compareInfluenceMatrices(file1, file2):
     """
@@ -847,3 +846,123 @@ def compareCFD(files):
 
 # data = np.genfromtxt(f'./results/drone8040_7445_SWE_blade1_angle0_res.csv', delimiter=',', skip_header=1)
 # print(data[:,-1])
+
+
+def set_bw_design():
+    """
+    Configure matplotlib + seaborn for consistent black & white (grayscale) plotting style.
+    """
+    # Seaborn & matplotlib styles
+    sns.set_style("whitegrid")
+    plt.style.use("seaborn-v0_8")
+    sns.set_palette("Greys_r")  # grayscale palette
+    
+    # Global rcParams for consistent looks
+    plt.rcParams.update({
+        "figure.figsize": (6, 4),
+        "figure.dpi": 200,
+        "axes.edgecolor": "black",
+        "axes.labelweight": "bold",
+        "axes.grid": True,
+        "grid.alpha": 0.3,
+        "grid.color": "black",
+        "grid.linewidth": 0.5,
+        "legend.frameon": True,
+        "legend.fancybox": False,
+        "legend.shadow": False,  # cleaner for B&W
+        "lines.linewidth": 1.5,
+        "lines.markersize": 3,
+    })
+    
+    # Line styles / markers / colors for B&W distinction
+    design = {
+        "line_styles": ['-', '--', '-.'],
+        "markers": ['o', 's', '^'],
+        "colors": ['black', '0.4', '0.7']  # black, dark gray, light gray
+    }
+    return design
+
+# design = set_bw_design()
+# data_x = np.linspace(0, 10, 100)
+# data_y1 = np.sin(data_x)
+# data_y2 = np.cos(data_x)
+
+# plt.figure()
+# plt.plot(data_x, data_y1, label='Sine Wave', linestyle=design['line_styles'][0], marker=design['markers'][0], color=design['colors'][0])
+# plt.plot(data_x, data_y2, label='Cosine Wave', linestyle=design['line_styles'][1], marker=design['markers'][1], color=design['colors'][1])
+# plt.legend()
+# plt.show()
+
+
+def plot_twist(fig, axs, data, transparency, label):
+    # r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, u, v, w
+    v_axial = data[:, 1]
+    v_tangential = data[:, 2]
+    inflowangle = data[:, 3]
+    alpha = data[:, 4]
+    Faxial = data[:, 5]
+    Ftan = data[:, 6]
+    Gammas = data[:, 7]
+    Cl = data[:, 14]
+    Cd = data[:, 15]
+    L_unitspan = data[:, 17]
+    chords = data[:, 18]
+    twist = data[:, 19]
+
+    npM = int(data[9, -1])  # number of points in the main rotor
+    main_NB = int(data[11, -1])
+    n_main = int(npM/main_NB)
+    r_main = data[:n_main, 0]
+
+
+    npS = int(data[10, -1])  # number of points in the small rotor
+    small_NB = int(data[12, -1])
+    n_small = int(npS/small_NB)
+    r_small = data[npM:npM + n_small, 0]
+    r_small_normalized = (r_small - r_small[0]) / (r_small[-1] - r_small[0])
+    r_small_rescaled = r_small_normalized * (r_main[-1] - r_main[0]) + r_main[0]
+    r_small = r_small_rescaled
+
+    area = chords[:n_main-1] * (r_main[1:] - r_main[:-1])  # assuming uniform chord length
+
+    design = set_bw_design()
+    axs.plot(r_small, twist[npM:npM + n_small], label=label, marker='o', linestyle='--', color='black', alpha=transparency)
+    
+def plot_AoA_perBlade(fig, axs, data, transparency, label):
+
+    # r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, u, v, w
+    v_axial = data[:, 1]
+    v_tangential = data[:, 2]
+    inflowangle = data[:, 3]
+    alpha = data[:, 4]
+    Faxial = data[:, 5]
+    Ftan = data[:, 6]
+    Gammas = data[:, 7]
+    Cl = data[:, 14]
+    Cd = data[:, 15]
+    L_unitspan = data[:, 17]
+    chords = data[:, 18]
+
+    npM = int(data[9, -1])  # number of points in the main rotor
+    main_NB = int(data[11, -1])
+    n_main = int(npM/main_NB)
+    r_main = data[:n_main, 0]
+
+
+    npS = int(data[10, -1])  # number of points in the small rotor
+    small_NB = int(data[12, -1])
+    n_small = int(npS/small_NB)
+    r_small = data[npM:npM + n_small, 0]
+    r_small_normalized = (r_small - r_small[0]) / (r_small[-1] - r_small[0])
+    r_small_rescaled = r_small_normalized * (r_main[-1] - r_main[0]) + r_main[0]
+    r_small = r_small_rescaled
+
+    area = chords[:n_main-1] * (r_main[1:] - r_main[:-1])  # assuming uniform chord length
+
+    design = set_bw_design()
+    axs[0].plot(r_small, alpha[npM:npM + n_small], label=label, marker='o', linestyle='--', color='black', alpha=transparency)
+
+    axs[1].plot(r_small, alpha[npM + n_small:npM + n_small*2], label=label, marker='o', linestyle='--', color='black', alpha=transparency)
+
+    axs[2].plot(r_small, alpha[npM + 2*n_small:npM + 3*n_small], label=label, marker='o', linestyle='--', color='black', alpha=transparency)
+
