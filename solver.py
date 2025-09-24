@@ -1,7 +1,7 @@
 from tqdm import tqdm
 import numpy as np
 import time, os
-from geometry import Point
+from geometry import Point, median_filter
 import matplotlib.pyplot as plt
 import pyvista as pv
 import xfoilUtil as xf
@@ -11,9 +11,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.interpolate import make_interp_spline
 import glob
 
-import numpy as np
 
-def preload_airfoil_data(data_folder="./airfoil/data/numpy"):
+
+def preload_airfoil_data(data_folder="./airfoil/data/numpy_smoothed"):
     """
     Preload all airfoil npz files into a dictionary.
     """
@@ -60,85 +60,118 @@ def conditional_median_filter_1d(signal, kernel_size=3, std_thresh=1.0):
 
     return result
 
-
-def computeNumberOfPoints(drone, helicopter=False):
+def computeNumberOfPoints(drone, type):
     """
     Compute the number of collocation points for the main and small propellers.
+
     """
-    
-    main_NB = drone.main_prop.NB
-    main_n = drone.main_prop.n
-    npM = main_NB*(main_n-1) # number of collocation points for main prop
-    print('hel:', helicopter)
-    if helicopter==False:
-        small_NB = drone.small_props[0].NB
-        small_n = drone.small_props[0].n
-        npS = small_NB*(small_n-1) # number of collocation points for small prop
-        collocN = (npM + npS*main_NB) # total number of collocation points
-        return npM, npS, collocN, main_NB, small_NB, main_n, small_n
-    else:
-        collocN = npM
+    if type == 'quadcopter':
+        main_NB = drone.props[0].NB
+        main_n = drone.props[0].n
+        npM = main_NB*(main_n-1)
+        collocN = npM*4
         return npM, 0, collocN, main_NB, 0, main_n, 0
+
+    else:
+        main_NB = drone.main_prop.NB
+        main_n = drone.main_prop.n
+        npM = main_NB*(main_n-1) # number of collocation points for main prop
+
+        if type == 'drone':
+            small_NB = drone.small_props[0].NB
+            small_n = drone.small_props[0].n
+            npS = small_NB*(small_n-1) # number of collocation points for small prop
+            collocN = (npM + npS*main_NB) # total number of collocation points
+            return npM, npS, collocN, main_NB, small_NB, main_n, small_n
+        
+        else:
+            collocN = npM
+            return npM, 0, collocN, main_NB, 0, main_n, 0
    
-def computeAzimuthAndOrigin(drone, npM, npS, main_NB, collocN, helicopter=False):
+def computeAzimuthAndOrigin(drone, npM, npS, main_NB, collocN, type):
     n_azimuth = np.zeros((collocN, 3))
     n_origin = np.zeros((collocN, 3))
-    n_azimuth[:npM] = np.tile(drone.main_prop.azimuth, (npM, 1))
-    n_origin[:npM] = np.array([drone.main_prop.origin.x, drone.main_prop.origin.y, drone.main_prop.origin.z])
-    if helicopter:
+    if type=='quadcopter':
+        for i in range(4):
+            n_azimuth [i*npM:(i+1)*npM] = np.tile(drone.props[i].azimuth, (npM, 1))
+            n_origin [i*npM:(i+1)*npM] = np.array([drone.props[i].origin.x, 
+                                                   drone.props[i].origin.y, 
+                                                   drone.props[i].origin.z])
         return n_azimuth, n_origin
-    
-    for i in range(main_NB):
-        n_local_prop = drone.small_props[i].azimuth
-        n_azimuth[npM + i * npS: npM + (i + 1) * npS] = np.tile(n_local_prop, (npS, 1))
-        n_origin[npM + i * npS: npM + (i + 1) * npS] = np.array([drone.small_props[i].origin.x, 
-                                                                 drone.small_props[i].origin.y, 
-                                                                 drone.small_props[i].origin.z])
-    return n_azimuth, n_origin
-
-def computeCollocationPoints(drone, npM, npS, main_NB, small_NB, main_n, small_n, helicopter=False):
-    mainCollocPoints = np.zeros((npM, 3))
-    main_colloc = np.array(drone.main_prop.collocationPoints)
-    for i in range(main_NB):
-        mainCollocPoints[i * (main_n - 1):(i + 1) * (main_n - 1)] = main_colloc[i].T
-    if helicopter:
-        return mainCollocPoints
     else:
-        smallCollocPoints = np.zeros((npS*main_NB, 3))
-    
-        for i in range(main_NB):
-            small_colloc = np.array(drone.small_props[i].collocationPoints)
-            for j in range(small_NB):
-                smallCollocPoints[i * small_NB * (small_n - 1) + j * (small_n - 1): i * small_NB * (small_n - 1) + (j + 1) * (small_n - 1)] = small_colloc[j].T
-        total_colloc_points = np.concatenate((mainCollocPoints, smallCollocPoints))
-        return total_colloc_points
+        
+        n_azimuth[:npM] = np.tile(drone.main_prop.azimuth, (npM, 1))
+        n_origin[:npM] = np.array([drone.main_prop.origin.x, drone.main_prop.origin.y, drone.main_prop.origin.z])
 
-def computeChords(drone, npM, collocN, main_NB, small_NB, main_n, small_n, helicopter=False):
-    chords = np.zeros((collocN, 1)) 
-    ch_mid = 0.5*(drone.main_prop.chord[1:main_n] + drone.main_prop.chord[:main_n-1]) # Chords corresponding to the control points of the main prop
-    chords[:npM, 0] = np.tile(ch_mid, (main_NB))
-    if helicopter:
+        if type=='helicopter':
+            return n_azimuth, n_origin
+
+        for i in range(main_NB):
+            n_local_prop = drone.small_props[i].azimuth
+            n_azimuth[npM + i * npS: npM + (i + 1) * npS] = np.tile(n_local_prop, (npS, 1))
+            n_origin[npM + i * npS: npM + (i + 1) * npS] = np.array([drone.small_props[i].origin.x, 
+                                                                    drone.small_props[i].origin.y, 
+                                                                    drone.small_props[i].origin.z])
+        return n_azimuth, n_origin
+
+def computeCollocationPoints(drone, npM, npS, main_NB, small_NB, main_n, small_n, drone_type):
+    
+    if drone_type == 'quadcopter':
+        colloc_points = np.array(drone.props[0].collocationPoints)
+        print('colloc_points shape', colloc_points.shape)
+
+        return 0
+        return total_colloc_points
+        # If
+    main_collocPoints = np.array(drone.main_prop.collocationPoints)
+    if drone_type=='helicopter':
+            return mainCollocPoints
+    else:
+        for i in range(main_NB):
+            mainCollocPoints[i * (main_n - 1):(i + 1) * (main_n - 1)] = main_colloc[i].T
+            smallCollocPoints = np.zeros((npS*main_NB, 3))
+            for i in range(main_NB):
+                small_colloc = np.array(drone.small_props[i].collocationPoints)
+                for j in range(small_NB):
+                    smallCollocPoints[i * small_NB * (small_n - 1) + j * (small_n - 1): i * small_NB * (small_n - 1) + (j + 1) * (small_n - 1)] = small_colloc[j].T
+            total_colloc_points = np.concatenate((mainCollocPoints, smallCollocPoints))
+            return total_colloc_points
+
+def computeChords(drone, npM, collocN, main_NB, small_NB, main_n, small_n, type):
+    
+    if type =='quadcopter':
+        chords = drone.props[0].chord
+        chords = 0.5*(chords[1:] + chords[:-1])
+        return np.tile(chords, 4)
+    else:
+        chords = np.zeros((collocN, 1)) 
+        ch_mid = 0.5*(drone.main_prop.chord[1:main_n] + drone.main_prop.chord[:main_n-1]) # Chords corresponding to the control points of the main prop
+        chords[:npM, 0] = np.tile(ch_mid, (main_NB))
+        if type == 'helicopter':
+            return chords
+        # Chords for small prop
+        chords_small = drone.small_props[0].chord
+        chords_small = 0.5*(chords_small[1:] + chords_small[:-1])
+        chords[npM: , 0] = np.tile(chords_small, (main_NB*small_NB))
         return chords
 
-    # Chords for small prop
-    chords_small = drone.small_props[0].chord
-    chords_small = 0.5*(chords_small[1:] + chords_small[:-1])
-    chords[npM: , 0] = np.tile(chords_small, (main_NB*small_NB))
-    return chords
+def computeVrotational(drone, total_colloc_points, Omega, n_azimuth, n_origin, npM, npS, main_NB, type):
+    if type =='quadcopter':
+        v_rotational = np.cross(total_colloc_points-n_origin, n_azimuth*Omega[0])
+        return v_rotational
+    else:
+        v_rotational_small = np.zeros((npS*main_NB, 3))
+        azimuthVector = drone.main_prop.azimuth
+        v_rotational_main = np.cross(total_colloc_points[:npM], azimuthVector*Omega[0])
+        if type=='helicopter':
+            return v_rotational_main
 
-def computeVrotational(drone, total_colloc_points, Omega, n_azimuth, n_origin, npM, npS, main_NB, helicopter=False):
-    v_rotational_small = np.zeros((npS*main_NB, 3))
-    azimuthVector = drone.main_prop.azimuth
-    v_rotational_main = np.cross(total_colloc_points[:npM], azimuthVector*Omega[0])
-    if helicopter:
-        return v_rotational_main
+        # V rotational small props 
+        v_rotational_small = np.cross(total_colloc_points[npM:] - n_origin[npM:], n_azimuth[npM:]*Omega[npM:]) + np.cross(total_colloc_points[npM:], azimuthVector*Omega[0]) 
 
-    # V rotational small props 
-    v_rotational_small = np.cross(total_colloc_points[npM:] - n_origin[npM:], n_azimuth[npM:]*Omega[npM:]) + np.cross(total_colloc_points[npM:], azimuthVector*Omega[0]) 
+        v_rotational = np.concatenate( (v_rotational_main, v_rotational_small))
 
-    v_rotational = np.concatenate( (v_rotational_main, v_rotational_small))
-
-    return v_rotational
+        return v_rotational
 
 def computeVaxial(v_rotational, n_azimuth, total_colloc_points, n_origin):
 
@@ -222,14 +255,25 @@ def smoothSpline(data, step=2):
 
 def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
 
-    print(savePath)
     preloaded_data = preload_airfoil_data()
-    helicopter = drone.helicopter
-    U = drone.main_prop.U
+    if drone.type == 'quadcopter':
+        print('Solving for Quadcopter')
+        type = 'quadcopter'
+    elif (drone.type == 'helicopter'):
+        print('Solving for Helicopter')
+        type = 'helicopter'
+    else:
+        print('Solving for Drone with small propellers')
+        type = 'drone'
+    #helicopter = drone.helicopter
     ReInfluence = drone.reynolds
-    main_airfoil = drone.main_prop.airfoil
-    small_airfoil = drone.small_airfoil
-    npM, npS, collocN, main_NB, small_NB, main_n, small_n = computeNumberOfPoints(drone, helicopter)
+    if type=='drone':
+        main_airfoil = drone.main_prop.airfoil
+        small_airfoil = drone.small_airfoil
+    else:
+        main_airfoil = drone.airfoil
+
+    npM, npS, collocN, main_NB, small_NB, main_n, small_n = computeNumberOfPoints(drone, type)
 
     v_axial = np.zeros((collocN, 1))
     v_tangential = np.zeros((collocN, 1))
@@ -244,22 +288,14 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
 
     Gammas = np.ones((collocN, 1))
 
-    if ReInfluence:
-        print('Reynolds influence')
-    else:
+    if ReInfluence is False:
         data_main = np.loadtxt('./A18_(smoothed)_Re0.191_M0.00_N9.0.txt', skiprows=12)
         data_small = np.loadtxt('./A18 (smoothed)_A18_(smoothed)_Re0.050_M0.00_N9.0.txt',skiprows=12)
-        #data = np.loadtxt('./NACA0012_Re0.191_M0.00_N9.0.txt', skiprows=12)
         alpha_main, clP_main, cdP_main = smoothSpline(data_main, step=2)
-
-        alpha_cl_max_main  = alpha_main[np.argmax(clP_main)]
 
         alpha_small, clP_small, cdP_small = smoothSpline(data_small, step=3)
 
-        alpha_cl_max_small = alpha_small[np.argmax(clP_small)]
-
-    total_colloc_points = computeCollocationPoints(drone, npM, npS, main_NB, small_NB, main_n, small_n, helicopter=helicopter)
-
+    total_colloc_points = computeCollocationPoints(drone, npM, npS, main_NB, small_NB, main_n, small_n, type)
     table = np.array(drone.vortexTABLE)
 
     if os.name == 'nt':
@@ -281,24 +317,28 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
     res = mylib.computeInfluenceMatrices(N, T, collocationPoints_ptr, vortexTable_ptr, uInfluence_ptr, vInfluence_ptr, wInfluence_ptr, core_size)
 
     # n_azimuth, n_origin 
-    n_azimuth, n_origin = computeAzimuthAndOrigin(drone, npM, npS, main_NB, collocN, helicopter=helicopter)
+    n_azimuth, n_origin = computeAzimuthAndOrigin(drone, npM, npS, main_NB, collocN, type)
 
     # Omega
-    Omega[:npM] = drone.main_prop.RPM*2*np.pi/60
-
+    if type == 'quadcopter':
+        Omega = np.tile(drone.props[0].RPM*2*np.pi/60, (collocN, 1))
+        twist = np.tile(drone.props[0].pitch, (collocN, 1))
+    else:
+        Omega[:npM] = drone.main_prop.RPM*2*np.pi/60
+        twist[:npM, 0] = drone.main_prop.pitch
     # Chords
-    chords = computeChords(drone, npM, collocN, main_NB, small_NB, main_n, small_n, helicopter=helicopter)
+    chords = computeChords(drone, npM, collocN, main_NB, small_NB, main_n, small_n, type)
 
-    # Twist
-    twist[:npM, 0] = drone.main_prop.pitch
 
-    if not helicopter:
+    if type=='drone':
         Omega[npM:] = drone.small_props[0].RPM*2*np.pi/60
         twist[npM:, 0] = np.tile(drone.small_props[0].pitch, (main_NB*small_NB))
+    if type=='quadcopter':
+        twist  = np.tile(twist[:npM, 0], (4, 1))
     # V rotational main prop 
-    v_rotational = computeVrotational(drone, total_colloc_points, Omega, n_azimuth, n_origin, npM, npS, main_NB, helicopter=helicopter)
-    angle_small = drone.small_props[0].angles[1]
-    twist[npM:] = -np.rad2deg(angle_small)- twist[npM:]  # for small props, the twist is shifted by 90 degrees
+    v_rotational = computeVrotational(drone, total_colloc_points, Omega, n_azimuth, n_origin, npM, npS, main_NB, type)
+    # angle_small = drone.small_props[0].angles[1]
+    # twist[npM:] = -np.rad2deg(angle_small)- twist[npM:]  # for small props, the twist is shifted by 90 degrees
 
 
     weight = 0.05
@@ -329,8 +369,15 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
         Re = 1.225*v_mag.flatten()*chords.flatten()/1.81e-5
         inflowangle = np.arctan(-v_axial/v_tangential)
 
+        if type=='drone':
+            for i in range(main_NB):
+                for j in range(small_NB):
+                    start = npM +i*npS + j*(small_n-1)
+                    end = start + (small_n-1)
+                    inflowangle[start: end] = median_filter(inflowangle[start: end].copy(), kernel_size=5)
+
         # ################
-        if not helicopter:
+        if type=='drone':
             # Adjust inflow angle for small props
             small_prop_angle = -drone.small_props[0].angles[1]
             inflowangle[npM:] = small_prop_angle - inflowangle[npM:] 
@@ -340,15 +387,16 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
         alpha = twist.flatten() -  (inflowangle*180/np.pi).flatten()
         # Try catching stall
 
-        alpha[alpha>11] = 11
+        alpha[alpha>15] = 15
         alpha[alpha<-5] = -5
         #alpha[alpha>alpha_cl_max_main] = alpha_cl_max_main
-        
-        alpha_small_temp = inflowangle[npM:]*180/np.pi - twist[npM:].flatten()# for small props, the alpha is shifted by 90 degrees
-        #alpha_small_temp[alpha_small_temp>alpha_cl_max_small] = alpha_cl_max_small
-        alpha_small_temp[alpha_small_temp>11] = 11
-        alpha_small_temp[alpha_small_temp<-5] = -5
-        alpha[npM:] = alpha_small_temp
+
+        if type=='drone':
+            alpha_small_temp = inflowangle[npM:]*180/np.pi - twist[npM:].flatten()# for small props, the alpha is shifted by 90 degrees
+            #alpha_small_temp[alpha_small_temp>alpha_cl_max_small] = alpha_cl_max_small
+            alpha_small_temp[alpha_small_temp>15] = 15
+            alpha_small_temp[alpha_small_temp<-5] = -5
+            alpha[npM:] = alpha_small_temp
 
         alpha = np.reshape(alpha, (-1, 1))
 
@@ -356,8 +404,13 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
         STALL_MAIN_UPPER = np.sum(alpha[:npM]>10)/npM
         STALL_MAIN_LOWER = np.sum(alpha[:npM]<-4)/npM
 
-        STALL_SMALL_UPPER = np.sum(alpha[npM:npM+npS]>10)/npS
-        STALL_SMALL_LOWER = np.sum(alpha[npM:npM+npS]<-4)/npS
+        if type=='drone':
+
+            STALL_SMALL_UPPER = np.sum(alpha[npM:npM+npS]>10)/npS
+            STALL_SMALL_LOWER = np.sum(alpha[npM:npM+npS]<-4)/npS
+        else:
+            STALL_SMALL_UPPER = 0
+            STALL_SMALL_LOWER = 0
 
         STALL_TUPLE = (STALL_MAIN_UPPER, STALL_MAIN_LOWER, STALL_SMALL_UPPER, STALL_SMALL_LOWER)
 
@@ -367,7 +420,10 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
 
         if ReInfluence:
             #airfoil_array = np.array([main_airfoil]*collocN)
-            airfoil_array = np.array([main_airfoil]*npM + [small_airfoil]*(collocN - npM))
+            if type == 'drone':
+                airfoil_array = np.array([main_airfoil]*npM + [small_airfoil]*(collocN - npM))
+            else:
+                airfoil_array = np.array([main_airfoil]*collocN)
 
             #cl, cd = xf.getPolar_batch(Re, alpha, airfoil_array, npz_dir="./airfoil/data/numpy")
             cl, cd = xf.getPolar_batch(Re, alpha, airfoil_array, preloaded_data)
@@ -410,19 +466,23 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
         Cd[:npM] = np.interp(alpha[:npM], alpha_main, cdP_main)
         Cd[npM:] = np.interp(alpha[npM:], alpha_small, cdP_small)
 
-    r_main =  drone.main_prop.r
+    if type=='quadcopter':
+        r_main = drone.props[0].r
+    else:
+        r_main =  drone.main_prop.r
 
     r_main = (r_main[1:] - r_main[:-1])
     r_main = np.tile(r_main, (main_NB))
     
 
-    if not helicopter:
+    if type=='drone':
         r_small = drone.small_props[0].r
         r_small = (r_small[1:] - r_small[:-1])
         r_small= np.tile(r_small, (main_NB*small_NB, 1))
 
         r_steps = np.concatenate((r_main, r_small), axis=None)
-    
+    elif type=='quadcopter':
+        r_steps = np.tile(r_main, 4)
     else:
         r_steps = r_main
 
@@ -439,11 +499,11 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
     Faxial[npM:] = Lift[npM:] * np.cos(-(inflowangle[npM:]-np.pi/2).flatten()) - Drag[npM:] * np.sin(-(inflowangle[npM:]-np.pi/2).flatten())
     Ftan = Lift * np.sin(inflowangle.flatten()) + Drag * np.cos(inflowangle.flatten())
 
-    r_main =  drone.main_prop.r
-    r_main = (r_main[1:] + r_main[:-1]) * 0.5
-    r_main = np.tile(r_main, (main_NB, 1))
+    # r_main =  drone.main_prop.r
+    # r_main = (r_main[1:] + r_main[:-1]) * 0.5
+    # r_main = np.tile(r_main, (main_NB, 1))
 
-    if not helicopter:
+    if type=='drone':
         r_small = drone.small_props[0].r
         r_small = (r_small[1:] + r_small[:-1]) * 0.5
         r_small = np.tile(r_small, (main_NB*small_NB, 1))
@@ -453,15 +513,19 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
         r = r_main
 
     Torque = np.sum(Ftan[:npM] * r[:npM].flatten())
-    angle_small = drone.small_props[0].angles[1]
 
-    Thrust = Faxial[:npM].sum() + Faxial[npM:].sum()*np.sin(np.pi/2 + angle_small)
+    print(f"Main RPM: {Omega[0,0]/0.1047:.2f} Torque:{Torque:.2f}")
+    if type=='drone':
+        angle_small = drone.small_props[0].angles[1]
+        Thrust = Faxial[:npM].sum() + Faxial[npM:].sum()*np.sin(np.pi/2 + angle_small)
+    else:
+        Thrust = Faxial.sum()
     print('----------------------------------')
 
-    computed_power = Torque*drone.main_prop.RPM*2*np.pi/60
+    computed_power = Torque*Omega[0,0]  
     
     # Compute small propeller thrust and torque
-    if not helicopter:
+    if type=='drone':
         
         Torque_small = np.sum(Ftan[npM:] * r[npM:].flatten())
         Thrust_small = Faxial[npM:].sum() 
@@ -492,7 +556,7 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
     NB_arr = np.ones((collocN))
     R_arr = np.zeros((collocN))
     R_arr[:npM] = drone.main_prop.diameter*0.5
-    if not helicopter:
+    if type=='drone':
         R_arr[npM:] = drone.small_props[0].diameter*0.5
         NB_arr[npM:] = small_NB
 
@@ -510,7 +574,7 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
 
 
 
-    print(f"Profile power main rotor {profile_power:.2f}")
+    print(f"Profile power main rotor {profile_power:.2f}, main RPM: {drone.main_prop.RPM:.2f}")
     total_power = induced_power + profile_power
     print(f"Total Power: {total_power:.2f}")
 
@@ -524,7 +588,7 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
     Ct = Thrust/(1.225*np.pi*R**2*(R * drone.main_prop.RPM*2*np.pi/60)**2)
     drone.main_prop.Ct = Ct
     # save results to csv 
-    if save:
+    if savePath is not None:
         #plotInfluenceMatrices(u_influences, v_influences, w_influences)
         table_final = table.copy()
         hsN = 0 
@@ -538,7 +602,8 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
         else:
             table[i][-1] = Gammas[hsN]
             
-        #np.savetxt('table_final.txt', table_final)
+        
+        #np.savetxt(f'{savePath}/table_final.txt', table_final)
 
         misc  = np.zeros((collocN, 1))
         misc[0] = Thrust

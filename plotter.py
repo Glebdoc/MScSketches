@@ -41,6 +41,40 @@ import seaborn as sns
     # misc[12] = small_NB
     # misc[13] = drone.main_prop.RPM
     # misc[14] = drone.small_props[0].RPM
+
+def set_bw_design():
+    """
+    Configure matplotlib + seaborn for consistent black & white (grayscale) plotting style.
+    """
+    # Seaborn & matplotlib styles
+    sns.set_style("whitegrid")
+    plt.style.use("seaborn-v0_8")
+    sns.set_palette("Greys_r")  # grayscale palette
+    
+    # Global rcParams for consistent looks
+    plt.rcParams.update({
+        "figure.figsize": (6, 4),
+        "figure.dpi": 200,
+        "axes.edgecolor": "black",
+        "axes.labelweight": "bold",
+        "axes.grid": True,
+        "grid.alpha": 0.3,
+        "grid.color": "black",
+        "grid.linewidth": 0.5,
+        "legend.frameon": True,
+        "legend.fancybox": False,
+        "legend.shadow": False,  # cleaner for B&W
+        "lines.linewidth": 1.5,
+        "lines.markersize": 3,
+    })
+    
+    # Line styles / markers / colors for B&W distinction
+    design = {
+        "line_styles": ['-', '--', '-.'],
+        "markers": ['o', 's', '^'],
+        "colors": ['black', '0.4', '0.7']  # black, dark gray, light gray
+    }
+    return design
 def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, i):
     axs[0, 0].plot(r_main, -data[:n_main, 1], label=f'm1{file}', marker='o')
     axs[0, 0].plot(r_main, -data[n_main:2*n_main, 1], label=f'm2{file}', marker='o')
@@ -82,102 +116,13 @@ def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 
     axs[1, 1].set_title('r vs v_rot_small')
     axs[1, 1].legend()
 
+def cumulative_to_differentiated(r, cumulative):
+    return np.gradient(cumulative, r)
 def plot(files, show=False, title=False, misc=True, helicopter=False, QBlade=False, path=None):
     plt.close()
-    # cfd_faxial_heli = np.array([	13.857112,
-    #                         36.955533,
-    #                         74.822902,
-    #                         125.97218,
-    #                         188.47118,
-    #                         259.16722,
-    #                         328.30965,
-    #                         412.20165,
-    #                         465.96409])
-    cfd_faxial_heli = np.array([	11.01122,
-                                    32.934581,
-                                    70.070923,
-                                    121.09236,
-                                    184.45948,
-                                    257.45775,
-                                    328.69693,
-                                    424.60523,
-                                    470.37266
-                                    ])
-                                        
-    # cfd_ftan_heli = np.array([	3.7062831,
-    #                         8.6494665,
-    #                         15.197173,
-    #                         22.570386,
-    #                         30.259358,
-    #                         37.539395,
-    #                         43.719315,
-    #                         49.108042,
-    #                         54.728354])
-
-    cfd_ftan_heli = np.array([	3.2781992,
-                                8.1568434,
-                                14.819917,
-                                22.339605,
-                                30.172741,
-                                37.468915,
-                                43.907587,
-                                48.866468,
-                                54.690536
-                                ])
-                                    
-    cfd_r_heli = np.linspace(0.15, 0.95, len(cfd_faxial_heli))
-
-    cfd_r_drone = np.array([0.15,
-                            0.25,
-                            0.35,
-                            0.45,
-                            0.55,
-                            0.65,
-                            0.75,
-                            0.8125,
-                            0.8375,
-                            0.8625,
-                            0.8875,
-                            0.9125,
-                            0.9375,
-                            0.9625,
-                            0.9875
-                            ])
-    cfd_faxial_drone = np.array([21.203668,
-                                    39.070535,
-                                    79.876164,
-                                    134.43845,
-                                    200.86617,
-                                    276.10326,
-                                    357.24676,
-                                    413.95608,
-                                    447.48172,
-                                    486.57392,
-                                    535.35868,
-                                    597.4842,
-                                    689.16336,
-                                    704.75084,
-                                    673.85792])
-    cfd_ftan_drone = np.array([4.2645645,
-                                9.2669645,
-                                16.458348,
-                                24.738673,
-                                33.454984,
-                                41.832769,
-                                49.563131,
-                                54.302936,
-                                56.503592,
-                                58.01602,
-                                59.332168,
-                                65.553364,
-                                58.010724,
-                                39.0764828,
-                                78.72962])
-
-
-
     # Create figure and gridspec
     fig = plt.figure(figsize=(16, 8))  # Just use plt.figure, not plt.subplots
+    design = set_bw_design()
     gs = gridspec.GridSpec(3, 4, height_ratios=[1.2, 3, 3])  # First row for table
 
     # Subplots: rows 1 and 2
@@ -186,17 +131,13 @@ def plot(files, show=False, title=False, misc=True, helicopter=False, QBlade=Fal
         [fig.add_subplot(gs[2, 0]), fig.add_subplot(gs[2, 1]), fig.add_subplot(gs[2, 2]), fig.add_subplot(gs[2, 3])]
     ])
 
-    
 
     labels = ['Thrust', 'Torque', 'LD', 'FM', 'η', 'P_ind', 'P_prof', 'P_tot', 'P_comp', 'npM', 'npS', 'NBm', 'NBs', 'RPMmain', 'RPMsmall', 'err',]
     table_data = []
 
-
-
     colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
     count = 0
     for file in files:
-
         data = np.genfromtxt(f'{file}', delimiter=',', skip_header=1)
         file = file.replace("_res.csv", "")
 
@@ -211,9 +152,8 @@ def plot(files, show=False, title=False, misc=True, helicopter=False, QBlade=Fal
             small_NB = int(data[12, -1])
             n_small = int(npS/small_NB)
             r_small = data[npM:npM + n_small, 0]
-            r_small_normalized = (r_small - r_small[0]) / (r_small[-1] - r_small[0])
-            r_small_rescaled = r_small_normalized * (r_main[-1] - r_main[0]) + r_main[0]
-            r_small = r_small_rescaled
+            R_small = r_small[-1]
+            r_small = r_small * (r_main[-1]/R_small)
         
         #plot the data
         # r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, u, v, w
@@ -229,98 +169,132 @@ def plot(files, show=False, title=False, misc=True, helicopter=False, QBlade=Fal
         L_unitspan = data[:, 17]
         chords = data[:, 18]
 
-        area = chords[:n_main-1] * (r_main[1:] - r_main[:-1])  # assuming uniform chord length
-
         color = colors[count % len(colors)]
-        plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 4)
+        #plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 4)
 
         # plot Cl 
-        axs[0, 0].plot(r_main, Cl[:n_main], label=f'm1{file}', marker='o', color=color)
+        ##################################################################
+        axs[0, 0].plot(r_main, Cl[:n_main], label=f'm1{file}', marker='o', color=design['colors'][0])
+        axs[0, 0].plot(r_main, Cl[n_main:2*n_main], label=f'm2{file}', marker='o', color=design['colors'][1])
+        axs[0, 0].plot(r_main, Cl[2*n_main:3*n_main], label=f'm3{file}', marker='o', color=design['colors'][2])
+        # label axis
+        axs[0, 0].set_xlabel('r/R')
+        axs[0, 0].set_ylabel('Cl')
         if not helicopter:
-            axs[0, 0].plot(r_small, Cl[npM:npM + n_small], label=f's1{file}', marker='x',  color=color, linestyle="--")   
+            axs[0, 0].plot(r_small, Cl[npM:npM + n_small], label=f's1{file}', marker='x',  color=design['colors'][0], linestyle="--")   
+            axs[0, 0].plot(r_small, Cl[npM + n_small:npM + 2*n_small], label=f's2{file}', marker='x',  color=design['colors'][1], linestyle="--")
+            axs[0, 0].plot(r_small, Cl[npM + 2*n_small:npM + 3*n_small], label=f's3{file}', marker='x',  color=design['colors'][2], linestyle="--")
         if QBlade:
             data_qb = np.genfromtxt(f'./QBlade_cl.txt', skip_header=3)
             axs[0, 0].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
-        axs[0, 0].set_title('r vs Cl')
-        #axs[0, 0].legend()
+        ####################################################################
 
         # plot Cd
-        axs[0, 1].plot(r_main, Cd[:n_main], label=f'm1{file}', marker='o', color=color)
+        #####################################################################
+        axs[0, 1].plot(r_main, Cd[:n_main], label=f'm1{file}', marker='o', color=design['colors'][0])
+        axs[0, 1].plot(r_main, Cd[n_main:2*n_main], label=f'm2{file}', marker='o', color=design['colors'][1])
+        axs[0, 1].plot(r_main, Cd[2*n_main:3*n_main], label=f'm3{file}', marker='o', color=design['colors'][2])
+        # label axis
+        axs[0, 1].set_xlabel('r/R')
+        axs[0, 1].set_ylabel('Cd')
         if not helicopter:
-            axs[0, 1].plot(r_small, Cd[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
+            axs[0, 1].plot(r_small, Cd[npM:npM + n_small], label=f's1{file}', marker='x', color=design['colors'][0], linestyle="--")   
+            axs[0, 1].plot(r_small, Cd[npM + n_small:npM + 2*n_small], label=f's2{file}', marker='x', color=design['colors'][1], linestyle="--")
+            axs[0, 1].plot(r_small, Cd[npM + 2*n_small:npM + 3*n_small], label=f's3{file}', marker='x', color=design['colors'][2], linestyle="--")
         if QBlade:
             data_qb = np.genfromtxt(f'./QBlade_cd.txt', skip_header=3)
             axs[0, 1].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
-        axs[0, 1].set_title('r vs Cd')
-        #axs[0, 1].legend()
+        #####################################################################
 
         # plot Re 
-        axs[0, 2].plot(r_main, data[:n_main, 16], label=f'm1{file}', marker='o', color=color)
+        #####################################################################
+        # axs[0, 2].plot(r_main, data[:n_main, 16], label=f'm1{file}', marker='o', color=design['colors'][0])
+        # axs[0, 2].plot(r_main, data[n_main:2*n_main, 16], label=f'm2{file}', marker='o', color=design['colors'][1])
+        # axs[0, 2].plot(r_main, data[2*n_main:3*n_main, 16], label=f'm3{file}', marker='o', color=design['colors'][2])
+        # axs[0, 2].set_xlabel('r/R')
+        # axs[0, 2].set_ylabel('Re')
+        # if not helicopter:
+        #     axs[0, 2].plot(r_small, data[npM:npM + n_small, 16], label=f's1{file}', marker='x', color=design['colors'][0], linestyle="--")
+        #     axs[0, 2].plot(r_small, data[npM + n_small:npM + 2*n_small, 16], label=f's2{file}', marker='x', color=design['colors'][1], linestyle="--")
+        #     axs[0, 2].plot(r_small, data[npM + 2*n_small:npM + 3*n_small, 16], label=f's3{file}', marker='x', color=design['colors'][2], linestyle="--")
+        # if QBlade:
+        #     data_qb = np.genfromtxt(f'./QBlade_re.txt', skip_header=3)
+        #     axs[0, 2].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
+
+        # plot v_tan 
+        axs[0, 2].plot(r_main, v_tangential[:n_main], label=f'm1{file}', marker='o', color=design['colors'][0])
+        axs[0, 2].plot(r_main, v_tangential[n_main:2*n_main], label=f'm2{file}', marker='o', color=design['colors'][1])
+        axs[0, 2].plot(r_main, v_tangential[2*n_main:3*n_main], label=f'm3{file}', marker='o', color=design['colors'][2])
+        axs[0, 2].set_xlabel('r/R')
+        axs[0, 2].set_ylabel(r'$v_{t}$')
         if not helicopter:
-            axs[0, 2].plot(r_small, data[npM:npM + n_small, 16], label=f's1{file}', marker='x', color=color, linestyle="--")
-        if QBlade:
-            data_qb = np.genfromtxt(f'./QBlade_re.txt', skip_header=3)
-            axs[0, 2].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
-        axs[0, 2].set_title('r vs Re')
-        #axs[0, 2].legend()
+            axs[0, 2].plot(r_small, v_tangential[npM:npM + n_small], label=f's1{file}', marker='x', color=design['colors'][0], linestyle="--")
+            axs[0, 2].plot(r_small, v_tangential[npM + n_small:npM + 2*n_small], label=f's2{file}', marker='x', color=design['colors'][1], linestyle="--")
+            axs[0, 2].plot(r_small, v_tangential[npM + 2*n_small:npM + 3*n_small], label=f's3{file}', marker='x', color=design['colors'][2], linestyle="--")
+        #####################################################################
 
         # plot v_axial
-        axs[0, 3].plot(r_main, v_axial[:n_main], label=f'm1{file}', marker='o', color=color)
+        ####################################################################
+        axs[0, 3].plot(r_main, v_axial[:n_main], label=f'm1{file}', marker='o', color=design['colors'][0])
+        # label axis
+        axs[0, 3].set_xlabel('r/R')
+        axs[0, 3].set_ylabel(r'$v_{a}$')
         if not helicopter:
-            axs[0, 3].plot(r_small, v_axial[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
-        # if QBlade:
-        #     data_qb = np.genfromtxt(f'./QBlade_vaxial.txt', skip_header=3)
-        #     axs[0, 3].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
-        axs[0, 3].set_title('r vs v_axial')
-        #axs[0, 3].legend()
-        
+            axs[0, 3].plot(r_small, v_axial[npM:npM + n_small], label=f's1{file}', marker='x', color=design['colors'][0], linestyle="--")
+            axs[0, 3].plot(r_small, v_axial[npM + n_small:npM + 2*n_small], label=f's2{file}', marker='x', color=design['colors'][1], linestyle="--")
+            axs[0, 3].plot(r_small, v_axial[npM + 2*n_small:npM + 3*n_small], label=f's3{file}', marker='x', color=design['colors'][2], linestyle="--")
+        ###################################################################
 
         # plot inflowangle
-        axs[1, 0].plot(r_main, np.rad2deg(inflowangle[:n_main]), label=f'm1{file}', marker='o', color=color)
+        ###################################################################
+        inflowangle = np.rad2deg(inflowangle)
+        axs[1, 0].plot(r_main, inflowangle[:n_main], label=f'm1{file}', marker='o', color=design['colors'][0])
+        axs[1, 0].set_xlabel('r/R')
+        axs[1, 0].set_ylabel(r'$\phi$ [deg]')
         if not helicopter:
-            axs[1, 0].plot(r_small, np.rad2deg(inflowangle[npM:npM + n_small]), label=f's1{file}', marker='x', color=color, linestyle="--")
-        if QBlade:
-            data_qb = np.genfromtxt(f'./QBlade_inflow.txt', skip_header=3)
-            axs[1, 0].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
-        axs[1, 0].set_title('r vs inflowangle')
-        #axs[1, 0].legend()
+            axs[1, 0].plot(r_small, inflowangle[npM:npM + n_small], label=f's1{file}', marker='x', color=design['colors'][0], linestyle="--")
+            axs[1, 0].plot(r_small, inflowangle[npM + n_small:npM + 2*n_small], label=f's2{file}', marker='x', color=design['colors'][1], linestyle="--")
+            axs[1, 0].plot(r_small, inflowangle[npM + 2*n_small:npM + 3*n_small], label=f's3{file}', marker='x', color=design['colors'][2], linestyle="--")
+        ####################################################################
+
 
         # plot alpha
-        axs[1, 1].plot(r_main, alpha[:n_main], label=f'm1{file}', marker='o', color=color)
+        ####################################################################
+        axs[1, 1].plot(r_main, alpha[:n_main], label=f'm1{file}', marker='o', color=design['colors'][0])
+        axs[1, 1].set_xlabel('r/R')
+        axs[1, 1].set_ylabel(r'$\alpha$ [deg]')
         if not helicopter:
-            axs[1, 1].plot(r_small, alpha[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
-        if QBlade:
-            data_qb = np.genfromtxt(f'./QBlade_aoa.txt', skip_header=3)
-            axs[1, 1].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
-        axs[1, 1].set_title('r vs alpha')
-        #axs[1, 1].legend()
+            axs[1, 1].plot(r_small, alpha[npM:npM + n_small], label=f's1{file}', marker='x', color=design['colors'][0], linestyle="--")
+            axs[1, 1].plot(r_small, alpha[npM + n_small:npM + 2*n_small], label=f's2{file}', marker='x', color=design['colors'][1], linestyle="--")
+            axs[1, 1].plot(r_small, alpha[npM + 2*n_small:npM + 3*n_small], label=f's3{file}', marker='x', color=design['colors'][2], linestyle="--")
+
+        ####################################################################
 
         # plot Faxial
-        axs[1, 2].plot(r_main[:-1], Faxial[:n_main-1]/area, label=f'm1{file}', marker='o', color=color)
-        # lift_unitspan = data[:n_main, 17]
-        axs[1, 2].plot(cfd_r_heli, cfd_faxial_heli, label=f'heli CFD Faxial/unitspan', marker='o', color=color, linestyle="--")
+        axs[1, 2].plot(r_main[:-1], Faxial[:n_main-1], label=f'm1{file}', marker='o', color=design['colors'][0])
+        axs[1, 2].set_xlabel('r/R')
+        axs[1, 2].set_ylabel(r'$F_{axial}$')
         if not helicopter:
-            axs[1, 2].plot(r_small, Faxial[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
-            axs[1, 2].plot(cfd_r_drone, cfd_faxial_drone, label=f'drone CFD Faxial/unitspan', marker='x', color=color, linestyle="--")
-        if QBlade:
-            data_qb = np.genfromtxt(f'./QBlade_Faxial.txt', skip_header=3)
-            axs[1, 2].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
-        axs[1, 2].set_title('r vs Faxial')
-        #axs[1, 2].legend()
+            axs[1, 2].plot(r_small, Faxial[npM:npM + n_small], label=f's1{file}', marker='x', color=design['colors'][0], linestyle="--")
+            axs[1, 2].plot(r_small, Faxial[npM + n_small:npM + 2*n_small], label=f's2{file}', marker='x', color=design['colors'][1], linestyle="--")
+            axs[1, 2].plot(r_small, Faxial[npM + 2*n_small:npM + 3*n_small], label=f's3{file}', marker='x', color=design['colors'][2], linestyle="--")
+        
+        ################################################################
 
         
         # plot Ftan
-        axs[1, 3].plot(r_main[:-1], Ftan[:n_main-1]/area, label=f'm1{file}', marker='o', color=color)
-        axs[1, 3].plot(cfd_r_heli, cfd_ftan_heli, label=f'heli CFD Ftan/unitspan', marker='o', color=color, linestyle="--")
-
+        ################################################################
+        axs[1, 3].plot(r_main[:-1], Ftan[:n_main-1], label=f'm1{file}', marker='o', color=design['colors'][0])
+        axs[1, 3].plot(r_main[:-1], Ftan[n_main:2*n_main-1], label=f'm2{file}', marker='o', color=design['colors'][1])
+        axs[1, 3].plot(r_main[:-1], Ftan[2*n_main:3*n_main-1], label=f'm3{file}', marker='o', color=design['colors'][2])
+        axs[1, 3].set_xlabel('r/R')
+        axs[1, 3].set_ylabel(r'$F_{tan}$')
         if not helicopter:
-            axs[1, 3].plot(r_small, Ftan[npM:npM + n_small], label=f's1{file}', marker='x', color=color, linestyle="--")
-            axs[1, 3].plot(cfd_r_drone, cfd_ftan_drone, label=f'drone CFD Ftan/unitspan', marker='x', color=color, linestyle="--")
-        if QBlade:
-            data_qb = np.genfromtxt(f'./QBlade_Ftan.txt', skip_header=3)
-            axs[1, 3].plot(data_qb[:, 0], data_qb[:, 1], label=f'QBlade', marker='o')
-        axs[1, 3].set_title('r vs Ftan')
-        #axs[1, 3].legend()
+            axs[1, 3].plot(r_small, Ftan[npM:npM + n_small], label=f's1{file}', marker='x', color=design['colors'][0], linestyle="--")
+            axs[1, 3].plot(r_small, Ftan[npM + n_small:npM + 2*(n_small)], label=f's2{file}', marker='x', color=design['colors'][1], linestyle="--")
+            axs[1, 3].plot(r_small, Ftan[npM + 2*n_small:npM + 3*(n_small)], label=f's3{file}', marker='x', color=design['colors'][2], linestyle="--")
+
+        ################################################################
 
         if misc:
             data[15, -1] = 100*(data[7, -1] - data[8, -1])/data[7, -1]  # err
@@ -340,7 +314,7 @@ def plot(files, show=False, title=False, misc=True, helicopter=False, QBlade=Fal
     handles, labels = axs[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.84, 0.5), fontsize='large')
     if title:
-        plt.tight_layout(rect=[0.05, 0, 0.9, 1])
+        #plt.tight_layout(rect=[0.05, 0, 0.9, 1])
         plt.savefig(f'{path}/plots.png', dpi = 500)
     
     if show:
@@ -352,13 +326,14 @@ def tipRotorForces(cfd_file, ll_files):
     ll_data = np.genfromtxt(f'./results/{ll_files}_res.csv', delimiter=',', skip_header=1)
 
     # plot 2 subplots for faxial and Ftan
-    fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-
+    fig, axs = plt.subplots(1, 2, figsize=(20, 8))
+    design = set_bw_design()
     ax0_err = axs[0].twinx()
     ax1_err = axs[1].twinx()
 
     # plot cfd data
     r_cfd = cfd_data[:, 4]
+    r_plot = r_cfd/cfd_data[-3, 4]
     area_cfd = cfd_data[:, 5]
     f_axial_b1 = cfd_data[:, 6]
     f_axial_b2 = cfd_data[:, 7]
@@ -368,13 +343,13 @@ def tipRotorForces(cfd_file, ll_files):
     f_tan_b2 = cfd_data[:, 10]/r_cfd
     f_tan_b3 = cfd_data[:, 11]/r_cfd
 
-    axs[0].plot(r_cfd, f_axial_b1/area_cfd, label='CFD Blade 1', marker='o', color='blue')
-    axs[0].plot(r_cfd, f_axial_b2/area_cfd, label='CFD Blade 2', marker='o', color='red')
-    axs[0].plot(r_cfd, f_axial_b3/area_cfd, label='CFD Blade 3', marker='o', color='green')
+    axs[0].plot(r_plot, f_axial_b1/area_cfd, label='CFD Blade 1', marker='o', color='blue')
+    axs[0].plot(r_plot, f_axial_b2/area_cfd, label='CFD Blade 2', marker='o', color='red')
+    axs[0].plot(r_plot, f_axial_b3/area_cfd, label='CFD Blade 3', marker='o', color='green')
 
-    axs[1].plot(r_cfd, f_tan_b1/area_cfd, label='CFD Blade 1', marker='o', color='blue')
-    axs[1].plot(r_cfd, f_tan_b2/area_cfd, label='CFD Blade 2', marker='o', color='red')
-    axs[1].plot(r_cfd, f_tan_b3/area_cfd, label='CFD Blade 3', marker='o', color='green')
+    axs[1].plot(r_plot, f_tan_b1/area_cfd, label='CFD Blade 1', marker='o', color='blue')
+    axs[1].plot(r_plot, f_tan_b2/area_cfd, label='CFD Blade 2', marker='o', color='red')
+    axs[1].plot(r_plot, f_tan_b3/area_cfd, label='CFD Blade 3', marker='o', color='green')
 
     # plot ll data
     data = ll_data
@@ -383,6 +358,7 @@ def tipRotorForces(cfd_file, ll_files):
     small_NB = int(data[12, -1])
     n_small = int(npS/small_NB)
     r_small = data[npM:npM + n_small, 0]
+    r_plot = r_small/r_small[-1]
     chords = data[:, 18]
     area = chords[npM:npM + n_small]*(r_small[1]- r_small[0])  # assuming uniform chord length
 
@@ -394,13 +370,13 @@ def tipRotorForces(cfd_file, ll_files):
     f_tan_b2_ll = data[npM + n_small :npM + n_small*2, 6]
     f_tan_b3_ll = data[npM + 2*n_small:npM + 3*n_small, 6]
 
-    axs[0].plot(r_small, f_axial_b1_ll/area, label='LL Blade 1', marker='x', linestyle='--', color='blue')
-    axs[0].plot(r_small, f_axial_b2_ll/area, label='LL Blade 2', marker='x', linestyle='--', color='red')
-    axs[0].plot(r_small, f_axial_b3_ll/area, label='LL Blade 3', marker='x', linestyle='--', color='green')
+    axs[0].plot(r_plot, f_axial_b1_ll/area, label='LL Blade 1', marker='x', linestyle='--', color='blue')
+    axs[0].plot(r_plot, f_axial_b2_ll/area, label='LL Blade 2', marker='x', linestyle='--', color='red')
+    axs[0].plot(r_plot, f_axial_b3_ll/area, label='LL Blade 3', marker='x', linestyle='--', color='green')
 
-    axs[1].plot(r_small, f_tan_b1_ll/area, label='LL Blade 1', marker='x', linestyle='--', color='blue')
-    axs[1].plot(r_small, f_tan_b2_ll/area, label='LL Blade 2', marker='x', linestyle='--', color='red')
-    axs[1].plot(r_small, f_tan_b3_ll/area, label='LL Blade 3', marker='x', linestyle='--', color='green')
+    axs[1].plot(r_plot, f_tan_b1_ll/area, label='LL Blade 1', marker='x', linestyle='--', color='blue')
+    axs[1].plot(r_plot, f_tan_b2_ll/area, label='LL Blade 2', marker='x', linestyle='--', color='red')
+    axs[1].plot(r_plot, f_tan_b3_ll/area, label='LL Blade 3', marker='x', linestyle='--', color='green')
 
 
 
@@ -408,7 +384,7 @@ def tipRotorForces(cfd_file, ll_files):
     axs[1].legend(loc='upper left')
 
     # add a second axis for the relative error
-    
+    #lol
 
     # compute relative error
     # interpolate f_axial
@@ -429,13 +405,13 @@ def tipRotorForces(cfd_file, ll_files):
     rel_err_tan_b2 = np.abs((f_tan_b2_ll/area - f_tan_b2) / np.maximum(np.abs(f_tan_b2), 1e-12)) * 100
     rel_err_tan_b3 = np.abs((f_tan_b3_ll/area - f_tan_b3) / np.maximum(np.abs(f_tan_b3), 1e-12)) * 100
 
-    ax0_err.plot(r_small, rel_err_axial_b1, '--', label='RelErr Blade 1', color='blue', alpha=0.3)
-    ax0_err.plot(r_small, rel_err_axial_b2, '--', label='RelErr Blade 2', color='red', alpha=0.3)
-    ax0_err.plot(r_small, rel_err_axial_b3, '--', label='RelErr Blade 3', color='green', alpha=0.3)
+    ax0_err.plot(r_plot, rel_err_axial_b1, '--', label='RelErr Blade 1', color='blue', alpha=0.3)
+    ax0_err.plot(r_plot, rel_err_axial_b2, '--', label='RelErr Blade 2', color='red', alpha=0.3)
+    ax0_err.plot(r_plot, rel_err_axial_b3, '--', label='RelErr Blade 3', color='green', alpha=0.3)
 
-    ax1_err.plot(r_small, rel_err_tan_b1, '--', label='RelErr Blade 1', color='blue', alpha=0.3)
-    ax1_err.plot(r_small, rel_err_tan_b2, '--', label='RelErr Blade 2', color='red', alpha=0.3)
-    ax1_err.plot(r_small, rel_err_tan_b3, '--', label='RelErr Blade 3', color='green', alpha=0.3)
+    ax1_err.plot(r_plot, rel_err_tan_b1, '--', label='RelErr Blade 1', color='blue', alpha=0.3)
+    ax1_err.plot(r_plot, rel_err_tan_b2, '--', label='RelErr Blade 2', color='red', alpha=0.3)
+    ax1_err.plot(r_plot, rel_err_tan_b3, '--', label='RelErr Blade 3', color='green', alpha=0.3)
 
     # ax0_err.yaxis.set_major_formatter(mtick.PercentFormatter())
     # ax1_err.yaxis.set_major_formatter(mtick.PercentFormatter())
@@ -507,87 +483,27 @@ def convergence(files):
     plt.tight_layout()
     plt.show()
 
-plot(['./DesignSpace/DP2/_res.csv'], True, path="/DesignSpace/DP2")
-
-# def mainRotorForces(cfd_file, ll_files):
-#     cfd_data = np.genfromtxt(f'./cfdResults/{cfd_file}', delimiter=',', skip_header=1)
-#     ll_data = np.genfromtxt(f'./results/{ll_files}_res.csv', delimiter=',', skip_header=1)
-
-#     # plot 2 subplots for faxial and Ftan
-#     fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-
-#     # plot cfd data
-#     r_cfd = cfd_data[:, 0]
-#     area_cfd = cfd_data[:, 3]
-#     f_axial = cfd_data[:, 1]
-#     f_tan = cfd_data[:, 2]
-
-#     axs[0].plot(r_cfd, f_axial/area_cfd, label='CFD', marker='o', color='blue')
-#     axs[1].plot(r_cfd, f_tan/area_cfd, label='CFD', marker='o', color='blue')
-
-#     # plot ll data
-#     data = ll_data
-#     npM = int(data[9, -1])  # number of points in the main rotor
-#     main_NB = int(data[11, -1])
-#     n_main = int(npM/main_NB)
-#     r_main = data[:n_main, 0]
-#     chords = data[:, 18]
-#     area = chords[:n_main]*(r_main[1]- r_main[0])  # assuming uniform chord length
-
-#     f_axial_ll = data[:n_main, 5]
-#     f_tan_ll = data[:n_main, 6]
-
-#     axs[0].plot(r_main, f_axial_ll/area, label='LL', marker='x', linestyle='--', color='red')
-#     axs[1].plot(r_main, f_tan_ll/area, label='LL', marker='x', linestyle='--', color='red')
-
-#     # add a second axis for the relative error
-#     ax0_err = axs[0].twinx()
-#     ax1_err = axs[1].twinx()
-
-#     # interpolate cfd data
-#     f_axial_interp = np.interp(r_main, r_cfd, f_axial/area_cfd)
-#     f_tan_interp = np.interp(r_main, r_cfd, f_tan/area_cfd)
-
-#     # compute relative error
-#     rel_err_axial = np.abs((f_axial_ll/area - f_axial_interp) / np.maximum(np.abs(f_axial_interp), 1e-12)) * 100
-#     rel_err_tan = np.abs((f_tan_ll/area - f_tan_interp) / np.maximum(np.abs(f_tan_interp), 1e-12)) * 100
-
-#     ax0_err.plot(r_main, rel_err_axial, '--', label='RelErr Axial', color='blue', alpha=0.3)
-#     ax1_err.plot(r_main, rel_err_tan, '--', label='RelErr Tangential', color='blue', alpha=0.3)
-
-#     ax0_err.yaxis.set_major_formatter(mtick.PercentFormatter())
-#     ax1_err.yaxis.set_major_formatter(mtick.PercentFormatter())
-
-#     ax0_err.legend(loc='upper right')
-#     ax1_err.legend(loc='upper right')
-
-#     axs[0].set_ylabel("Axial Force / Area")
-#     axs[1].set_ylabel("Tangential Force / Area")
-#     axs[1].set_xlabel("Radius")
-#     axs[0].legend()
-#     axs[1].legend()
-#     plt.tight_layout()
-#     plt.show()
-
 
 def mainRotorForces(cfd_file, ll_files):
     # extra data
-    cumulative = np.genfromtxt(f'./cfdResults/cumulativeY.csv', delimiter=',', skip_header=1)
-    cumulative_r = cumulative[:, 0] +0.1
-    cumulative_faxial = cumulative[:, 2]
+    # cumulative = np.genfromtxt(f'./cfdResults/cumulativeY.csv', delimiter=',', skip_header=1)
+    # cumulative_r = cumulative[:, 0] +0.1
+    # cumulative_faxial = cumulative[:, 2]
 
 
     # Load CFD data
     cfd_data = np.genfromtxt(f'./cfdResults/{cfd_file}', delimiter=',', skip_header=1)
     r_cfd = cfd_data[:, 0]
+    print(r_cfd)
     area_cfd = cfd_data[:, 3]
+    print(area_cfd)
     f_axial = cfd_data[:, 1]
     f_tan = cfd_data[:, 2]
 
     # Plot setup
     fig, axs = plt.subplots(2, 1, figsize=(10, 8))
     
-    axs[0].plot(cumulative_r, cumulative_faxial, label='Cumulative differentiated', marker='o', color='green', linestyle='--')
+    #axs[0].plot(cumulative_r, cumulative_faxial, label='Cumulative differentiated', marker='o', color='green', linestyle='--')
     # Plot CFD
     axs[0].plot(r_cfd, f_axial / area_cfd, label='CFD', marker='o', color='blue')
     axs[1].plot(r_cfd, f_tan / area_cfd, label='CFD', marker='o', color='blue')
@@ -834,6 +750,7 @@ def compareCFD(files):
 #convergence(['drone8040_7445_CFD_1500','drone8040_7445_CFD_2000', 'drone8040_7445_CFD_3000'])
 #mainRotorForces('drone8040_7445_CFD_2000.csv', ['drone8040_200625_downwash2', 'drone8040_7445_n80_newNPZ_blade1_angle30', 'drone8040_7445_n80_newNPZ_blade1_angle45', 'drone8040_7445_n80_newNPZ_blade1_angle60', 'drone8040_7445_n80_newNPZ_blade1_angle85', 'drone8040_7445_n80_newNPZ_blade1_angle95'])
 #mainRotorForces('drone8040_7445_CFD_fine_3000.csv', ['drone8040_mp_blade1_angle0', 'drone8040_mp_blade1_angle15', 'drone8040_mp_blade1_angle0'])
+#mainRotorForces('drone8040_7445_CFD_fine_3000.csv', ['drone8040_mp_blade1_angle0'])
 #compareInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json', 'influence_matrices_drone8040_7445_DSW_downwash2_wake_length100.json')
 #compareInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json', 'influence_matrices_drone8040_7445_DSW_downwash4_wake_length5.json')
 #plotInfluenceMatrices('influence_matrices_drone8040_7445_DSW_downwash2_wake_length5.json')
@@ -848,50 +765,6 @@ def compareCFD(files):
 # print(data[:,-1])
 
 
-def set_bw_design():
-    """
-    Configure matplotlib + seaborn for consistent black & white (grayscale) plotting style.
-    """
-    # Seaborn & matplotlib styles
-    sns.set_style("whitegrid")
-    plt.style.use("seaborn-v0_8")
-    sns.set_palette("Greys_r")  # grayscale palette
-    
-    # Global rcParams for consistent looks
-    plt.rcParams.update({
-        "figure.figsize": (6, 4),
-        "figure.dpi": 200,
-        "axes.edgecolor": "black",
-        "axes.labelweight": "bold",
-        "axes.grid": True,
-        "grid.alpha": 0.3,
-        "grid.color": "black",
-        "grid.linewidth": 0.5,
-        "legend.frameon": True,
-        "legend.fancybox": False,
-        "legend.shadow": False,  # cleaner for B&W
-        "lines.linewidth": 1.5,
-        "lines.markersize": 3,
-    })
-    
-    # Line styles / markers / colors for B&W distinction
-    design = {
-        "line_styles": ['-', '--', '-.'],
-        "markers": ['o', 's', '^'],
-        "colors": ['black', '0.4', '0.7']  # black, dark gray, light gray
-    }
-    return design
-
-# design = set_bw_design()
-# data_x = np.linspace(0, 10, 100)
-# data_y1 = np.sin(data_x)
-# data_y2 = np.cos(data_x)
-
-# plt.figure()
-# plt.plot(data_x, data_y1, label='Sine Wave', linestyle=design['line_styles'][0], marker=design['markers'][0], color=design['colors'][0])
-# plt.plot(data_x, data_y2, label='Cosine Wave', linestyle=design['line_styles'][1], marker=design['markers'][1], color=design['colors'][1])
-# plt.legend()
-# plt.show()
 
 
 def plot_twist(fig, axs, data, transparency, label):
@@ -928,7 +801,7 @@ def plot_twist(fig, axs, data, transparency, label):
     design = set_bw_design()
     axs.plot(r_small, twist[npM:npM + n_small], label=label, marker='o', linestyle='--', color='black', alpha=transparency)
     
-def plot_AoA_perBlade(fig, axs, data, transparency, label):
+def plot_AoA_perBlade(fig, axs, data, transparency, label, black=False):
 
     # r, v_axial, v_tangential, inflowangle, alpha, Faxial, Ftan, Gammas, v_rot_norm, u, v, w
     v_axial = data[:, 1]
@@ -960,9 +833,241 @@ def plot_AoA_perBlade(fig, axs, data, transparency, label):
     area = chords[:n_main-1] * (r_main[1:] - r_main[:-1])  # assuming uniform chord length
 
     design = set_bw_design()
-    axs[0].plot(r_small, alpha[npM:npM + n_small], label=label, marker='o', linestyle='--', color='black', alpha=transparency)
+    color = 'white' if black else 'black'
+    axs[0].plot(r_small, alpha[npM:npM + n_small], label=label, marker='o', linestyle='--', color=color, alpha=transparency)
 
-    axs[1].plot(r_small, alpha[npM + n_small:npM + n_small*2], label=label, marker='o', linestyle='--', color='black', alpha=transparency)
+    axs[1].plot(r_small, alpha[npM + n_small:npM + n_small*2], label=label, marker='o', linestyle='--', color=color, alpha=transparency)
 
-    axs[2].plot(r_small, alpha[npM + 2*n_small:npM + 3*n_small], label=label, marker='o', linestyle='--', color='black', alpha=transparency)
+    axs[2].plot(r_small, alpha[npM + 2*n_small:npM + 3*n_small], label=label, marker='o', linestyle='--', color=color, alpha=transparency)
 
+#plot(['./DesignSpace/main_simple/_res.csv'], show=True)
+
+def plot_axial_force():
+    # cfd data 
+    axial_cumulative = np.genfromtxt(f'./cfdResults/mainy_50.csv', skip_header=4, skip_footer=1)
+    axial_cfd = cumulative_to_differentiated(axial_cumulative[:,0], axial_cumulative[:,1])
+
+    plt.figure(figsize=(8,6))
+    design = set_bw_design()
+
+    plt.plot(axial_cfd[:,0], axial_cfd[:,1], label='CFD', marker='o', color=design['colors'][0])
+    plt.xlabel('Radius [m]')
+    plt.ylabel(r'$F_{axial}$')
+
+    pass
+
+# def mainRotorForcesUpdated(ll_files):
+
+#     axial_cumulative = np.genfromtxt(f'./cfdResults/results/mainy_50', skip_header=4, skip_footer=1)
+#     r_cfd = axial_cumulative[:,0]+0.1
+#     f_axial = cumulative_to_differentiated(axial_cumulative[:,0], axial_cumulative[:,1])
+  
+
+#     tangential_cumulative = np.genfromtxt(f'./cfdResults/results/mainx_50', skip_header=4, skip_footer=1)
+#     f_tan = cumulative_to_differentiated(tangential_cumulative[:,0], tangential_cumulative[:,1])
+#     area_cfd = np.ones(len(r_cfd)) * 0.1#* (r_cfd[-1]-r_cfd[-2])*0.1  # uniform spacing assumed
+#     # print(area_cfd)
+#     # print('Sum of axial CFD:', np.sum(f_axial*area_cfd)) 
+
+#     # Plot setup
+#     fig, axs = plt.subplots(1,2, figsize=(20, 6))
+#     design = set_bw_design()
+    
+#     #axs[0].plot(cumulative_r, cumulative_faxial, label='Cumulative differentiated', marker='o', color='green', linestyle='--')
+#     # Plot CFD
+#     axs[0].plot(r_cfd, f_axial / area_cfd, label='CFD', marker='o', color='black')
+#     axs[1].plot(r_cfd, f_tan / area_cfd, label='CFD', marker='o', color='black')
+
+#     ###########################################
+#     ax0_err = axs[0].twinx()
+#     ax1_err = axs[1].twinx()
+#     alpha=1
+#     for ll_file in ll_files:
+#          # Decrease alpha for each LL file to make them more transparent
+
+#         # Load LL data
+#         ll_data = np.genfromtxt(f'./results/{ll_file}_res.csv', delimiter=',', skip_header=1)
+#         npM = int(ll_data[9, -1])  # number of points in the main rotor
+#         main_NB = int(ll_data[11, -1])
+#         n_main = int(npM / main_NB)
+#         r_ll = ll_data[:n_main, 0]
+#         chords = ll_data[:, 18]
+#         area_ll = chords[:n_main] * (r_ll[1] - r_ll[0])  # assuming uniform spacing
+
+#         f_axial_ll = ll_data[:n_main, 5]
+#         f_tan_ll = ll_data[:n_main, 6]
+
+#         # Plot LL (interpolated)
+#         axs[0].plot(r_ll, f_axial_ll/area_ll, label='LL', marker='x', linestyle=':', color='black', alpha=alpha)
+#         axs[1].plot(r_ll, f_tan_ll/area_ll, label='LL', marker='x', linestyle=':', color='black')
+
+#         # Interpolate LL data to CFD radius points
+#         f_axial_ll_interp = np.interp(r_cfd, r_ll, f_axial_ll / area_ll)
+#         f_tan_ll_interp = np.interp(r_cfd, r_ll, f_tan_ll / area_ll)
+
+#         # Compute relative error
+#         rel_err_axial = np.abs((f_axial / area_cfd - f_axial_ll_interp) / np.maximum(np.abs(f_axial / area_cfd), 1e-12)) * 100
+#         rel_err_tan = np.abs((f_tan / area_cfd - f_tan_ll_interp) / np.maximum(np.abs(f_tan / area_cfd), 1e-12)) * 100
+
+#         # Add twin axes for error
+#         ax0_err.plot(r_cfd, rel_err_axial, '--', label='RelErr Axial', color='black', alpha=0.3)
+#         ax1_err.plot(r_cfd, rel_err_tan, '--', label='RelErr Tangential', color='black', alpha=0.3)
+
+        
+#         # compute the average relative error
+#         avg_rel_err_axial = np.mean(rel_err_axial)
+#         avg_rel_err_tan = np.mean(rel_err_tan)
+
+#         # plot average relative error
+#         ax0_err.axhline(avg_rel_err_axial, color='black', linestyle='--',
+#                 label=f'Avg RelErr: {avg_rel_err_axial:.2f}%', alpha=0.7)
+
+#         ax1_err.axhline(avg_rel_err_tan, color='black', linestyle='--',
+#                 label=f'Avg RelErr: {avg_rel_err_tan:.2f}%', alpha=0.7)
+        
+#         alpha-=0.9/len(ll_files)
+
+
+#     ax0_err.legend(loc='upper center')
+#     ax1_err.legend(loc='upper center')
+
+#     ax0_err.yaxis.set_major_formatter(mtick.PercentFormatter())
+#     ax1_err.yaxis.set_major_formatter(mtick.PercentFormatter())
+    
+
+#     axs[0].set_ylabel(r'$F_{axial}/S$')
+#     axs[0].set_xlabel("Radius")
+#     axs[1].set_ylabel(r'$F_{tan}/S$')
+#     axs[1].set_xlabel("Radius")
+#     axs[0].legend()
+#     axs[1].legend()
+#     plt.tight_layout()
+#     plt.savefig("./mainRotorForces.png", dpi=300)
+# mainRotorForcesUpdated(['drone8040_mp_blade1_angle0'])
+
+
+def mainRotorForcesUpdated(ll_files, save_plots=False):
+
+    # Load CFD axial forces
+    axial_cumulative = np.genfromtxt('./cfdResults/results/mainy_50', skip_header=4, skip_footer=1)
+    r_cfd = axial_cumulative[:, 0] + 0.1
+    f_axial = cumulative_to_differentiated(axial_cumulative[:, 0], axial_cumulative[:, 1])
+
+    # Load CFD tangential forces
+    tangential_cumulative = np.genfromtxt('./cfdResults/results/mainx_50', skip_header=4, skip_footer=1)
+    f_tan = cumulative_to_differentiated(tangential_cumulative[:, 0], tangential_cumulative[:, 1])
+
+    area_cfd = np.ones(len(r_cfd)) * 0.1  # uniform spacing assumed
+
+    # --- Axial Force Plot ---
+    design = set_bw_design()
+    fig_axial, ax_axial = plt.subplots(figsize=(10, 6))
+    design = set_bw_design()
+    ax0_err = ax_axial.twinx()
+
+    # Plot CFD baseline
+    ax_axial.plot(r_cfd, f_axial / area_cfd, label='CFD', marker='o', color='black')
+
+    alpha = 1
+    for ll_file in ll_files:
+        # Load LL data
+        ll_data = np.genfromtxt(f'./results/{ll_file}_res.csv', delimiter=',', skip_header=1)
+        npM = int(ll_data[9, -1])
+        main_NB = int(ll_data[11, -1])
+        n_main = int(npM / main_NB)
+        r_ll = ll_data[:n_main, 0]
+        chords = ll_data[:, 18]
+        area_ll = chords[:n_main] * (r_ll[1] - r_ll[0])
+
+        f_axial_ll = ll_data[:n_main, 5]
+
+        # Plot LL axial
+        ax_axial.plot(r_ll, f_axial_ll / area_ll, label='LL', marker='x', linestyle=':', color='black', alpha=alpha)
+
+        # Interpolate to CFD grid
+        f_axial_ll_interp = np.interp(r_cfd, r_ll, f_axial_ll / area_ll)
+
+        # Compute relative error
+        rel_err_axial = np.abs((f_axial / area_cfd - f_axial_ll_interp) /
+                               np.maximum(np.abs(f_axial / area_cfd), 1e-12)) * 100
+
+        # Error plot
+        ax0_err.plot(r_cfd, rel_err_axial, '--', color='black', alpha=0.3, label='RelErr Axial')
+
+        # Avg relative error
+        avg_rel_err_axial = np.mean(rel_err_axial)
+        ax0_err.axhline(avg_rel_err_axial, color='black', linestyle='--',
+                        label=f'Avg RelErr: {avg_rel_err_axial:.2f}%', alpha=0.7)
+
+        alpha -= 0.9 / len(ll_files)
+
+    ax0_err.yaxis.set_major_formatter(mtick.PercentFormatter())
+    ax_axial.set_ylabel(r'$F_{axial}/S$')
+    ax_axial.set_xlabel("Radius")
+    ax_axial.legend(loc="best")
+    ax0_err.legend(loc="upper center")
+    plt.tight_layout()
+    if save_plots:
+        plt.savefig("./faxial_comparison.png", dpi=300)
+    else:
+        plt.show()
+    plt.close(fig_axial)
+
+    # --- Tangential Force Plot ---
+    fig_tan, ax_tan = plt.subplots(figsize=(10, 6))
+    design = set_bw_design()
+    ax1_err = ax_tan.twinx()
+
+    # Plot CFD baseline
+    ax_tan.plot(r_cfd, f_tan / area_cfd, label='CFD', marker='o', color='black')
+
+    alpha = 1
+    for ll_file in ll_files:
+        # Load LL data
+        ll_data = np.genfromtxt(f'./results/{ll_file}_res.csv', delimiter=',', skip_header=1)
+        npM = int(ll_data[9, -1])
+        main_NB = int(ll_data[11, -1])
+        n_main = int(npM / main_NB)
+        r_ll = ll_data[:n_main, 0]
+        chords = ll_data[:, 18]
+        area_ll = chords[:n_main] * (r_ll[1] - r_ll[0])
+
+        f_tan_ll = ll_data[:n_main, 6]
+
+        # Plot LL tangential
+        ax_tan.plot(r_ll, f_tan_ll / area_ll, label='LL', marker='x', linestyle=':', color='black', alpha=alpha)
+
+        # Interpolate to CFD grid
+        f_tan_ll_interp = np.interp(r_cfd, r_ll, f_tan_ll / area_ll)
+
+        # Compute relative error
+        rel_err_tan = np.abs((f_tan / area_cfd - f_tan_ll_interp) /
+                             np.maximum(np.abs(f_tan / area_cfd), 1e-12)) * 100
+
+        # Error plot
+        ax1_err.plot(r_cfd, rel_err_tan, '--', color='black', alpha=0.3, label='RelErr Tangential')
+
+        # Avg relative error
+        avg_rel_err_tan = np.mean(rel_err_tan)
+        ax1_err.axhline(avg_rel_err_tan, color='black', linestyle='--',
+                        label=f'Avg RelErr: {avg_rel_err_tan:.2f}%', alpha=0.7)
+
+        alpha -= 0.9 / len(ll_files)
+
+    ax1_err.yaxis.set_major_formatter(mtick.PercentFormatter())
+    ax_tan.set_ylabel(r'$F_{tan}/S$')
+    ax_tan.set_xlabel("Radius")
+    ax_tan.legend(loc="best")
+    ax1_err.legend(loc="upper center")
+    plt.tight_layout()
+    if save_plots:
+
+        plt.savefig("./fta_comparison.png", dpi=300)
+    else:
+        plt.show()
+    plt.close(fig_tan)
+
+    print("Saved faxial_comparison.png and fta_comparison.png")
+
+#mainRotorForcesUpdated(['drone8040_mp_blade1_angle0'])
+#mainRotorForcesUpdated(['inProgress2', 'inProgress3'])

@@ -21,13 +21,13 @@ FLAGS = {
     "run_optimization": False,
     "thrust_optimization": False,
     "helicopter": False,
-    "rpm_optimization": False, 
-    "display_convergence": False
+    "rpm_optimization": True, 
+    "display_convergence": True
 }
 
 # --- Inputs ---
 PATH = 'configs/base.json'
-MTOW = 60  # Max Take-Off Weight in N
+MTOW = 20  # Max Take-Off Weight in N
 
 VARIABLE_SPACE = {
     #"small_propellers.diameter":[0.14,0.15,0.16],  # Main pro,peller angle
@@ -35,13 +35,14 @@ VARIABLE_SPACE = {
 
 }
 
-ERR_VEL  = 1e-4
+ERR_VEL  = 1e-6
 ERR_MOMENT = 1e-1
 ERR_THRUST = 1e-1
 IT_MAX = 30
-WEIGHT_VEL = 0.995 # The heigher the more stable
+#WEIGHT_VEL = 0.995 # The heigher the more stable
+WEIGHT_VEL = 0.7 # The heigher the more stable
 STALL_TRESHOLD = 0.2
-TITLE= 'drone8040_mp_spitch'  # Title for the plot
+TITLE= None  # Title for the plot
 
 #SWE - small wake effect
 #MWE - main wake effect : no effect
@@ -64,7 +65,7 @@ def updateVisualization(v, vOld, mainNB, im, cbar, smallNB):
     #cbar.update_normal(im)                         # <-- refresh colorbar limits
     im.axes.figure.canvas.draw()
     im.axes.figure.canvas.flush_events()
-    plt.pause(0.01)
+    plt.pause(0.05)
 
 def low_pass_filter(signal, cutoff_ratio=0.1):
     fft = np.fft.rfft(signal)
@@ -165,7 +166,7 @@ def bisectingMethod(createdMoment, torque, upperBound, lowerBound, RPM_small):
 
 
 
-def main(RPM_MAIN, RPM_SMALL, config=None, savePath=None):
+def main(RPM_MAIN, RPM_SMALL, config=None, savePath=None, plot=True):
     if config is None:
         # Load base config 
         baseConfig = loadConfig(PATH)
@@ -176,7 +177,7 @@ def main(RPM_MAIN, RPM_SMALL, config=None, savePath=None):
         configFiles = [config]
 
     for config in configFiles:
-
+        
         if FLAGS["just_display"]:
             # Define the drone
             drone = defineDrone(config, main_RPM=RPM_MAIN, small_RPM=RPM_SMALL)
@@ -187,6 +188,7 @@ def main(RPM_MAIN, RPM_SMALL, config=None, savePath=None):
 
         errVel, iterVel = 1, 0
         while errVel > ERR_VEL and iterVel < IT_MAX: 
+            print(f'Solving case: {config}')
             drone = defineDrone(config, main_RPM=RPM_MAIN, small_RPM=RPM_SMALL)
             FLAGS["helicopter"] = drone.helicopter
 
@@ -224,14 +226,14 @@ def main(RPM_MAIN, RPM_SMALL, config=None, savePath=None):
                     ax = None
 
             # Solve the LL problem 
-            Gammas, _, createdMoment, torque, thrust, power_required, _,_, v, STALL_FACTOR = solve(drone, case=f'{config}', updateConfig=True, save=True, savePath=savePath)
+            Gammas, _, createdMoment, torque, thrust, power_required, _,_, v, STALL_FACTOR = solve(drone, case=f'{config}', updateConfig=True, save=False, savePath=None)
 
-            if STALL_FACTOR[2] > STALL_TRESHOLD:
-                print('WARNING: The tip small propeller is stalling, reduce RPM_SMALL')
-                break
-            if STALL_FACTOR[3] > STALL_TRESHOLD:
-                print('WARNING: The root small propeller is stalling, increase RPM_SMALL')
-                break
+            # if STALL_FACTOR[2] > STALL_TRESHOLD:
+            #     print('WARNING: The tip small propeller is stalling, reduce RPM_SMALL')
+            #     break
+            # if STALL_FACTOR[3] > STALL_TRESHOLD:
+            #     print('WARNING: The root small propeller is stalling, increase RPM_SMALL')
+            #     break
             # compute velocity error
             v, errVel, vOldMain, vOldSmall, im1, im2, line3, line4 = computeVelocityError(v, 
                                                                     vOldMain, 
@@ -246,10 +248,16 @@ def main(RPM_MAIN, RPM_SMALL, config=None, savePath=None):
                                                                     Gammas, mainN=mainN, smallN=smallN, ax=ax, updateVisualizationFLAG=FLAGS['display_convergence'])
             np.savetxt('./auxx/v_axial.txt', v)
             iterVel += 1
-            print(f'Iteration: {iterVel}, Error: {errVel}, weight: {WEIGHT_VEL}')
+            print(f'Iteration: {iterVel}, Error velocity: {errVel}, weight: {WEIGHT_VEL}')
         
         os.remove('./auxx/v_axial.txt')
 
+        if savePath is not None:
+            Gammas, _, createdMoment, torque, thrust, power_required, _,_, v, STALL_FACTOR = solve(drone, case=f'{config}', updateConfig=True, save=True, savePath=savePath)
+        if plot:
+            if FLAGS['display_convergence']:
+                plt.ioff()
+            myPlt.plot([f'{savePath}/_res.csv'], show=True, title=TITLE, helicopter=FLAGS["helicopter"], QBlade=False, path=savePath)
         return thrust, torque, power_required, createdMoment, STALL_FACTOR, iterVel
 
 
@@ -273,8 +281,8 @@ def nested_optimization(config, x_0, bounds, results=False, savePlots=False, sav
     if saveInnerLog is not None:
         log_file = saveInnerLog + "/trim_log.csv"
         print('Im here')
-    with open(log_file, "w") as f:
-            f.write("RPM_MAIN,RPM_SMALL,thrust,torque,power_required,createdMoment,STALL_FACTOR,RPM_MAIN_bound,RPM_SMALL_bound, iterVel\n")
+        with open(log_file, "w") as f:
+                f.write("RPM_MAIN,RPM_SMALL,thrust,torque,power_required,createdMoment,STALL_FACTOR,RPM_MAIN_bound,RPM_SMALL_bound, iterVel\n")
 
     # optimize for equilibrium of thrust
     iter_T = 0
@@ -365,14 +373,17 @@ def nested_optimization(config, x_0, bounds, results=False, savePlots=False, sav
     if savePlots:
         if FLAGS['display_convergence']:
             plt.ioff()
-        myPlt.plot([f'{saveInnerLog}/_res.csv'], show=False, title=TITLE, helicopter=FLAGS["helicopter"], QBlade=False, path=saveInnerLog)
+        myPlt.plot([f'{saveInnerLog}/_res.csv'], show=True, title=TITLE, helicopter=FLAGS["helicopter"], QBlade=False, path=saveInnerLog)
         
     return RPM_MAIN, RPM_SMALL, thrust, torque, power_required, createdMoment, STALL_FACTOR
 
 if __name__ == "__main__":
-    start_time = time.time()
-    x_0 = [400, 9500]  # Initial guess for RPM_MAIN and RPM_SMALL
-    bounds = [(300, 500), (7000, 12000)]  # Bounds for RPM_MAIN and RPM_SMALL
-    nested_optimization(x_0=x_0, bounds=bounds, config=None, results=False, savePlots=False, saveInnerLog='./results/one_shot', )
-    end_time = time.time()
-    print(f"Execution time: {end_time - start_time:.2f} seconds")
+    #main(RPM_MAIN=400, RPM_SMALL=7445, config=None, savePath='./DesignSpace/main_simple')
+    # # start_time = time.time()
+    # # x_0 = [400, 9500]  # Initial guess for RPM_MAIN and RPM_SMALL
+    # # bounds = [(300, 500), (7000, 12000)]  # Bounds for RPM_MAIN and RPM_SMALL
+    # # nested_optimization(x_0=x_0, bounds=bounds, config=None, results=False, savePlots=False, saveInnerLog='./DesignSpace/main_simple', )
+    # # end_time = time.time()
+    # # print(f"Execution time: {end_time - start_time:.2f} seconds")
+    quad = defineDrone('base_quad.json')
+    Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial, STALL_TUPLE = solve(quad)

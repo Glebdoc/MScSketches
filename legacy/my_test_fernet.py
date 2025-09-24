@@ -6,13 +6,15 @@ downwash = 2 #m/s
 a = 1.0 
 b = -np.deg2rad(90 - naccelle_angle)  # pitch of the helix (rise per radian) 
 phi0 = np.pi/2         # phase shift (radians)
-omega = -1.0       # <--- spin: +CCW, -CW (looking from +Z toward origin)
+omega = -5.0       # <--- spin: +CCW, -CW (looking from +Z toward origin)
 
 t = np.linspace(0, 2*np.pi, 100)
+
+
 theta = omega*t + phi0
 
 # arclength (speed * t); speed = ||r'(t)||
-s = np.sqrt((a*omega)**2 + b**2) * t
+#s = np.sqrt((a*omega)**2 + b**2) * t
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
@@ -43,6 +45,16 @@ ax.quiver(rx[i], ry[i], rz[i], N[i,0], N[i,1], N[i,2], color='g', length=0.5, no
 ax.quiver(rx[i], ry[i], rz[i], B[i,0], B[i,1], B[i,2], color='b', length=0.5, normalize=True)
 
 i = 0
+ax.quiver(rx[i], ry[i], rz[i], T[i,0], T[i,1], T[i,2], color='r', length=0.5, normalize=True)
+ax.quiver(rx[i], ry[i], rz[i], N[i,0], N[i,1], N[i,2], color='g', length=0.5, normalize=True)
+ax.quiver(rx[i], ry[i], rz[i], B[i,0], B[i,1], B[i,2], color='b', length=0.5, normalize=True)
+
+i = 40
+ax.quiver(rx[i], ry[i], rz[i], T[i,0], T[i,1], T[i,2], color='r', length=0.5, normalize=True)
+ax.quiver(rx[i], ry[i], rz[i], N[i,0], N[i,1], N[i,2], color='g', length=0.5, normalize=True)
+ax.quiver(rx[i], ry[i], rz[i], B[i,0], B[i,1], B[i,2], color='b', length=0.5, normalize=True)
+
+i = 60
 ax.quiver(rx[i], ry[i], rz[i], T[i,0], T[i,1], T[i,2], color='r', length=0.5, normalize=True)
 ax.quiver(rx[i], ry[i], rz[i], N[i,0], N[i,1], N[i,2], color='g', length=0.5, normalize=True)
 ax.quiver(rx[i], ry[i], rz[i], B[i,0], B[i,1], B[i,2], color='b', length=0.5, normalize=True)

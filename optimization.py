@@ -6,6 +6,10 @@ import numpy as np
 import csv
 import plotter as myPlt
 from bemUtils import computeVelocityField
+from matplotlib.animation import FuncAnimation
+import os, re
+from pathlib import Path
+import imageio.v2 as imageio
 
 
 PATH = 'configs/base.json'
@@ -264,8 +268,8 @@ def propellerAzimuthalStudy(batch, key1, key2, angle_1, angle_2, steps, updateda
    # from one of the converged design points 
    plt.close()
    # 388.8671875,8495.767630161266
-   RPM_MAIN = 389
-   RPM_SMALL = 8495
+   RPM_MAIN = 340
+   RPM_SMALL = 12000
 
    batch_path = f'./DesignSpace/{batch}'
    os.makedirs(batch_path, exist_ok=True)
@@ -347,22 +351,17 @@ end = 120
 #propellerAzimuthalStudy('propeller_azimuth_8032_5_AH-791', 'settings', 'blade1_angle', start, end, splits, updatedata=False, twist=True)
 
 
-import os
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-
 
 def propellerAzimuthalAnimation(
     batch, key1, key2, angle_1, angle_2, steps,
     updatedata=False, twist=False,
-    save_anim=None, fps=8, trail=3
+    save_anim=None, fps=8, trail=3, black=False
 ):
     """
     Animate AoA distribution per blade as azimuth changes.
     trail = number of previous frames to keep visible with fading opacity.
+    If black=True: black background + white lines.
     """
-
     plt.close('all')
     RPM_MAIN, RPM_SMALL = 389, 8495
     batch_path = f'./DesignSpace/{batch}'
@@ -386,12 +385,27 @@ def propellerAzimuthalAnimation(
 
     # figure setup
     if twist:
-        fig, axs = plt.subplots(1,4, figsize=(12, 8))
-        axs[3].set_title('Twist Distribution')
+        fig, axs = plt.subplots(1, 4, figsize=(12, 8))
+        axs[3].set_title('Twist Distribution', color=('white' if black else None))
     else:
-        fig, axs = plt.subplots(1,3, figsize=(9, 8))
-    myPlt.set_bw_design()
-    title = fig.suptitle(f"Azimuth = {angles[0]:.1f}°", fontsize=14)
+        fig, axs = plt.subplots(1, 3, figsize=(9, 8))
+
+    # Use your BW design only for light theme
+    if not black:
+        myPlt.set_bw_design()
+
+    # Dark theme cosmetics
+    if black:
+        fig.patch.set_facecolor('black')
+        for ax in axs:
+            ax.set_facecolor('black')
+            # force white line color for anything plotted without an explicit color
+            ax.set_prop_cycle(color=['white'])
+            # subtle grid on black
+            ax.grid(True, color='0.3', alpha=0.5)
+        title = fig.suptitle(f"Azimuth = {angles[0]:.1f}°", fontsize=14, color='white')
+    else:
+        title = fig.suptitle(f"Azimuth = {angles[0]:.1f}°", fontsize=14)
 
     # storage for keeping last few plotted lines
     history = []
@@ -408,74 +422,373 @@ def propellerAzimuthalAnimation(
         # clear axes
         for ax in axs:
             ax.cla()
+            # re-apply background + cycler + grid after cla()
+            if black:
+                ax.set_facecolor('black')
+                ax.set_prop_cycle(color=['white'])
+                ax.grid(True, color='0.3', alpha=0.5)
 
         # replot all history frames with fading opacity
         for j, (arr_h, ang_h) in enumerate(history):
-            alpha = (j+1)/len(history)  # fade older frames
-            label = f'{ang_h:.1f} deg' if j == len(history)-1 else None
-            myPlt.plot_AoA_perBlade(fig, axs, arr_h, alpha, label)
+            alpha = (j + 1) / len(history)  # fade older frames
+            label = f'{ang_h:.1f} deg' if j == len(history) - 1 else None
+            myPlt.plot_AoA_perBlade(fig, axs, arr_h, alpha, label, black=black)
             if twist:
                 myPlt.plot_twist(fig, axs[3], arr_h, alpha, label)
 
-        # cosmetics
+        # cosmetics per-axis
         for j, ax in enumerate(axs):
-            ax.grid(True)
-            ax.set_facecolor('#f5f5f5')
-            ax.set_xlabel('Radial position (m)')
-            if twist and j==3:
-                ax.set_ylabel('Twist (deg)')
+            if not black:
+                ax.grid(True)
+                ax.set_facecolor('#f5f5f5')
+
+            # labels
+            if twist and j == 3:
+                ax.set_ylabel('Twist (deg)', color=('white' if black else None))
                 ax.set_ylim(0, 90)
-                ax.set_aspect(1/100)
+                ax.set_aspect(1 / 100)
             else:
-                ax.set_ylabel('Angle of Attack (deg)')
+                ax.set_ylabel('Angle of Attack (deg)', color=('white' if black else None))
                 ax.set_ylim(-5, 15)
-                ax.set_aspect(1/20)
-            ax.legend(loc='upper right', fontsize=9, frameon=True)
+                ax.set_aspect(1 / 20)
+
+            ax.set_xlabel('Radial position (m)', color=('white' if black else None))
+            ax.tick_params(colors=('white' if black else None))
+
+            # spines & legend styling
+            if black:
+                for sp in ax.spines.values():
+                    sp.set_color('white')
+                leg = ax.legend(loc='upper right', fontsize=9, frameon=True)
+                if leg:
+                    leg.get_frame().set_facecolor('black')
+                    leg.get_frame().set_edgecolor('white')
+                    for txt in leg.get_texts():
+                        txt.set_color('white')
+            else:
+                ax.legend(loc='upper right', fontsize=9, frameon=True)
 
         title.set_text(f"Azimuth = {angle:.1f}°")
+        if black:
+            title.set_color('white')
         return axs
 
     ani = FuncAnimation(
-        fig, update, frames=len(frames), interval=1000/fps, blit=False
+        fig, update, frames=len(frames), interval=1000 / fps, blit=False
     )
 
     if save_anim:
         ext = os.path.splitext(save_anim)[1].lower()
         if ext == ".mp4":
-            ani.save(save_anim, writer='ffmpeg', fps=fps, dpi=150)
+            # ensure the saved video keeps the black figure facecolor
+            ani.save(save_anim, writer='ffmpeg', fps=fps, dpi=150,
+                     savefig_kwargs={'facecolor': fig.get_facecolor()})
         elif ext == ".gif":
-            ani.save(save_anim, writer='pillow', fps=fps)
+            ani.save(save_anim, writer='pillow', fps=fps,
+                     savefig_kwargs={'facecolor': fig.get_facecolor()})
         else:
             print("Unsupported format. Use .mp4 or .gif.")
     else:
         plt.show(block=True)
 
-
-propellerAzimuthalAnimation(
-    'propeller_azimuth_8032_5_eppler_animation_full_capped',
-    'settings', 'blade1_angle',
-    0, 360, 50,
-    updatedata=False,
-    twist=True,
-    save_anim="DesignSpace/prop_anim_full_12FPS_notrail_capped.mp4",
-    fps=12,
-    trail=1
-)
+# propellerAzimuthalAnimation(
+#     'propeller_azimuth_8032_5_eppler_animation_full_capped',
+#     'settings', 'blade1_angle',
+#     0, 360, 50,
+#     updatedata=False,
+#     twist=False,
+#     save_anim="DesignSpace/prop_anim_full_12FPS_notrail_capped_black.gif",
+#     fps=12,
+#     trail=1,
+#     black=True
+# )
 
 
 #propellerAzimuthalStudy('propeller_azimuth_8032_eppler560_cordDist', 'settings', 'small_chord_a', -2, 5, 5, updatedata=True, twist=True)
-# propellerAzimuthalStudy('propeller_azimuth_8032_AH-79100B_pitchtip', 'small_propellers', 'pitch_tip', 32.5, 38, 4, updatedata=True, twist=True)
+#propellerAzimuthalStudy('propeller_azimuth_8032_AH-79100B_pitchtip', 'small_propellers', 'pitch_tip', 32.5, 38, 2, updatedata=True, twist=True)
 
 #design_map(refine=3)
 
-def velocity_field_around_propeller(angle_1, angle_2, steps):
-   # for every available azimuthal position produce a velocity field plot
-   # stack them together as a gif
-   batch = 'propeller_azimuth_8032_5_AH-791'
-   batch_path = f'./DesignSpace/{batch}'
+def circular_patch(center, radius, n_r=30, n_theta=100, plane='YZ', return_edges=False):
+    x0, y0, z0 = center
+    # centers
+    r  = np.linspace(0, radius, n_r)
+    th = np.linspace(0, 2*np.pi, n_theta, endpoint=False)
+    R, TH = np.meshgrid(r, th, indexing='ij')
 
-   for i in range(steps):
-      path =f'./DesignSpace/{batch}/DP{i}'
-      u, v, w = computeVelocityField(plane='YZ', shift=0, discretization=50, plotting=False)
+    if plane == 'YZ':
+        X = np.full_like(R, x0)
+        Y = y0 + R*np.cos(TH)
+        Z = z0 + R*np.sin(TH)
+    else:
+        raise NotImplementedError("add XY/XZ if needed")
+
+    if not return_edges:
+        return X, Y, Z
+
+    # edges (one more in each direction)
+    r_e  = np.linspace(0, radius, n_r+1)
+    th_e = np.linspace(0, 2*np.pi, n_theta+1)  # include 2π to close the seam
+    R_e, TH_e = np.meshgrid(r_e, th_e, indexing='ij')
+
+    if plane == 'YZ':
+        X_e = np.full_like(R_e, x0)
+        Y_e = y0 + R_e*np.cos(TH_e)
+        Z_e = z0 + R_e*np.sin(TH_e)
+
+    return (X, Y, Z), (X_e, Y_e, Z_e)
 
 
+
+
+def velocity_field_around_propeller(batch, steps):
+
+    batch_path = f'./DesignSpace/{batch}'
+
+    # Create batch-level "Fields" subfolder
+    fields_path = os.path.join(batch_path, "Fields")
+    os.makedirs(fields_path, exist_ok=True)
+
+    # Build circular YZ grid once
+    (Xc, Yc, Zc), (Xe, Ye, Ze) = circular_patch(
+        center=(-0.1, 1.0, 0.0),
+        radius=0.1,
+        n_r=50, n_theta=360,
+        plane='YZ',
+        return_edges=True
+    )
+    pts = np.column_stack((Xc.ravel(), Yc.ravel(), Zc.ravel()))
+
+    for i in range(steps):
+        dp_dir = os.path.join(batch_path, f'DP{i}')
+        data = np.loadtxt(os.path.join(dp_dir, 'table_final.txt'))
+
+        # Compute velocities
+        u, v, w = computeVelocityField(data, pts, plane='YZ')
+        U = u.reshape(Xc.shape)
+        V = v.reshape(Xc.shape)
+        W = w.reshape(Xc.shape)
+        mag = np.sqrt(U**2 + V**2 + W**2)
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(7, 6))
+        pcm = ax.pcolormesh(Ye, Ze, mag, shading='auto', cmap='jet')
+        fig.colorbar(pcm, ax=ax, label='Velocity Magnitude (m/s)')
+
+        step = 3
+        ax.quiver(Yc[::step, ::step], Zc[::step, ::step],
+                  V[::step, ::step], W[::step, ::step],
+                  scale=None, width=0.002)
+
+        ax.set_xlabel('Y (m)')
+        ax.set_ylabel('Z (m)')
+        ax.set_aspect('equal')
+        ax.set_title(f'YZ velocity slice (DP {i})')
+
+        # Save into Fields folder
+        out_png = os.path.join(fields_path, f'DP{i}_field.png')
+        fig.savefig(out_png, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+
+        print(f"Saved {out_png}")
+
+
+
+      #u, v, w = computeVelocityField(plane='YZ', shift=0, discretization=20, plotting=True)
+
+
+
+def stitch_velocity_fields(batch: str,
+                           out_name: str = "velocity_fields.gif",
+                           fps: int = 8,
+                           loop: int = 0):
+    """
+    Stitch PNGs in ./DesignSpace/{batch}/Fields/ into a GIF.
+
+    Args:
+        batch: batch folder name under ./DesignSpace/
+        out_name: name of the output GIF file (default: velocity_fields.gif)
+        fps: frames per second
+        loop: number of times the GIF should loop (0 = infinite)
+    """
+    batch_path = Path("./DesignSpace") / batch
+    fields_path = batch_path / "Fields"
+    assert fields_path.is_dir(), f"Fields folder not found: {fields_path}"
+
+    # collect and sort PNGs
+    def dp_index(path: Path):
+        m = re.search(r'DP(\d+)', path.stem)
+        return int(m.group(1)) if m else 1e9
+
+    frames = sorted(fields_path.glob("DP*_field.png"), key=dp_index)
+    if not frames:
+        raise FileNotFoundError(f"No PNGs found in {fields_path}")
+
+    out_path = fields_path / out_name
+    with imageio.get_writer(out_path, mode="I", duration=1.0/fps, loop=loop) as writer:
+        for f in frames:
+            writer.append_data(imageio.imread(f))
+    print(f"Saved GIF: {out_path.resolve()} ({len(frames)} frames @ {fps} fps)")
+
+#propellerAzimuthalStudy('azimuth_for_field', 'settings', 'blade1_angle', 0, 360, 100, updatedata=True, twist=False)
+
+#velocity_field_around_propeller('azimuth_for_field', 100)
+
+# stitch_velocity_fields(
+#     batch="azimuth_for_field",
+#     out_name="fields.gif",
+#     fps=20
+# )
+
+def cache_velocity_fields(
+    batch: str,
+    steps: int,
+    center=(-0.15, 1.0, 0.0),
+    radius=0.15,
+    n_r=30,
+    n_theta=120,
+    plane='YZ'
+):
+    """
+    Build a circular grid once, compute velocities for each DP{i},
+    and save results to ./DesignSpace/{batch}/Fields/ without plotting.
+
+    Files written:
+      Fields/grid_yz_disk.npz      -> Xc, Yc, Zc (centers), Xe, Ye, Ze (edges), meta
+      Fields/DP{i}_field.npz       -> U, V, W (reshaped to grid), mag, meta
+      Fields/meta.json             -> parameters for reference
+    """
+    batch_path = f'./DesignSpace/{batch}'
+    fields_path = os.path.join(batch_path, "Fields")
+    os.makedirs(fields_path, exist_ok=True)
+
+    # ----- Build grid once -----
+    (Xc, Yc, Zc), (Xe, Ye, Ze) = circular_patch(
+        center=center, radius=radius,
+        n_r=n_r, n_theta=n_theta,
+        plane=plane, return_edges=True
+    )
+    pts = np.column_stack((Xc.ravel(), Yc.ravel(), Zc.ravel()))
+
+    # Save grid once
+    grid_meta = {
+        "plane": plane, "center": tuple(center), "radius": float(radius),
+        "n_r": int(n_r), "n_theta": int(n_theta)
+    }
+    np.savez_compressed(
+        os.path.join(fields_path, "grid_yz_disk.npz"),
+        Xc=Xc, Yc=Yc, Zc=Zc, Xe=Xe, Ye=Ye, Ze=Ze, meta=json.dumps(grid_meta)
+    )
+
+    # Also store a human-readable meta.json
+    with open(os.path.join(fields_path, "meta.json"), "w") as f:
+        json.dump({"grid": grid_meta, "steps": int(steps)}, f, indent=2)
+
+    # ----- Compute & save per-DP velocities -----
+    for i in range(steps):
+        dp_dir = os.path.join(batch_path, f'DP{i}')
+        data = np.loadtxt(os.path.join(dp_dir, 'table_final.txt'))
+
+        # Compute velocities on the circular patch
+        u, v, w = computeVelocityField(data, pts, plane=plane)  # returns flat arrays
+        U = u.reshape(Xc.shape)
+        V = v.reshape(Xc.shape)
+        W = w.reshape(Xc.shape)
+        mag = np.sqrt(U**2 + V**2 + W**2)
+
+        # Save per-DP cache
+        np.savez_compressed(
+            os.path.join(fields_path, f"DP{i}_field.npz"),
+            U=U, V=V, W=W, mag=mag,
+            meta=json.dumps({"dp": i})
+        )
+        print(f"Saved cache: {os.path.join(fields_path, f'DP{i}_field.npz')}")
+
+# cache_velocity_fields('azimuth_for_field', 
+# 100)
+
+def render_cached_fields_to_pngs(batch: str, out_dir: str = None,cmap_limits=None,
+                                 quiver_step=3, vmin=0, vmax=10, cmap='jet'):
+    base = Path(f'./DesignSpace/{batch}/Fields')
+    grid = np.load(base / "grid_yz_disk.npz", allow_pickle=True)
+    Xc, Yc, Zc, Xe, Ye, Ze = grid["Xc"], grid["Yc"], grid["Zc"], grid["Xe"], grid["Ye"], grid["Ze"]
+
+    def dp_idx(p: Path):
+        m = re.search(r'DP(\d+)_field\.npz', p.name)
+        return int(m.group(1)) if m else 10**9
+
+    frames = sorted(base.glob("DP*_field.npz"), key=dp_idx)
+    out_dir = Path(out_dir or base)  # default into Fields/
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    for f in frames:
+        d = np.load(f)
+        U, V, W, mag = d["U"], d["V"], d["W"], d["mag"]
+
+        fig, ax = plt.subplots(figsize=(7, 6))
+        # --- black background ---
+        fig.patch.set_facecolor('black')
+        ax.set_facecolor('black')
+
+        # field
+        pcm = ax.pcolormesh(Ye, Ze, mag, shading='auto', cmap=cmap, vmin=vmin, vmax=vmax)
+        cbar = fig.colorbar(pcm, ax=ax, label='Velocity Magnitude (m/s)')
+        # colorbar to white text & outline, black bg
+        cbar.ax.tick_params(colors='white')
+        cbar.outline.set_edgecolor('white')
+        cbar.set_label('Velocity Magnitude (m/s)', color='white')
+
+        # quiver in white so it shows on black
+        ax.quiver(Yc[::quiver_step, ::quiver_step], Zc[::quiver_step, ::quiver_step],
+                  V[::quiver_step, ::quiver_step], W[::quiver_step, ::quiver_step],
+                  color='white', scale=None, width=0.002)
+
+        # labels, ticks, spines, title in white
+        ax.set_xlabel('Y (m)', color='white')
+        ax.set_ylabel('Z (m)', color='white')
+        ax.set_title(f.stem.replace('_', ' '), color='white')
+        ax.tick_params(colors='white')
+        for spine in ax.spines.values():
+            spine.set_color('white')
+
+        ax.set_aspect('equal')
+
+        out_png = out_dir / f.with_suffix('.png').name
+        fig.savefig(out_png, dpi=150, bbox_inches='tight', facecolor=fig.get_facecolor())
+        plt.close(fig)
+        print("Wrote", out_png)
+
+def stitch_cached_pngs_to_gif(batch: str, gif_name: str = "fields.gif", fps: int = 8):
+    base = Path(f'./DesignSpace/{batch}/Fields')
+    pngs = sorted(base.glob("DP*_field.png"), key=lambda p: int(re.search(r'DP(\d+)', p.stem).group(1)))
+    gif_path = base / gif_name
+    with imageio.get_writer(gif_path, mode="I", duration=1.0/fps, loop=0) as wr:
+        for p in pngs:
+            wr.append_data(imageio.imread(p))
+    print("Saved GIF:", gif_path.resolve())
+
+
+#cache_velocity_fields('azimuth_for_field', 100)
+# render_cached_fields_to_pngs('azimuth_for_field', out_dir=None, cmap_limits=None, quiver_step=3, vmin=0, vmax=10)
+#render_cached_fields_to_pngs('azimuth_for_field', out_dir=None, cmap_limits=None, quiver_step=3, vmin=0, vmax=10)
+# stitch_cached_pngs_to_gif('azimuth_for_field', gif_name="fields_fixedscale_10ms.gif", fps=20)
+#stitch_cached_pngs_to_gif('azimuth_for_field', gif_name="fields_fixedscale_10ms_black.gif", fps=20)
+
+#propellerAzimuthalStudy('naccelle8090_constRPM', 'small_propellers', 'angle', 90, 90, 4, updatedata=True, twist=False)
+#propellerAzimuthalStudy('azimuth_for_field', 'settings', 'blade1_angle', 0, 360, 100, updatedata=True, twist=False)
+#propellerAzimuthalStudy('azimuth_for_field_sm15', 'settings', 'blade1_angle', 0, 360, 100, updatedata=True, twist=False)
+
+propellerAzimuthalAnimation(
+    'azimuth_new_dist_reFalse',
+    'settings', 'blade1_angle',
+    0, 360, 100,
+    updatedata=False,
+    twist=False,
+    save_anim="DesignSpace/azimuth_new_dist_reFalse_noItsTrue.gif",
+    fps=12,
+    trail=1,
+    black=True
+)
+
+#propellerAzimuthalStudy('azimuth_new_dist_reFalse', 'settings', 'blade1_angle', 0, 360, 100, updatedata=True, twist=False)
+#naccelle_exploration('main_chord_a_1m','settings', 'main_chord_a', -2, -1, 3)

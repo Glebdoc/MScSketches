@@ -5,17 +5,7 @@ import matplotlib.pyplot as plt
 import time
 import pandas as pd
 from scipy.interpolate import RegularGridInterpolator
-
-
-
-
-
-
-
-
-### The goal of this file is to pre save relevant
-# airfoil polars for Various Re numbers
-###
+from plotter import set_bw_design
 
 airfoil_name = ["a18sm" ]
 directory = "./airfoil/dat_files"
@@ -23,7 +13,7 @@ directory = "./airfoil/dat_files"
 alpha_i = -2
 alpha_f = 15
 alpha_step = 0.5
-n_iter = 300
+n_iter = 30
 max_runtime = 20  # Max time (in seconds) allowed per XFOIL run
 
 # Let's find the best airfoil for each reynolds number
@@ -200,7 +190,6 @@ def updatePolar(airfoil_name):
                 cl, cd = [], [] 
                 for i in range(N):
                     cl_i, cd_i = clCdfromData(data, alpha[i])
-                    print(cl_i, cd_i)
                     cl.append(cl_i)
                     cd.append(cd_i)
                 cl = np.array(cl)
@@ -209,7 +198,6 @@ def updatePolar(airfoil_name):
                 print(f"Polar file {polar} does not match airfoil {airfoil}.")
                 continue
             # write the new polar data to a file
-            print(len(cl), len(cd))
             with open(f"./airfoil/data/updated/{polar}", 'w') as f:
                 # clear the file
                 f.truncate(0)
@@ -223,6 +211,7 @@ def updatePolar(airfoil_name):
             f.close()
             print(f"Polar data for {airfoil} at Re = {Re} updated.")
  
+#updatePolar('NACA 0012')
 def getPolar(airfoil_name, Re, target_alpha, interpolate=True):
 
     # find Re above and below the target Re
@@ -383,3 +372,176 @@ def getPolar_batch(Re_array, alpha_array, airfoil_array, preloaded_data):
 # for airfoil in airfoil_name:
 #     build_airfoil_npz(airfoil, source_dir="./airfoil/data/updated", output_dir="./airfoil/data/numpy")
 
+
+
+def plotUpdatedPolars(airfoil):
+    path = "./airfoil/data/updated"
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+    design = set_bw_design()  # expect keys like: 'fig_face', 'axes_face', 'grid'
+
+    # --- apply background + grid early ---
+    fig.patch.set_facecolor(design.get('fig_face', 'white'))
+    for a in ax:
+        a.set_facecolor(design.get('axes_face', 'white'))
+        a.grid(True, color=design.get('grid', '#DDDDDD'), linewidth=0.8)
+        a.set_axisbelow(True)  # keep grid behind the curves
+        a.set_xlim(-5, 20)     # <-- requested x-limits
+    ax[0].set_ylim(-0.5, 2)
+    files = []
+    for file in os.listdir(path):
+        if airfoil in file and "Re" in file:
+            try:
+                Re = float(file.split("Re")[1].split(".txt")[0])
+                files.append((Re, file))
+            except ValueError:
+                continue
+
+    files.sort(key=lambda x: x[0])
+    Re_vals = [Re for Re, _ in files]
+    Re_min, Re_max = min(Re_vals), max(Re_vals)
+
+    for i, (Re, file) in enumerate(files):
+        data = np.genfromtxt(os.path.join(path, file), skip_header=2)
+        if data.ndim != 2 or data.shape[1] != 3:
+            continue
+        alpha, Cl, Cd = data[:, 0], data[:, 1], data[:, 2]
+
+        # color & opacity mapping
+        color = 'black'
+        frac = (Re - Re_min) / (Re_max - Re_min + 1e-9)
+        opacity = 0.1 + 0.6 * frac
+        label = f"Re={int(Re)}" if i % 5 == 0 else None
+
+        ax[0].plot(alpha, Cl, label=label, color=color, alpha=opacity, marker='o', markersize=2)
+        ax[1].plot(alpha, Cd, label=label, color=color, alpha=opacity)
+
+    ax[0].set_xlabel(r'$\alpha$ (deg)')
+    ax[0].set_ylabel(r'$C_\ell$')
+    ax[1].set_xlabel(r'$\alpha$ (deg)')
+    ax[1].set_ylabel(r'$C_d$')
+
+    ax[0].legend()
+    ax[1].legend()
+    plt.tight_layout()
+    plt.show()
+
+#plotUpdatedPolars("a18sm")
+
+def read_npz(airfoil_name, npz_dir="./airfoil/data/numpy"):
+    data = np.load(f"{npz_dir}/{airfoil_name}.npz")
+    Re = data["Re"]
+    polar = data["polar"]  # shape (n_re, n_alpha, 3)
+    return Re, polar, data
+
+def plot_npz_data(airfoil, directory="./airfoil/data/numpy", label_i=2):
+    Re, polar, data = read_npz(airfoil, npz_dir=directory)
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+    design = set_bw_design()  # expect keys like: 'fig_face', 'axes_face', 'grid'
+    # --- apply background + grid early ---
+    fig.patch.set_facecolor(design.get('fig_face', 'white'))
+    for a in ax:
+        a.set_facecolor(design.get('axes_face', 'white'))
+        a.grid(True, color=design.get('grid', '#DDDDDD'), linewidth=0.8)
+        a.set_axisbelow(True)  # keep grid behind the curves
+        #a.set_xlim(-10, 20)     # <-- requested x-limits
+   # ax[0].set_ylim(-0.5, 2)
+    count = 0
+    Re_min = min(Re)
+    Re_max = max(Re)
+    color = 'black'
+    for re in Re:
+        idx = np.where(Re == re)[0][0]
+        alpha = polar[idx, :, 0]
+        Cl = polar[idx, :, 1]
+        Cd = polar[idx, :, 2]
+        if count % label_i == 0:
+            label = f"Re={int(re)}"
+        else:
+            label = None
+        frac = (re - Re_min) / (Re_max - Re_min + 1e-9)
+        opacity = 0.1 + 0.6 * frac
+        k=5
+        ax[0].plot(alpha[k:-k], Cl[k:-k], label=label, alpha=opacity, marker='o', markersize=2, color=color)
+        ax[1].plot(alpha[k:-k], Cd[k:-k], label=label, alpha=opacity, marker='o', markersize=2, color=color)
+        count += 1
+    ax[0].set_xlabel(r'$\alpha$ (deg)')
+    ax[0].set_ylabel(r'$C_{l_a}$')
+    ax[0].legend()
+
+
+    ax[1].set_xlabel(r'$\alpha$ (deg)')
+    ax[1].set_ylabel(r'$C_d$')
+    ax[1].legend()
+
+    plt.show()
+
+
+def smooth_npz(airfoil_name, plotting=False):
+    Re, polar, data = read_npz(airfoil_name, npz_dir="./airfoil/data/numpy")
+    smoothed_polar = np.zeros_like(polar)
+    # plot original and smoothed
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    design = set_bw_design()  # expect keys like: 'fig_face', 'axes_face', 'grid'
+
+    Re_min = min(Re)
+    Re_max = max(Re)
+    color = 'black'
+    Re_smoothed = []
+    count = 0
+    for i in range(len(Re)):
+        if i % 4 != 0:
+            # remove this  Re from smoothed polar
+            # remove polar [i] 
+
+            continue
+        
+        Re_smoothed.append(Re[i])
+        alpha = polar[i, :, 0]
+        Cl = polar[i, :, 1]
+        Cd = polar[i, :, 2]
+
+        # Smooth Cl and Cd using a simple moving average
+        window_size = 7
+        Cl_smooth = np.convolve(Cl, np.ones(window_size)/window_size, mode='same')
+        Cd_smooth = np.convolve(Cd, np.ones(window_size)/window_size, mode='same')
+
+        smoothed_polar[count, :, 0] = alpha
+        smoothed_polar[count, :, 1] = Cl_smooth
+        smoothed_polar[count, :, 2] = Cd_smooth
+        count+=1
+        frac = (Re[i] - Re_min) / (Re_max - Re_min + 1e-9)
+        opacity = 0.1 + 0.6 * frac
+
+        label = f"Re={int(Re[i])}" if i % 3 == 0 else None
+
+        plt.plot(alpha, Cl, label=label, alpha=opacity, marker='o', markersize=2, color=color)
+        if label is not None:
+            label = label + ' sm '
+        plt.plot(alpha, Cl_smooth, label=label, alpha=opacity, linestyle='--', color='red')
+    plt.xlabel(r'$\alpha$ (deg)')
+    plt.ylabel(r'$C_{l_a}$')
+    plt.legend()
+    plt.xlim(-10, 20)
+    plt.ylim(-0.5, 1.8)
+    plt.show()
+        
+
+    os.makedirs("./airfoil/data/numpy_smoothed", exist_ok=True)
+    np.savez_compressed(f"./airfoil/data/numpy_smoothed/{airfoil_name}.npz", Re=Re_smoothed, polar=smoothed_polar[:count, :, :])
+    print(f"Saved smoothed data to ./airfoil/data/numpy_smoothed/{airfoil_name}.npz")
+    # check how many polar files were are in the smoothed npz
+    print(f"Number of Re in smoothed npz: {len(Re_smoothed)}")
+
+#plot_npz_data("a18sm")
+#plot_npz_data("eppler560", "./airfoil/data/numpy_smoothed", label_i=2)
+#plt.close()
+#plot_npz_data("eppler560", "./airfoil/data/numpy", label_i=4)
+
+#for file in //airfoil/data/numpy: run smooth_npz 
+# for file in os.listdir("./airfoil/data/numpy"):
+#     if file.endswith(".npz"):
+#         airfoil = file.split(".npz")[0]
+#         print(f"Smoothing {airfoil}...")
+#         smooth_npz(airfoil, plotting=True)
+#         #plot_npz_data(airfoil)

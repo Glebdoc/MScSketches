@@ -59,7 +59,7 @@
         "reynolds": true,
         "wind_speed": 0,
         "wind_angle": 0,
-        "blade1_angle": 0,
+        "blade1_angle": 54,
         "downwash": 2,
         "wake_bend": true,
         "pitch_incline": -400,

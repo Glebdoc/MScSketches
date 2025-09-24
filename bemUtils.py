@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 import os, json
 import time 
 import ctypes
-from geometry import*
+#from geometry import*
 from matplotlib.colors import ListedColormap, BoundaryNorm
+import seaborn as sns
 
 def get_axis_vectors(length=1.5):
     """
@@ -128,9 +129,16 @@ def endurance(power_required, battery_capacity, battery_config='2P6S', battery_e
         raise ValueError('Invalid battery configuration')     
 
  
-def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velocity_vectors, tangential_velocity_vectors, extra_points=None, extra_lines=None):
+def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velocity_vectors, tangential_velocity_vectors, extra_points=None, extra_lines=None, savefig = False):
         plotter = pv.Plotter()
         plotter.set_background("white") 
+
+        camera = pv.Camera()
+        camera.position = (-5, -5, 3)
+        camera.focal_point = (0, 0, 0)
+        camera.up = (0, 0, 1)
+        plotter.camera = camera
+
 
         if total_velocity_vectors is not None:
             poly_data = pv.PolyData(collocation_points)
@@ -197,6 +205,8 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
         )
 
         plotter.show()
+        # if display:
+        #     plotter.save_graphic("scene.png")
 
 def twistGen(in_hub, in_tip, r, AoA):
     in_hub = in_hub + AoA
@@ -211,45 +221,49 @@ def twistGen(in_hub, in_tip, r, AoA):
     twist = k/r + m
     return twist
 
-def computeVelocityField(plane='YZ', shift=0, discretization=50, plotting=False):
-    vortexTable = np.loadtxt('table_final.txt')
+def computeVelocityField(data, points, plane='YZ', shift=0, discretization=50, plotting=False):
+    vortexTable = data
 
-    if plane == 'YZ':
-        y_range = np.linspace(-1.5, 1.5, discretization)
-        z_range = np.linspace(-2, .5, discretization)
+    # --- Decide the sampling mode ---
+    if points is not None:
+        points = np.asarray(points)
+        N_points = len(points)
+        use_structured = False
+    else:
+        use_structured = True
+        if plane == 'YZ':
+            y_range = np.linspace(-1.5, 1.5, discretization)
+            z_range = np.linspace(-2.0, 0.5, discretization)
+            Y, Z = np.meshgrid(y_range, z_range)
+            N_points = Y.size
+            points = np.column_stack((np.full(N_points, shift), Y.ravel(), Z.ravel()))
+        elif plane == 'XZ':
+            x_range = np.linspace(-1.5, 1.5, discretization)
+            z_range = np.linspace(-2.0, 0.5, discretization)
+            X, Z = np.meshgrid(x_range, z_range)
+            N_points = X.size
+            points = np.column_stack((X.ravel(), np.full(N_points, shift), Z.ravel()))
+        elif plane == 'XY':
+            x_range = np.linspace(-0.5, 1.0, discretization)
+            y_range = np.linspace(0.5, 1.3, discretization)
+            X, Y = np.meshgrid(x_range, y_range)
+            N_points = X.size
+            points = np.column_stack((X.ravel(), Y.ravel(), np.full(N_points, shift)))
+        else:
+            raise ValueError("plane must be 'YZ', 'XZ', or 'XY'")
 
-        Y, Z = np.meshgrid(y_range, z_range)
-        N_points = len(Y.flatten())
-        points = np.column_stack((np.ones(N_points)*shift, Y.flatten(), Z.flatten()))
-
-    elif plane == 'XZ':
-        x_range = np.linspace(-1.5, 1.5, discretization)
-        z_range = np.linspace(-2, 0.5, discretization)
-
-        X, Z = np.meshgrid(x_range, z_range)
-        N_points = len(X.flatten())
-        points = np.column_stack((X.flatten(), np.ones(N_points)*shift, Z.flatten()))
-
-    elif plane == 'XY':
-        x_range = np.linspace(-0.5, 1.0, discretization)
-        y_range = np.linspace(0.5, 1.3, discretization)
-
-        X, Y = np.meshgrid(x_range, y_range)
-        N_points = len(X.flatten())
-        points = np.column_stack((X.flatten(), Y.flatten(), np.ones(N_points)*shift))
-
+    # --- Allocate and call C library ---
     u = np.zeros(N_points)
     v = np.zeros(N_points)
     w = np.zeros(N_points)
 
     if os.name == 'nt':
-            mylib = ctypes.CDLL("./mylib.dll")  
+        mylib = ctypes.CDLL("./mylib.dll")
     else:
-        # Assuming Linux or MacOS
         mylib = ctypes.CDLL("./mylib.so")
 
-    T = len(vortexTable) 
-    table_ptr = vortexTable.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    T = len(vortexTable)
+    table_ptr  = vortexTable.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     points_ptr = points.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     u_ptr = u.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     v_ptr = v.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
@@ -257,59 +271,37 @@ def computeVelocityField(plane='YZ', shift=0, discretization=50, plotting=False)
 
     start = time.time()
     mylib.computeVelocityField(N_points, T, points_ptr, table_ptr, u_ptr, v_ptr, w_ptr)
+    print("C Fields function execution time:", time.time() - start, "seconds")
 
-    time2 = time.time() - start
-    print("C Fields function execution time:", time2, "seconds")
+    # --- Only build structured arrays when we actually used a structured grid ---
+    if use_structured:
+        mag = np.sqrt(u**2 + v**2 + w**2)
+        mag = np.clip(mag, 0, 25).reshape((discretization, discretization))
+        # (any PyVista grid construction would go here)
+        # Return both flat and structured if you want:
+        return u, v, w, mag
+    else:
+        return u, v, w
 
 
-    magnitude = np.sqrt(u**2 + v**2 + w**2)
-    magnitude[magnitude > 25] = 25  # Cap the magnitude at 25 m/s
-    magnitude = magnitude.reshape((discretization, discretization))
-
-    # Create PyVista mesh for visualization
-    mesh = pv.PolyData(points)  # Create the points from the grid
-    mesh['u'] = u  # Add u velocity component to mesh (use dictionary assignment)
-    mesh['v'] = v  # Add v velocity component to mesh
-    mesh['w'] = w  # Add w velocity component to mesh
-    mesh['magnitude'] = magnitude.flatten()  # Add magnitude of velocity to mesh
-
-    # Set bounds for colormap
-    min_mag = 0
-    max_mag = 25
-    n_bands = 64  
-    cmap = plt.get_cmap("jet", n_bands)  # Creates discrete colors
-
-    grid = pv.StructuredGrid()
-    grid.points = points  # Keep it (N,3), do NOT reshape!
-    grid.dimensions = [discretization, discretization, 1]  # Needed for 2D slices
-    grid["magnitude"] = magnitude.flatten()
-    grid['u'] = u
-    grid['v'] = v
-    grid['w'] = w
-
-    discrete_cmap = ListedColormap(cmap(np.linspace(0, 1, n_bands)))  # Apply discrete colors
-
-    if plotting:
-        pl = pv.Plotter(shape=(2, 2))
-        pl.subplot(0, 0)
-        pl.add_mesh(grid, scalars='u', cmap='jet')
-        pl.add_text("u", color='k')
-        pl.subplot(0, 1)
-        pl.add_mesh(grid.copy(),  scalars='v', cmap='jet')
-        pl.add_text("v", color='k')
-        pl.subplot(1, 0)
-        pl.add_mesh(grid.copy(),  scalars='w', cmap='jet')
-        pl.add_text("w", color='k')
-        pl.subplot(1, 1)
-        pl.add_mesh(grid.copy(),  scalars='magnitude', cmap=discrete_cmap, clim=[min_mag, max_mag], show_scalar_bar=True)
-        pl.add_text("magnitude", color='k')
-        pl.link_views()
-        pl.camera_position = 'iso'
-        pl.background_color = 'white'
-        pl.show()
-
-    return u, v, w
-
+    # if plotting:
+    #     pl = pv.Plotter(shape=(2, 2))
+    #     pl.subplot(0, 0)
+    #     pl.add_mesh(grid, scalars='u', cmap='jet')
+    #     pl.add_text("u", color='k')
+    #     pl.subplot(0, 1)
+    #     pl.add_mesh(grid.copy(),  scalars='v', cmap='jet')
+    #     pl.add_text("v", color='k')
+    #     pl.subplot(1, 0)
+    #     pl.add_mesh(grid.copy(),  scalars='w', cmap='jet')
+    #     pl.add_text("w", color='k')
+    #     pl.subplot(1, 1)
+    #     pl.add_mesh(grid.copy(),  scalars='magnitude', cmap=discrete_cmap, clim=[min_mag, max_mag], show_scalar_bar=True)
+    #     pl.add_text("magnitude", color='k')
+    #     pl.link_views()
+    #     pl.camera_position = 'iso'
+    #     pl.background_color = 'white'
+    #     pl.show()
 def contractionCoefficients(y_close, z_close, z_far, R):
     """
     Compute the contraction coefficients for a wake. 
@@ -382,3 +374,36 @@ def contraction_sigmoid(z, contraction=0.78):
 #     for i in range((N-2)):
         
 
+def set_bw_design():
+    """
+    Configure matplotlib + seaborn for consistent black & white (grayscale) plotting style.
+    """
+    # Seaborn & matplotlib styles
+    sns.set_style("whitegrid")
+    plt.style.use("seaborn-v0_8")
+    sns.set_palette("Greys_r")  # grayscale palette
+    
+    # Global rcParams for consistent looks
+    plt.rcParams.update({
+        "figure.figsize": (6, 4),
+        "figure.dpi": 200,
+        "axes.edgecolor": "black",
+        "axes.labelweight": "bold",
+        "axes.grid": True,
+        "grid.alpha": 0.4,
+        "grid.color": "black",
+        "grid.linewidth": 0.5,
+        "legend.frameon": True,
+        "legend.fancybox": False,
+        "legend.shadow": False,  # cleaner for B&W
+        "lines.linewidth": 1.5,
+        "lines.markersize": 3,
+    })
+    
+    # Line styles / markers / colors for B&W distinction
+    design = {
+        "line_styles": ['-', '--', '-.'],
+        "markers": ['o', 's', '^'],
+        "colors": ['black', '0.4', '0.7']  # black, dark gray, light gray
+    }
+    return design

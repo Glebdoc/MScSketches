@@ -4,6 +4,7 @@ import bemUtils as bu
 import json
 import xfoilUtil as xfu
 import matplotlib.pyplot as plt
+from plotter import set_bw_design
 
 class Point:
     def __init__(self, x, y, z):
@@ -134,7 +135,7 @@ class Propeller():
         self.n = n
         self.U = U
         self.wake_length = wake_length
-        self.ppr=20                         # number of points per revolution in the wake
+        self.ppr=60                         # number of points per revolution in the wake
         self.chord = chord
         self.v_axial = None
         self.Ct = None
@@ -167,23 +168,14 @@ class Propeller():
 
         
         self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
+        print('original',np.array(self.collocationPoints).shape, 'good')
+        #self.collocationPoints = [np.vstack((self.chord[:n-1]*3/4, (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
         self.sigma = np.average(self.NB*self.chord[:n]/(np.pi*self.r))
                               
         
         self.assemble(main_rotor=main_rotor, contraction=contraction)
+        print('after assemble',np.array(self.collocationPoints).shape)
 
-        # if self.small:
-        #     """
-        #     We first need to rotate around Z to pic a desired blade position with respect to the main rotor.
-        #     Then we rotate around Y - simulating the naccelle incline 
-        #     Then we bend the wake modifying 
-        #     """
-        #     temp_angles = np.array([0, 0, blade1_angle*np.pi/180])
-        #     self.rotate(extra=True, a=temp_angles[0], b=temp_angles[1], c=temp_angles[2])
-        #     if self.wake_bend:
-        #         self.bendSmallWake(downwash=True)
-        # self.rotate()
-        # self.translate(position)
 
         if self.small:
             """
@@ -198,10 +190,11 @@ class Propeller():
         self.translate(position)
 
         if self.wake_bend:
-                self.bendSmallWake_new(main_rotor)
+                self.bendSmallWake_new(main_rotor,)
+                #self.bendSmallWake(main_rotor)
 
     def bendSmallWake_new(self, main_rotor):
-
+        downwash = self.downwash
         points = self.vortexTABLE[:, :6]
 
         # Define helix parameters
@@ -209,14 +202,16 @@ class Propeller():
         omega = -2*np.pi*main_rotor.RPM/60  # <--- spin: +CCW, -CW (looking from +Z toward origin)
         a = R
         #b = self.angles[1]  # pitch of the helix (rise per radian)
-        b= -a*omega*np.tan(np.pi/2 - self.angles[1])
-
+        b= -a*omega*np.tan(np.pi/2 - self.angles[1]) - np.tan(downwash/(omega*R))
+        print(-a*omega*np.tan(np.pi/2 - self.angles[1]), - np.tan(downwash/(omega*R)))
+        print(b)
 
         angle_addition = np.arctan2(0.05, R)
 
         phi0 = self.angles[2] + np.pi/2  + angle_addition      # phase shift (radians)
 
         t = self.dt
+        t = np.concatenate([[0], t])  # tile for both sides of the wake
         theta = omega*t + phi0 
         
 
@@ -243,33 +238,84 @@ class Propeller():
         rz = b*t
 
         # tile
-        T = np.tile(T, (2*(self.n-1), 1))
-        N = np.tile(N, (2*(self.n-1), 1))
-        B = np.tile(B, (2*(self.n-1), 1))
-        rx = np.tile(rx, 2*(self.n-1))
-        ry = np.tile(ry, 2*(self.n-1))
-        rz = np.tile(rz, 2*(self.n-1))
+        # T = np.tile(T, (2*(self.n-1), 1))
+        # N = np.tile(N, (2*(self.n-1), 1))
+        # B = np.tile(B, (2*(self.n-1), 1))
+        # rx = np.tile(rx, 2*(self.n-1))
+        # ry = np.tile(ry, 2*(self.n-1))
+        # rz = np.tile(rz, 2*(self.n-1))
+
+        T_1 = np.concatenate([T[1:, :], T[:-1, :]], axis=0)
+        T_1 = np.tile(T_1, (self.n-1, 1))
+        N_1 = np.concatenate([N[1:, :], N[:-1, :]], axis=0)
+        N_1 = np.tile(N_1, (self.n-1, 1))
+        B_1 = np.concatenate([B[1:, :], B[:-1, :]], axis=0)
+        B_1 = np.tile(B_1, (self.n-1, 1))
+
+        rx_1 = np.concatenate([rx[1:], rx[:-1]], axis=0)
+        rx_1 = np.tile(rx_1, self.n-1)
+        ry_1 = np.concatenate([ry[1:], ry[:-1]], axis=0)
+        ry_1 = np.tile(ry_1, self.n-1)
+        rz_1 = np.concatenate([rz[1:], rz[:-1]], axis=0)
+        rz_1 = np.tile(rz_1, self.n-1)
+
+        T_2 = np.concatenate([T[:-1, :], T[1:, :]], axis=0)
+        T_2 = np.tile(T_2, (self.n-1, 1))
+        N_2 = np.concatenate([N[:-1, :], N[1:, :]], axis=0)
+        N_2 = np.tile(N_2, (self.n-1, 1))
+        B_2 = np.concatenate([B[:-1, :], B[1:, :]], axis=0)
+        B_2 = np.tile(B_2, (self.n-1, 1))
+
+        rx_2 = np.concatenate([rx[:-1], rx[1:]], axis=0)
+        rx_2 = np.tile(rx_2, self.n-1)
+        ry_2 = np.concatenate([ry[:-1], ry[1:]], axis=0)
+        ry_2 = np.tile(ry_2, self.n-1)
+        rz_2 = np.concatenate([rz[:-1], rz[1:]], axis=0)
+        rz_2 = np.tile(rz_2, self.n-1)
+
+        # T_2 = np.concatenate([T[1:, :], T[:-1, :]], axis=0)
+        # T_2 = np.tile(T_2, (self.n-1, 1))
+        # N_2 = np.concatenate([N[1:, :], N[:-1, :]], axis=0)
+        # N_2 = np.tile(N_2, (self.n-1, 1))
+        # B_2 = np.concatenate([B[1:, :], B[:-1, :]], axis=0)
+        # B_2 = np.tile(B_2, (self.n-1, 1))
+
+        # rx_2 = np.concatenate([rx[1:], rx[:-1]], axis=0)
+        # rx_2 = np.tile(rx_2, self.n-1)
+        # ry_2 = np.concatenate([ry[1:], ry[:-1]], axis=0)
+        # ry_2 = np.tile(ry_2, self.n-1)
+        # rz_2 = np.concatenate([rz[1:], rz[:-1]], axis=0)
+        # rz_2 = np.tile(rz_2, self.n-1)
+
+
 
         # Original axis 
         origin = np.array([self.position.x, self.position.y, self.position.z])
         direction = -self.azimuth / np.linalg.norm(self.azimuth)
         start = 0
         for i in range(self.NB):
-                end = start+ 2*(self.n-1)*len(t) 
-
+                end = start+ 2*(self.n-1)*(len(t)-1)
                 for i in range(1,3):
+                #for i in range(3,1):
                     ##################################################################
                     v = points[start:end, 3*(i-1):3*i] - origin
                     dir2 = direction @ direction
                     d = v - ((v @ direction)[:, None] / dir2) * direction
                     
-                    d_T = np.einsum('ij,ij->i', d, T)
-                    d_N = np.einsum('ij,ij->i', d, N)
-                    d_B = np.einsum('ij,ij->i', d, B)
+                    # d_T = np.einsum('ij,ij->i', d, T)
+                    # d_N = np.einsum('ij,ij->i', d, N)
+                    # d_B = np.einsum('ij,ij->i', d, B)
+
+                    d_T = np.einsum('ij,ij->i', d, T_1 if i==1 else T_2)
+                    d_N = np.einsum('ij,ij->i', d, N_1 if i==1 else N_2)
+                    d_B = np.einsum('ij,ij->i', d, B_1 if i==1 else B_2)
+
+                    if i ==1 :
+                        points[start: end,  0:3] = d_T[:, None]*T_1 + d_N[:, None]*N_1 + d_B[:, None]*B_1 + np.vstack((rx_1, ry_1, rz_1)).T
+                    else:
+                        points[start: end,  3:6] = d_T[:, None]*T_2 + d_N[:, None]*N_2 + d_B[:, None]*B_2 + np.vstack((rx_2, ry_2, rz_2)).T
                     
-                    points[start:end, 3*(i-1): 3*(i-1)+3] = d_T[:, None]*T + d_N[:, None]*N + d_B[:, None]*B + np.vstack((rx, ry, rz)).T 
-
-
+                    # points[start:end, 3*(i-1): 3*(i-1)+3] = d_T[:, None]*T + d_N[:, None]*N + d_B[:, None]*B + np.vstack((rx, ry, rz)).T 
 
 
 
@@ -376,6 +422,7 @@ class Propeller():
             else:
                 start = main_NB*(n_main-1) + (self.n-1)*self.NB*(self.bodyIndex-1)
                 end = main_NB*(n_main-1) + (self.n-1)*self.NB*self.bodyIndex
+                v_axial = median_filter(v_axial_orig[start:end].copy(), kernel_size=3, times=1)
                 v_axial = v_axial_orig[start:end]
 
 
@@ -385,21 +432,35 @@ class Propeller():
         if v_axial is None:
             #my_U = np.linspace(-1, -3, self.n-1)
             omega = 2*np.pi*self.RPM/60
-            solidity = self.NB*self.chord[:self.n-1].flatten()/(np.pi*self.r[:self.n-1])
+            #solidity = self.NB*self.chord[:self.n-1].flatten()/(np.pi*self.r[:self.n-1])
+            solidity = 0.1
             twist_local = np.radians(self.pitch[:self.n-1])
+
             cla = 0.5
-            inflowratio = solidity*cla/16*(np.sqrt(1 + 32*twist_local/(cla*solidity)) - 1)
+            inflowratio = (solidity*cla/16)*(np.sqrt(1 + 32*twist_local*self.r[:-1]/(cla*solidity)) - 1)
             if self.bodyIndex == 0:
                 my_U = - inflowratio*omega*self.r[:-1] 
             else:
                 my_U = - inflowratio*omega*self.r[:-1] - main_rotor.RPM*0.10472*main_rotor.diameter*0.5
 
-        
+            # plt.close()
+            # plt.ioff()
+            # design = set_bw_design()
+            # print(design)
+            # plt.plot(self.r[:-1], inflowratio, label=r'Initial inflow ratio')
+            # # plot a straight horizontal line indicating ideal inflow ratio
+            # plt.axhline(y=0.02, color=design['colors'][1], linestyle='--', label='Ideal inflow ratio')
+            # plt.xlabel('Radius (m)')
+            # plt.ylabel('Inflow ratio')
+            # plt.legend()
+
+            # plt.show()
         else:
             my_U = v_axial[:self.n-1]
         self.zw = zw
 
         if contraction:
+
             if self.bodyIndex == 0:
                 contTheta = np.linspace(0, 2*np.pi*nrevs, total_steps)
                 if self.Ct is None:
@@ -419,11 +480,15 @@ class Propeller():
             if v_axial is not None:
                 my_U = v_axial[j*(self.n-1):(j+1)*(self.n-1)]
             shift = j*2*np.pi/self.NB
+            print('j, shift', j, shift)
+            print('before extend',np.array(self.collocationPoints).shape)
             if j != 0:
                 R = bu.rotation_matrix(0, 0, shift)
                 self.collocationPoints.extend(R @ self.collocationPoints[:self.n-1])
             else:
                 R = np.eye(3)
+            
+            print('after extend',np.array(self.collocationPoints).shape)
             
             hn = np.arange((j+0)*(self.n-1), (j+1)*(self.n-1))
 
@@ -548,37 +613,13 @@ class Propeller():
         table[:, :6] = points.reshape(-1, 6)
         self.vortexTABLE = table
 
-
+        print(np.array(self.collocationPoints).shape)
         for i in range(self.NB):
             self.collocationPoints[i] = R @ self.collocationPoints[i]
+            print(np.array(self.collocationPoints).shape)
 
 
         self.azimuth = R @ self.azimuth
-
-#####################################################################
-
-    # def rotate(self, delta_x=0, delta_y=0, delta_z=0, extra=False):
-        
-    #     if not extra:
-    #         self.angles = np.array([delta_x, delta_y, delta_z])
-
-    #     R = bu.rotation_matrix(*self.angles)
-
-    #     table = self.vortexTABLE
-
-    #     points = table[:, :6].reshape(-1, 3) 
-    #     points = (R @ points.T).T 
-    #     table[:, :6] = points.reshape(-1, 6)
-    #     self.vortexTABLE = table
-
-
-    #     for i in range(self.NB):
-    #         self.collocationPoints[i] = R @ self.collocationPoints[i]
-
-
-    #     self.azimuth = R @ self.azimuth
-
-####################################################################
 
 
 
@@ -617,7 +658,7 @@ class Drone:
                  small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                  small_props_RPM, small_props_chord, small_props_n, small_props_pitch,
                  mainWakeLength, smallWakeLength, main_U, small_U, main_distribution, 
-                 small_distribution, 
+                 small_distribution, type,
                  helicopter=False, contraction=True, wind=None, reynolds=False, core_size = 1e-5, 
                  blade1_angle=0, downwash=None, wake_bend=False):
         # Main propeller
@@ -643,6 +684,7 @@ class Drone:
         self.small_airfoil = small_airfoil
         self.small_props = []
         self.wind = wind
+        self.type = type
         self.helicopter = helicopter
         self.reynolds = reynolds
         self.total_velocity_vectors = None
@@ -698,27 +740,210 @@ class Drone:
     def display(self, color_main='blue', color_small='green', extra_points=None, extra_lines=None):
         bodies = [self.main_prop] + self.small_props
         colors = [color_main] + [color_small]*len(self.small_props)
+        table_final = self.vortexTABLE
+        #np.savetxt('table_final_blender.txt', table_final)
         bu.scene(bodies, colors, collocation_points = self.total_collocation_points, 
               total_velocity_vectors=self.total_velocity_vectors,
               axial_velocity_vectors=self.axial_velocity, 
               tangential_velocity_vectors=self.tangential_velocity, 
-              extra_points=extra_points, extra_lines=extra_lines)
-        
+              extra_points=extra_points, extra_lines=extra_lines, savefig=True)
+def middle(array):
+    return (array[:-1] + array[1:])*0.5      
+  
+def plot_geometry_only(drone):
+    fig, ax = plt.subplots(1,2, figsize=(12,6))
+    design = set_bw_design()
 
-def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=None):
-    with open(f'./{filename}', 'r') as f:
+    # the left plot contains chord distributions for main and small propeller
+    r_main = drone.main_prop.r
+    R = drone.main_prop.diameter/2
+    r_main = middle(r_main)
+    print(r_main)
+    n_main = drone.main_prop.n
+    chord_main = drone.main_prop.chord[:(n_main)]
+    chord_main = middle(chord_main) 
+    print(len(chord_main))
+    pitch_main = drone.main_prop.pitch[:(n_main-1)]
+    ax[0].plot(r_main/R, chord_main/R, label='Main propeller', color=design['colors'][0])
+    ax[1].plot(r_main/R, pitch_main , label='Main propeller', color=design['colors'][0])
+    if not drone.helicopter:
+        R_small = drone.small_props[0].diameter/2
+        r_small = drone.small_props[0].r
+        r_small = middle(r_small)
+        # map the small propeller chord to the main propeller radius for better visualization
+        n_small = drone.small_props[0].n
+        chord_small = drone.small_props[0].chord[:(n_small)]
+        chord_small = middle(chord_small)
+        pitch = drone.small_props[0].pitch[:(n_small)]
+        ax[0].plot(r_small/R_small, chord_small/R_small, label='Small propeller', color=design['colors'][1])
+        ax[1].plot(r_small/R_small, pitch , label='Small propeller', color=design['colors'][1])
+    ax[0].set_xlabel('r/R')
+    ax[0].set_ylabel('c/R')
+    ax[0].legend()  
+    ax[1].set_xlabel('r/R')
+    ax[1].set_ylabel('Pitch (deg)')
+    ax[1].legend()
+    plt.show()
+
+def parabolic_distribution(root, tip, r, a):
+
+    a = a
+    c = root
+    locR = r[-1] - r[0]
+    b = (tip -c - a*locR*locR)/ locR
+    x = np.linspace(0, locR, len(r))
+    return  a*x**2 + b*x + c
+
+def synthetic_twist_curve(r, beta_root=30, beta_tip=12,
+                          bump_pos=0.2, bump_height=6, noise=False,
+                          seed=None):
+    """
+    Generate a synthetic blade twist curve β(r/R) with typical shape.
+
+    Parameters
+    ----------
+    r : array-like
+        Radial positions, normalized 0..1.
+    beta_root : float
+        Pitch at root (deg).
+    beta_tip : float
+        Pitch at tip (deg).
+    bump_pos : float
+        Position (r/R) of local bump near root.
+    bump_height : float
+        Height of that bump (deg).
+    noise : float
+        Random jitter amplitude (deg).
+    seed : int
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    beta : ndarray
+        β distribution, deg.
+    """
+    rng = np.random.default_rng(seed)
+    r = np.asarray(r)
+
+    # base linear decay
+    beta = beta_root + (beta_tip - beta_root) * r
+
+    # add a Gaussian-like bump near the root
+    beta += bump_height * np.exp(-((r - bump_pos) / 0.1)**2)
+
+    # small random noise
+    if noise > 0:
+        beta += rng.normal(scale=noise, size=r.shape)
+
+    return beta
+
+
+    
+
+# drone = defineDrone('configs/base.json', main_RPM=330, small_RPM=10000, plotGeom=True)
+# plot_geometry_only(drone)
+
+class QuadCopter:
+    def __init__(self, R, prop_hub, prop_diameter, 
+                 prop_NB, prop_pitch, prop_RPM, 
+                 prop_chord, prop_n, wake_length, 
+                 distribution, contraction, downwash, reynolds, main_airfoil, core_size=1e-5):
+        self.R = R
+        self.type= 'quadcopter'
+        self.props = []
+        self.airfoil = main_airfoil
+        self.total_collocation_points = None
+        self.total_velocity_vectors = None
+        self.axial_velocity = None
+        self.tangential_velocity = None
+        self.reynolds = reynolds
+        self.core_size = core_size
+        self.vortexTABLE = None
+        addHSN = 0
+
+        for i in range(4):
+            shift = i*(2*np.pi/4)
+            position = Point(self.R*np.cos(shift), self.R*np.sin(shift), 0.0)
+
+            angles = np.array([0,0, 0])
+
+            prop = Propeller(position, 
+                                angles, 
+                                prop_hub, 
+                                prop_diameter, 
+                                prop_NB,
+                                prop_pitch, 
+                                prop_RPM, 
+                                prop_chord, 
+                                prop_n,
+                                wake_length=wake_length,
+                                distribution=distribution,
+                                bodyIndex=0,
+                                contraction=contraction,
+                                downwash=downwash, )
+            print('i', i, 'colloc shape', np.array(prop.collocationPoints).shape)
+            table = prop.vortexTABLE
+            
+            
+            if i == 0:
+                self.vortexTABLE = prop.vortexTABLE
+            else:
+                addHSN = np.max(self.vortexTABLE[:, -2])
+                table[:, -2] += addHSN+1
+                self.vortexTABLE = np.concatenate((self.vortexTABLE, table), axis=0)
+            self.props.append(prop)
+        self.nPoints = np.max(self.vortexTABLE[:, -2])
+
+    def display(self, color_main='blue', color_small='green', extra_points=None, extra_lines=None):
+        bodies = self.props
+        colors = [color_main]*len(self.props) 
+        table_final = self.vortexTABLE
+        #np.savetxt('table_final_blender.txt', table_final)
+        bu.scene(bodies, colors, collocation_points = self.total_collocation_points, 
+                total_velocity_vectors=self.total_velocity_vectors,
+                axial_velocity_vectors=self.axial_velocity, 
+                tangential_velocity_vectors=self.tangential_velocity, 
+                extra_points=extra_points, extra_lines=extra_lines, savefig=True)
+        
+# def  defineQuad(filename):
+#     with 
+# # n = 15
+# chord = np.ones(n)*0.02
+# pitch = np.linspace(20, 10, n)
+# quad = QuadCopter(R=0.4, prop_hub=0.1, prop_diameter=0.12,
+#                     prop_NB=3, prop_pitch=pitch, prop_RPM=4000,
+#                     prop_chord=chord, prop_n=n, wake_length=10,
+#                     distribution='uniform', contraction=True, downwash=0.0)
+# #quad.display()
+
+
+def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=None, plotGeom=False):
+    helicopter, quadcopter = False, False
+    # if plotGeom:
+    #     filename = f'./{filename}'
+    # else:
+    #     filename = f'./configs/{filename}'
+    with open(f'./configs/{filename}', 'r') as f:
+    #with open(f'./{filename}', 'r') as f:
+    #with open(filename, 'r') as f:
         config = json.load(f)
+
+        LINEAR = config['settings']['linear']
 
         aircraft_type = config['main_propeller']['AIRCRAFT']
 
         if aircraft_type == 'helicopter':
             helicopter = True
+        if aircraft_type == 'quadcopter':
+            helicopter = False
+            quadcopter = True
         else:
             helicopter = False
+        
 
-        main_position = Point(*config['main_propeller']['position'])
-        main_angles = config['main_propeller']['angles']
-        main_hub = config['main_propeller']['hub']
+        main_position = Point(*config['main_propeller']['position']) # general  
+        main_angles = config['main_propeller']['angles']             # general
+        main_hub = config['main_propeller']['hub']                   # general
         main_diameter = config['main_propeller']['diameter']
         main_NB = config['main_propeller']['NB']
         main_n = config['main_propeller']['n']
@@ -728,11 +953,24 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         main_pitch_tip = config['main_propeller']['pitch_tip']
         main_airfoil = config['main_propeller']['airfoil']
         main_wake_length = config['main_propeller']['wake_length']
+        main_r = np.linspace(main_hub, main_diameter/2, main_n)
 
-        main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) #+ main_optimal_AoA
-        main_pitch = np.concatenate([main_pitch]*main_NB)
+        if LINEAR:
+            main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) #+ main_optimal_AoA
+            main_pitch = np.concatenate([main_pitch]*main_NB)
+            main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
+        else:
+        # Pitch distribution
+            pitch_incline = config['settings']['pitch_incline_main']
+            main_pitch = parabolic_distribution(main_pitch_root, main_pitch_tip, main_r, pitch_incline)
+            main_pitch = np.tile((main_pitch[0:-1] + main_pitch[1:])*0.5, main_NB)
+            main_chord_a = config['settings']['main_chord_a']
+            main_chord = parabolic_distribution(main_chord_root, main_chord_tip, main_r, main_chord_a)
 
-        main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
+
+        #main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
+        # Parabolic chord distribution
+        
         main_chord = np.concatenate([main_chord]*main_NB)
 
         if main_U is None:
@@ -743,7 +981,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
 
         
 
-        if helicopter!= True:
+        if aircraft_type == 'drone':
             if small_U is None:
                 small_U = config['small_propellers']['uWake']
             if small_RPM is None:
@@ -763,35 +1001,23 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             
 
             
-            small_pitch_root = config['small_propellers']['pitch_root']
-            small_pitch_tip = config['small_propellers']['pitch_tip']
+            small_twist_root = config['small_propellers']['twist_root']
+            small_twist_tip = config['small_propellers']['twist_tip']
+            small_pitch = config['small_propellers']['pitch']
             small_AoA = config['small_propellers']['AoA']
             small_wake_length = config['small_propellers']['wake_length']
 
-            small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n-1)
+            small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n)
 
             # Pitch distribution
-            pitch_incline = config['settings']['pitch_incline']
-            A = [[small_props_hub**2, small_props_hub, 1],
-                 [small_props_radius**2, small_props_radius, 1],
-                 [small_props_radius*2, 1, 0]]
-            Y = [small_pitch_root, small_pitch_tip, pitch_incline]
-            a, b, c = np.linalg.solve(A, Y)
-            x = np.linspace(small_props_hub, small_props_radius, small_props_n-1)
-            small_props_pitch = a*x**2 + b*x + c
-
-            #small_props_pitch = bu.twistGen(small_pitch_root, small_pitch_tip, small_r, small_AoA)
-            #small_props_pitch = np.linspace(small_pitch_root, small_pitch_tip, small_props_n-1)
-            #small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
-
+            pitch_incline = config['settings']['pitch_incline_small']
+            #small_props_twist = parabolic_distribution(small_twist_root, small_twist_tip, small_r, pitch_incline)
+            small_props_twist = synthetic_twist_curve(small_r/small_r[-1], beta_root=small_twist_root, beta_tip=small_twist_tip,
+                                                    bump_pos=0.2, bump_height=15, noise=0, seed=None)
+            small_props_pitch = middle(small_props_twist)  + small_pitch
             # cmall chord distribution
             small_chord_a = config['settings']['small_chord_a']
-            c = small_chord_root
-            locR = small_props_radius - small_props_hub
-            b = (small_chord_root - small_chord_tip - small_chord_a*locR*locR)/ locR
-            x = np.linspace(0, locR, small_props_n)
-            small_props_chord = small_chord_a*x**2 + b*x + c
-
+            small_props_chord = parabolic_distribution(small_chord_root, small_chord_tip, small_r, small_chord_a)
 
             small_distribution = config['small_propellers']['distribution']
             blade1_angle = config['settings']['blade1_angle']
@@ -809,6 +1035,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             small_distribution = 'cosine'
             blade1_angle = 0
             downwash = None
+            small_airfoil = None
 
 
         contraction = config['settings']['contraction']
@@ -825,14 +1052,30 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         core_size = config['settings']['core_size']
 
         main_distribution = config['main_propeller']['distribution']
+    
+        if quadcopter:
+            drone = QuadCopter(R=main_diameter, prop_hub=main_hub, prop_diameter=main_diameter,
+                                prop_NB=main_NB, prop_pitch=main_pitch, prop_RPM=main_RPM,
+                                prop_chord=main_chord, prop_n=main_n, wake_length=main_wake_length,
+                                distribution=main_distribution, contraction=contraction, downwash=downwash,
+                                reynolds=reynolds, main_airfoil=main_airfoil, core_size=core_size)   
+                               
         
-        drone = Drone(main_position, main_angles, main_hub, main_diameter, 
+        else:
+            drone = Drone(main_position, main_angles, main_hub, main_diameter, 
                                     main_NB, main_pitch, main_RPM, main_chord, main_n, main_airfoil, small_airfoil,
                                     small_props_angle, small_props_diameter, small_props_NB, small_props_hub,
                                     small_RPM, small_props_chord, small_props_n, small_props_pitch,
                                     mainWakeLength=main_wake_length, smallWakeLength=small_wake_length, main_U=main_U, small_U = small_U, 
-                                    main_distribution=main_distribution, small_distribution=small_distribution, 
+                                    main_distribution=main_distribution, small_distribution=small_distribution,
                                     contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size, helicopter=helicopter, blade1_angle=blade1_angle, 
-                                    downwash=downwash, wake_bend=wake_bend)
+                                    downwash=downwash, wake_bend=wake_bend, type= aircraft_type)
 
         return drone
+    
+
+#quad = defineDrone('base_quad.json')
+# print(np.array(quad.props[0].collocationPoints))
+# print(np.array(quad.props[1].collocationPoints))
+# # print(quad.total_collocation_points)
+# quad.display()
