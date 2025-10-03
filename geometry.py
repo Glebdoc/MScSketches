@@ -166,17 +166,15 @@ class Propeller():
             self.r = np.linspace(hub, diameter*0.5 , n)
 
 
-        
-        self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
-        print('original',np.array(self.collocationPoints).shape, 'good')
+        collocationPoints = np.zeros((3, n-1))
+        #self.collocationPoints = [np.vstack((np.zeros(n-1), (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
+        collocationPoints[1,: ] = (self.r[:-1]+self.r[1:])*0.5
+        self.collocationPoints = collocationPoints
+       
         #self.collocationPoints = [np.vstack((self.chord[:n-1]*3/4, (self.r[:-1]+self.r[1:])*0.5, np.zeros(n-1)))]
         self.sigma = np.average(self.NB*self.chord[:n]/(np.pi*self.r))
-                              
-        
+
         self.assemble(main_rotor=main_rotor, contraction=contraction)
-        print('after assemble',np.array(self.collocationPoints).shape)
-
-
         if self.small:
             """
             We first need to rotate around Z to pic a desired blade position with respect to the main rotor.
@@ -203,8 +201,6 @@ class Propeller():
         a = R
         #b = self.angles[1]  # pitch of the helix (rise per radian)
         b= -a*omega*np.tan(np.pi/2 - self.angles[1]) - np.tan(downwash/(omega*R))
-        print(-a*omega*np.tan(np.pi/2 - self.angles[1]), - np.tan(downwash/(omega*R)))
-        print(b)
 
         angle_addition = np.arctan2(0.05, R)
 
@@ -323,9 +319,6 @@ class Propeller():
 
         self.vortexTABLE[:,:6] = points
 
-        
-
-
     def bendSmallWake(self, downwash=False):
 
         """
@@ -385,9 +378,6 @@ class Propeller():
 
         self.vortexTABLE[:,:6] = points
 
-
-
-
     def assemble(self, main_rotor=None, contraction=True):
 
         """
@@ -406,7 +396,7 @@ class Propeller():
         omega = 2*np.pi*self.RPM/60
         length = self.diameter*self.wake_length
         total_time = length/self.U
-        nrevs = total_time*omega/(2*np.pi)
+        nrevs = total_time*abs(omega)/(2*np.pi)
         total_steps = int(nrevs*ppr)
 
         table = []
@@ -416,7 +406,13 @@ class Propeller():
 
         try:
             v_axial_orig = np.genfromtxt('./auxx/v_axial.txt')
+            # check if the length of v_axial_orig is compatible with the current propeller
+            # if len(v_axial_orig) != int((self.n-1)*self.NB):
+            #     v_axial = None 
+            #     # exit the try block
+            #     raise ValueError("Incompatible v_axial length")
             if self.bodyIndex == 0:
+                #print("Using main rotor induced velocity")
                 v_axial = median_filter(v_axial_orig[:self.n-1].copy(), kernel_size=3, times=1)
                 v_axial = np.tile(v_axial, (self.NB))
             else:
@@ -431,7 +427,7 @@ class Propeller():
 
         if v_axial is None:
             #my_U = np.linspace(-1, -3, self.n-1)
-            omega = 2*np.pi*self.RPM/60
+            omega = 2*np.pi*abs(self.RPM)/60
             #solidity = self.NB*self.chord[:self.n-1].flatten()/(np.pi*self.r[:self.n-1])
             solidity = 0.1
             twist_local = np.radians(self.pitch[:self.n-1])
@@ -480,15 +476,14 @@ class Propeller():
             if v_axial is not None:
                 my_U = v_axial[j*(self.n-1):(j+1)*(self.n-1)]
             shift = j*2*np.pi/self.NB
-            print('j, shift', j, shift)
-            print('before extend',np.array(self.collocationPoints).shape)
             if j != 0:
                 R = bu.rotation_matrix(0, 0, shift)
-                self.collocationPoints.extend(R @ self.collocationPoints[:self.n-1])
+                #self.collocationPoints.extend(R @ self.collocationPoints[:self.n-1])
+                rotated_collocs = R @ (self.collocationPoints[:, :self.n-1])
+                self.collocationPoints = np.hstack([self.collocationPoints, rotated_collocs])
             else:
                 R = np.eye(3)
             
-            print('after extend',np.array(self.collocationPoints).shape)
             
             hn = np.arange((j+0)*(self.n-1), (j+1)*(self.n-1))
 
@@ -565,6 +560,7 @@ class Propeller():
 
             Gamma = np.ones((x.shape[0], 1))
 
+
             chunk = np.stack([x[:,0], y[:,0], z[:,0], x[:,1], y[:,1], z[:,1], hn[:, 0], Gamma[:,0]], axis=1)
             table.append(chunk)
 
@@ -588,11 +584,13 @@ class Propeller():
         table[:,5] += translation.z
 
         for i in range(self.NB):
-            collocs = np.array(self.collocationPoints[i])
+            #collocs = np.array(self.collocationPoints[i])
+            collocs = self.collocationPoints[:, i*(self.n - 1) : (i+1)*(self.n - 1)]
             collocs[0,:] += translation.x
             collocs[1,:] += translation.y
             collocs[2,:] += translation.z
-            self.collocationPoints[i] = collocs
+            #self.collocationPoints[i] = collocs
+            self.collocationPoints[:, i*(self.n - 1) : (i+1)*(self.n - 1)] = collocs
 
 
         self.vortexTABLE = table
@@ -613,11 +611,12 @@ class Propeller():
         table[:, :6] = points.reshape(-1, 6)
         self.vortexTABLE = table
 
-        print(np.array(self.collocationPoints).shape)
-        for i in range(self.NB):
-            self.collocationPoints[i] = R @ self.collocationPoints[i]
-            print(np.array(self.collocationPoints).shape)
+        # for i in range(self.NB):
+        #     self.collocationPoints[i] = R @ self.collocationPoints[i]
 
+        for i in range(self.NB):
+            rotated_points = R @ self.collocationPoints[:, i*(self.n - 1) : (i+1)*(self.n - 1)]
+            self.collocationPoints[:, i*(self.n - 1) : (i+1)*(self.n - 1)] = rotated_points
 
         self.azimuth = R @ self.azimuth
 
@@ -697,6 +696,7 @@ class Drone:
         main_R = self.main_prop.diameter/2
         if helicopter==False:
             for i in range(main_NB):
+                sign = (-1)**i
                 shift = i*(2*np.pi/main_NB)
                 position = Point(main_R*np.cos(shift+np.pi/2), main_R*np.sin(shift+np.pi/2), 0.0)
 
@@ -758,11 +758,9 @@ def plot_geometry_only(drone):
     r_main = drone.main_prop.r
     R = drone.main_prop.diameter/2
     r_main = middle(r_main)
-    print(r_main)
     n_main = drone.main_prop.n
     chord_main = drone.main_prop.chord[:(n_main)]
     chord_main = middle(chord_main) 
-    print(len(chord_main))
     pitch_main = drone.main_prop.pitch[:(n_main-1)]
     ax[0].plot(r_main/R, chord_main/R, label='Main propeller', color=design['colors'][0])
     ax[1].plot(r_main/R, pitch_main , label='Main propeller', color=design['colors'][0])
@@ -858,10 +856,13 @@ class QuadCopter:
         self.tangential_velocity = None
         self.reynolds = reynolds
         self.core_size = core_size
+        self.airfoil = main_airfoil
+        self.v_axial = None
         self.vortexTABLE = None
         addHSN = 0
 
         for i in range(4):
+            sign = (-1)**i
             shift = i*(2*np.pi/4)
             position = Point(self.R*np.cos(shift), self.R*np.sin(shift), 0.0)
 
@@ -873,7 +874,7 @@ class QuadCopter:
                                 prop_diameter, 
                                 prop_NB,
                                 prop_pitch, 
-                                prop_RPM, 
+                                sign*prop_RPM, 
                                 prop_chord, 
                                 prop_n,
                                 wake_length=wake_length,
@@ -881,7 +882,6 @@ class QuadCopter:
                                 bodyIndex=0,
                                 contraction=contraction,
                                 downwash=downwash, )
-            print('i', i, 'colloc shape', np.array(prop.collocationPoints).shape)
             table = prop.vortexTABLE
             
             
@@ -934,12 +934,11 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
 
         if aircraft_type == 'helicopter':
             helicopter = True
-        if aircraft_type == 'quadcopter':
+        elif aircraft_type == 'quadcopter':
             helicopter = False
             quadcopter = True
         else:
             helicopter = False
-        
 
         main_position = Point(*config['main_propeller']['position']) # general  
         main_angles = config['main_propeller']['angles']             # general
@@ -966,6 +965,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             main_pitch = np.tile((main_pitch[0:-1] + main_pitch[1:])*0.5, main_NB)
             main_chord_a = config['settings']['main_chord_a']
             main_chord = parabolic_distribution(main_chord_root, main_chord_tip, main_r, main_chord_a)
+            main_chord = middle(main_chord)
 
 
         #main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
@@ -1052,9 +1052,9 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         core_size = config['settings']['core_size']
 
         main_distribution = config['main_propeller']['distribution']
-    
+        prop_diameter = 0.25
         if quadcopter:
-            drone = QuadCopter(R=main_diameter, prop_hub=main_hub, prop_diameter=main_diameter,
+            drone = QuadCopter(R=main_diameter, prop_hub=main_hub, prop_diameter=prop_diameter,
                                 prop_NB=main_NB, prop_pitch=main_pitch, prop_RPM=main_RPM,
                                 prop_chord=main_chord, prop_n=main_n, wake_length=main_wake_length,
                                 distribution=main_distribution, contraction=contraction, downwash=downwash,

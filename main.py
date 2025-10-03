@@ -264,8 +264,11 @@ def main(RPM_MAIN, RPM_SMALL, config=None, savePath=None, plot=True):
 def nested_optimization(config, x_0, bounds, results=False, savePlots=False, saveInnerLog=None):   
     """
     Hardoced optimization of RPM_MAIN and RPM_SMALL using double bisection and the STALL check. 
-
+    supports all 3 configurations: helicopter, quadcopter and octocopter.
     """
+    # Determine aircraft type
+    print('Determining aircraft type...')
+    print(config)
     # Initial guess + initialbounds 
     RPM_MAIN, RPM_SMALL = x_0
     lowerBoundMain, upperBoundMain = bounds[0]
@@ -378,6 +381,7 @@ def nested_optimization(config, x_0, bounds, results=False, savePlots=False, sav
     return RPM_MAIN, RPM_SMALL, thrust, torque, power_required, createdMoment, STALL_FACTOR
 
 if __name__ == "__main__":
+    pass
     #main(RPM_MAIN=400, RPM_SMALL=7445, config=None, savePath='./DesignSpace/main_simple')
     # # start_time = time.time()
     # # x_0 = [400, 9500]  # Initial guess for RPM_MAIN and RPM_SMALL
@@ -385,5 +389,23 @@ if __name__ == "__main__":
     # # nested_optimization(x_0=x_0, bounds=bounds, config=None, results=False, savePlots=False, saveInnerLog='./DesignSpace/main_simple', )
     # # end_time = time.time()
     # # print(f"Execution time: {end_time - start_time:.2f} seconds")
+    #quad = defineDrone('base_quad.json')
     quad = defineDrone('base_quad.json')
-    Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial, STALL_TUPLE = solve(quad)
+    Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial, STALL_TUPLE = solve(quad, case='base_quad.json', save=True, savePath='DesignSpace/quad_simple')
+    plt.ioff()
+    plt.plot(Gammas[:quad.props[0].n], label='Main prop')
+    npM = quad.props[0].NB * (quad.props[0].n - 1)
+    plt.plot(Gammas[npM:npM+quad.props[0].n-1], label='Second prop')
+    plt.plot(Gammas[2*npM:2*npM+quad.props[0].n-1], label='Third prop')
+    plt.plot(Gammas[3*npM:3*npM+quad.props[0].n-1], label='Fourth prop')
+    plt.legend()
+    plt.show()
+    # det the field 
+    # data = np.loadtxt('./DesignSpace/quad_simple/_res.csv', delimiter=',', skiprows=1)
+    # quad.display()
+    # #u, v, w, mag = computeVelocityField(data, points=None, plane='XY', discretization=10, plotting=True)
+    #nested_optimization(config='base_helicopter.json', x_0=[400, 8000], bounds=[(300, 500), (7000, 12000)], results=False, savePlots=True, saveInnerLog='./DesignSpace/helicopter_simple')
+    # helicopter = defineDrone('base_helicopter.json')
+    # Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial, STALL_TUPLE = solve(helicopter, case='base_helicopter.json', save=True, savePath='DesignSpace/helicopter_simple')
+    # drone = defineDrone('base.json')
+    # Gammas, FM, created_moment, Torque, Thrust, power_required, induced_power, profile_power, v_axial, STALL_TUPLE = solve(drone, case='base.json', save=True, savePath='DesignSpace/main_simple')

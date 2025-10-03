@@ -510,6 +510,25 @@ def propellerAzimuthalAnimation(
 #design_map(refine=3)
 
 def circular_patch(center, radius, n_r=30, n_theta=100, plane='YZ', return_edges=False):
+    """
+    Create a circular patch mesh (structured grid in polar coords) in a specified plane.
+    
+    Parameters
+    ----------
+    center : tuple of float
+        (x0, y0, z0) coordinates of the circle center.
+    radius : float
+        Circle radius.
+    n_r : int
+        Radial resolution (number of points in r).
+    n_theta : int
+        Angular resolution (number of points in theta).
+    plane : str
+        Plane of the circle: 'YZ' or 'XY'.
+    return_edges : bool
+        If True, also return edge grids (for visualization/meshing).
+    """
+
     x0, y0, z0 = center
     # centers
     r  = np.linspace(0, radius, n_r)
@@ -520,8 +539,19 @@ def circular_patch(center, radius, n_r=30, n_theta=100, plane='YZ', return_edges
         X = np.full_like(R, x0)
         Y = y0 + R*np.cos(TH)
         Z = z0 + R*np.sin(TH)
+
+    elif plane == 'XY':
+        X = x0 + R*np.cos(TH)
+        Y = y0 + R*np.sin(TH)
+        Z = np.full_like(R, z0)
+    
+    elif plane == 'XZ':
+        X = x0 + R*np.cos(TH)
+        Y = np.full_like(R, y0)
+        Z = z0 + R*np.sin(TH)
+
     else:
-        raise NotImplementedError("add XY/XZ if needed")
+        raise NotImplementedError("Only 'YZ' and 'XY' planes are implemented")
 
     if not return_edges:
         return X, Y, Z
@@ -536,12 +566,23 @@ def circular_patch(center, radius, n_r=30, n_theta=100, plane='YZ', return_edges
         Y_e = y0 + R_e*np.cos(TH_e)
         Z_e = z0 + R_e*np.sin(TH_e)
 
+    elif plane == 'XY':
+        X_e = x0 + R_e*np.cos(TH_e)
+        Y_e = y0 + R_e*np.sin(TH_e)
+        Z_e = np.full_like(R_e, z0)
+    
+    elif plane == 'XZ':
+        X_e = x0 + R_e*np.cos(TH_e)
+        Y_e = np.full_like(R_e, y0)
+        Z_e = z0 + R_e*np.sin(TH_e)
+
     return (X, Y, Z), (X_e, Y_e, Z_e)
 
 
 
 
-def velocity_field_around_propeller(batch, steps):
+def velocity_field_around_propeller(batch, steps, center, radius, plane,
+                                    variable='mag', title=None, dark_mode=False):
 
     batch_path = f'./DesignSpace/{batch}'
 
@@ -549,12 +590,12 @@ def velocity_field_around_propeller(batch, steps):
     fields_path = os.path.join(batch_path, "Fields")
     os.makedirs(fields_path, exist_ok=True)
 
-    # Build circular YZ grid once
+    # Build circular grid once
     (Xc, Yc, Zc), (Xe, Ye, Ze) = circular_patch(
-        center=(-0.1, 1.0, 0.0),
-        radius=0.1,
-        n_r=50, n_theta=360,
-        plane='YZ',
+        center=(center[0], center[1], center[2]),
+        radius=radius,
+        n_r=90, n_theta=360,
+        plane=plane,
         return_edges=True
     )
     pts = np.column_stack((Xc.ravel(), Yc.ravel(), Zc.ravel()))
@@ -562,35 +603,94 @@ def velocity_field_around_propeller(batch, steps):
     for i in range(steps):
         dp_dir = os.path.join(batch_path, f'DP{i}')
         data = np.loadtxt(os.path.join(dp_dir, 'table_final.txt'))
+        gammas = np.loadtxt(os.path.join(dp_dir, '_gammas.txt'))
 
         # Compute velocities
-        u, v, w = computeVelocityField(data, pts, plane='YZ')
+        u, v, w = computeVelocityField(data, pts, gammas, plane=plane)
+        w = w  # Invert Z velocity if needed
         U = u.reshape(Xc.shape)
         V = v.reshape(Xc.shape)
         W = w.reshape(Xc.shape)
         mag = np.sqrt(U**2 + V**2 + W**2)
 
-        # Plot
+        if variable.lower() == 'u':
+            mag = U
+        elif variable.lower() == 'v':
+            mag = V
+        elif variable.lower() == 'w':
+            mag = W
+        elif variable.lower() == 'mag':
+            pass
+        else:
+            raise ValueError(f"Unsupported variable: {variable}. Use 'U', 'V', 'W', or 'mag'")
+
+        # Create plot
         fig, ax = plt.subplots(figsize=(7, 6))
-        pcm = ax.pcolormesh(Ye, Ze, mag, shading='auto', cmap='jet')
-        fig.colorbar(pcm, ax=ax, label='Velocity Magnitude (m/s)')
 
-        step = 3
-        ax.quiver(Yc[::step, ::step], Zc[::step, ::step],
-                  V[::step, ::step], W[::step, ::step],
-                  scale=None, width=0.002)
+        # Switch to dark background if required
+        if dark_mode:
+            fig.patch.set_facecolor('black')
+            ax.set_facecolor('black')
+            ax.tick_params(colors='white')
+            for spine in ax.spines.values():
+                spine.set_color('white')
+            text_color = 'white'
+        else:
+            text_color = 'black'
 
-        ax.set_xlabel('Y (m)')
-        ax.set_ylabel('Z (m)')
+        # Plot depending on plane
+        if plane == 'YZ':
+            pcm = ax.pcolormesh(Ye, Ze, mag, shading='auto', cmap='jet')
+            fig.colorbar(pcm, ax=ax, label='Velocity Magnitude (m/s)')
+
+            step = 3
+            ax.quiver(Yc[::step, ::step], Zc[::step, ::step],
+                      V[::step, ::step], W[::step, ::step],
+                      scale=None, width=0.002, color=text_color)
+
+            ax.set_xlabel('Y (m)', color=text_color)
+            ax.set_ylabel('Z (m)', color=text_color)
+            ax.set_title(f'YZ velocity slice (DP {i})', color=text_color)
+
+        elif plane == 'XY':
+            pcm = ax.pcolormesh(Xe, Ye, mag, shading='auto', cmap='jet')
+            fig.colorbar(pcm, ax=ax, label='Velocity Magnitude (m/s)')
+
+            step = 3
+            ax.quiver(Xc[::step, ::step], Yc[::step, ::step],
+                      U[::step, ::step], V[::step, ::step],
+                      scale=None, width=0.002, color=text_color)
+
+            ax.set_xlabel('X (m)', color=text_color)
+            ax.set_ylabel('Y (m)', color=text_color)
+            ax.set_title(f'XY velocity slice (DP {i})', color=text_color)
+
+        elif plane == 'XZ':
+            pcm = ax.pcolormesh(Xe, Ze, mag, shading='auto', cmap='jet')
+            fig.colorbar(pcm, ax=ax, label='Velocity Magnitude (m/s)')
+
+            step = 3
+            ax.quiver(Xc[::step, ::step], Zc[::step, ::step],
+                      U[::step, ::step], W[::step, ::step],
+                      scale=None, width=0.002, color=text_color)
+
+            ax.set_xlabel('X (m)', color=text_color)
+            ax.set_ylabel('Z (m)', color=text_color)
+            ax.set_title(f'XZ velocity slice (DP {i})', color=text_color)
+
+        else:
+            raise ValueError(f"Unsupported plane: {plane}. Use 'XY', 'YZ', or 'XZ'")
+
         ax.set_aspect('equal')
-        ax.set_title(f'YZ velocity slice (DP {i})')
 
         # Save into Fields folder
-        out_png = os.path.join(fields_path, f'DP{i}_field.png')
-        fig.savefig(out_png, dpi=150, bbox_inches='tight')
+        suffix = "dark" if dark_mode else "light"
+        out_png = os.path.join(fields_path, f'DP{i}_{plane}_field_{title}_{suffix}.png')
+        fig.savefig(out_png, dpi=150, bbox_inches='tight', facecolor=fig.get_facecolor())
         plt.close(fig)
 
         print(f"Saved {out_png}")
+
 
 
 
@@ -631,8 +731,43 @@ def stitch_velocity_fields(batch: str,
     print(f"Saved GIF: {out_path.resolve()} ({len(frames)} frames @ {fps} fps)")
 
 #propellerAzimuthalStudy('azimuth_for_field', 'settings', 'blade1_angle', 0, 360, 100, updatedata=True, twist=False)
+# RADIUS = 0.5
+# VARIABLE = 'W'
+# TITLE = 'full_W'
+# CENTER = (0.0, 0.0, 0.0)
+# DARKMODE = True
+# # velocity_field_around_propeller('quad_simple', 1, center=(0.0, 0.0, 0.0), radius=RADIUS, plane='YZ', variable='W', title="W")
+# # velocity_field_around_propeller('quad_simple', 1, center=(0.0, 0.0, 0.0), radius=RADIUS, plane='XZ', variable='W', title="W")
+# # velocity_field_around_propeller('quad_simple', 1, center=(0.0, 0.0, 0.0), radius=RADIUS, plane='XY', variable='W', title="W")
 
-#velocity_field_around_propeller('azimuth_for_field', 100)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='YZ', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='XZ', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='XY', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
+
+# RADIUS = 0.5
+# VARIABLE = 'U'
+# TITLE = 'full_U'
+# CENTER = (0.0, 0.0, 0.0)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='YZ', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='XZ', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='XY', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
+
+# RADIUS = 0.5
+# VARIABLE = 'V'
+# TITLE = 'full_V'
+# CENTER = (0.0, 0.0, 0.0)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='YZ', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='XZ', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
+# velocity_field_around_propeller('quad_simple', 1, center=CENTER, radius=RADIUS, plane='XY', 
+#                                 variable=VARIABLE, title=TITLE, dark_mode=DARKMODE)
 
 # stitch_velocity_fields(
 #     batch="azimuth_for_field",
@@ -778,17 +913,49 @@ def stitch_cached_pngs_to_gif(batch: str, gif_name: str = "fields.gif", fps: int
 #propellerAzimuthalStudy('azimuth_for_field', 'settings', 'blade1_angle', 0, 360, 100, updatedata=True, twist=False)
 #propellerAzimuthalStudy('azimuth_for_field_sm15', 'settings', 'blade1_angle', 0, 360, 100, updatedata=True, twist=False)
 
-propellerAzimuthalAnimation(
-    'azimuth_new_dist_reFalse',
-    'settings', 'blade1_angle',
-    0, 360, 100,
-    updatedata=False,
-    twist=False,
-    save_anim="DesignSpace/azimuth_new_dist_reFalse_noItsTrue.gif",
-    fps=12,
-    trail=1,
-    black=True
-)
+#propellerAzimuthalAnimation(
+#     'azimuth_new_dist_reFalse',
+#     'settings', 'blade1_angle',
+#     0, 360, 100,
+#     updatedata=False,
+#     twist=False,
+#     save_anim="DesignSpace/azimuth_new_dist_reFalse_noItsTrue.gif",
+#     fps=12,
+#     trail=1,
+#     black=True
+# )
 
 #propellerAzimuthalStudy('azimuth_new_dist_reFalse', 'settings', 'blade1_angle', 0, 360, 100, updatedata=True, twist=False)
 #naccelle_exploration('main_chord_a_1m','settings', 'main_chord_a', -2, -1, 3)
+
+
+
+def powerMap():
+
+    """
+    Key design variables for each configuration: 
+
+        Drone 
+            - diameter (dependent)
+            - propeller diameter  
+            - blade pitch
+            - blade twist
+            - airfoil main 
+            - NB
+
+        Helicopter 
+            - diameter (dependent)
+            - AR 
+            - blade pitch
+            - blade twist
+            - airfoil 
+            - NB 
+
+        Quadcopter
+            - diagonal  
+            - rotor diameter (dependent)
+            - blade pitch
+            - blade twist 
+            - airfoil 
+            - AR             
+    """

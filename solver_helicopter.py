@@ -1,0 +1,185 @@
+from solver_base import BaseSolver
+import numpy as np 
+import xfoilUtil as xf
+from matplotlib import pyplot as plt
+from geometry import defineDrone
+import json
+
+
+class HelicopterSolver(BaseSolver):
+    def __init__(self, aircraft) -> None:
+        super().__init__(aircraft)
+    def compute_number_of_points(self):
+        main_NB = self.aircraft.main_prop.NB
+        main_n = self.aircraft.main_prop.n
+        npM = main_NB * (main_n-1)
+        
+        self.main_NB = main_NB
+        self.main_n = main_n
+        self.npM = npM
+        self.collocN = npM
+    def compute_collocation_points(self):
+        main_NB = self.main_NB
+        main_n = self.main_n
+        npM = self.npM
+
+        mainCollocPoints = np.zeros((npM, 3))
+        main_colloc = np.array(self.aircraft.main_prop.collocationPoints)
+        for i in range(main_NB):
+            mainCollocPoints[i * (main_n - 1):(i + 1) * (main_n - 1)] = main_colloc[i].T
+        return mainCollocPoints
+    def compute_azimuth_and_origin(self):
+        collocN = self.collocN
+        npM = self.npM
+        drone = self.aircraft
+        n_azimuth = np.zeros((collocN, 3))
+        n_origin = np.zeros((collocN, 3))
+
+        n_azimuth[:npM] = np.tile(drone.main_prop.azimuth, (npM, 1))
+        n_origin[:npM] = np.array([drone.main_prop.origin.x, drone.main_prop.origin.y, drone.main_prop.origin.z])
+        self.n_azimuth = n_azimuth
+        self.n_origin = n_origin
+    def compute_twist(self):
+        collocN = self.collocN
+        npM = self.npM
+        drone = self.aircraft
+        twist = np.zeros((collocN, 1))
+        twist[:npM, 0] = drone.main_prop.pitch
+        self.twist = twist
+    def compute_omega(self):
+        drone = self.aircraft
+        omega = np.ones((self.collocN, 1))* (drone.main_prop.RPM*2*np.pi/60)
+        self.omega = omega
+    def compute_chords(self):
+        collocN = self.collocN
+        npM = self.npM
+        main_NB = self.main_NB
+        main_n = self.main_n
+        drone = self.aircraft
+
+        chords = np.zeros((collocN, 1)) 
+        ch_mid = 0.5*(drone.main_prop.chord[1:main_n] + drone.main_prop.chord[:main_n-1]) # Chords corresponding to the control points of the main prop
+        chords[:npM, 0] = np.tile(ch_mid, (main_NB))
+        self.chords = chords
+    
+    def compute_v_rotational(self):
+        npM = self.npM
+        total_colloc_points = self.total_colloc_points
+        Omega = self.omega[0]
+        drone = self.aircraft
+        azimuthVector = drone.main_prop.azimuth
+        v_rotational_main = np.cross(total_colloc_points[:npM], azimuthVector*Omega)
+        self.v_rotational = v_rotational_main
+
+    def set_airfoil_array(self):
+        npM = self.npM
+        main_airfoil = self.aircraft.main_prop.airfoil
+
+        airfoil_array = np.array([main_airfoil]*npM)
+        self.airfoil_array = airfoil_array
+
+    def compute_r_steps(self):
+        drone = self.aircraft
+        main_NB = self.main_NB
+        r_main =  drone.main_prop.r
+        r_main = (r_main[1:] - r_main[:-1])
+        r_main = np.tile(r_main, (main_NB))
+        self.r_steps = r_main
+
+    def compute_r(self):
+        drone = self.aircraft
+        main_NB = self.main_NB
+        r_main =  drone.main_prop.r
+        r_main = 0.5*(r_main[1:] + r_main[:-1])
+
+        r_main = np.tile(r_main, (main_NB))
+        self.r = r_main
+
+    def compute_forces(self):
+        # F axial 
+        f_axial = self.lift * np.cos(self.inflowangle.flatten()) - self.drag * np.sin(self.inflowangle.flatten())
+        # F tangential
+        f_tan = self.lift * np.sin(self.inflowangle.flatten()) + self.drag * np.cos(self.inflowangle.flatten())
+        # Thrust helicopter 
+        thrust= np.sum(f_axial)
+        # Torque helicopter 
+        torque = np.sum(f_tan*self.r)
+        # induced power
+        p_induced = (-self.v_axial.flatten() * f_axial.flatten()).sum()
+        # Profile power 
+        p_profile = np.sum(0.5*1.225*(abs(self.omega).flatten()*self.r.flatten())**3 * self.Cd0.flatten()*self.r_steps.flatten()*self.chords.flatten())
+        # Total power
+        p_total = p_induced + p_profile
+        # Ideal power
+        p_ideal = thrust * np.sqrt(abs(thrust)/(2*(self.aircraft.main_prop.diameter**2)*np.pi*1.225/4))
+        # Power loading 
+        power_loading = thrust/p_total
+        # Figure of merit
+        figure_of_merit = p_ideal/p_total
+
+        # save 
+        self.f_axial = f_axial
+        self.f_tan = f_tan
+        self.thrust = thrust
+        self.torque = torque
+        self.p_induced = p_induced
+        self.p_profile = p_profile
+        self.p_total = p_total
+        self.p_ideal = p_ideal
+        self.power_loading = power_loading
+        self.figure_of_merit = figure_of_merit
+  
+    def save_results(self, path):
+        header_names = [
+            "r", "v_axial", "v_tangential", "inflowangle", "alpha",
+            "f_axial", "f_tan", "gammas", "Cl", "Cd", "chords", "twist"
+        ]
+
+        # build structured array
+        data = np.core.records.fromarrays([
+            self.r.flatten(),
+            self.v_axial.flatten(),
+            self.v_tangential.flatten(),
+            self.inflowangle.flatten(),
+            self.alpha.flatten(),
+            self.f_axial.flatten(),
+            self.f_tan.flatten(),
+            self.gammas.flatten(),
+            self.Cl.flatten(),
+            self.Cd.flatten(),
+            self.chords.flatten(),
+            self.twist.flatten()
+        ], names=",".join(header_names))
+
+        np.savez_compressed(f"{path}/_res.npz", data=data)
+        print(f"Saved structured results to {path}/_res.npz")
+
+        # Store performance metrics 
+        performance = {
+            "thrust": self.thrust,
+            "torque": self.torque,
+            "p_induced": self.p_induced,
+            "p_profile": self.p_profile,
+            "p_total": self.p_total,
+            "p_ideal": self.p_ideal,
+            "power_loading": self.power_loading,
+            "figure_of_merit": self.figure_of_merit
+        }
+
+        with open(f"{path}/performance.json", "w") as f:
+            json.dump(performance, f, indent=4)
+
+    def plot(self):
+        data = np.load('_res.npz')
+        data = data['data']
+        r = data['r']
+        alpha = data['alpha']
+        main_n = self.main_n
+
+        plt.plot(r[:main_n-1], alpha[:main_n-1], label='Main prop')
+        plt.show()
+# if __name__ == "__main__":
+#     drone = defineDrone('./base_helicopter.json',main_RPM=400)
+#     solver = HelicopterSolver(drone)
+#     solver.solve()
+#     solver.plot()

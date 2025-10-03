@@ -1071,3 +1071,5 @@ def mainRotorForcesUpdated(ll_files, save_plots=False):
 
 #mainRotorForcesUpdated(['drone8040_mp_blade1_angle0'])
 #mainRotorForcesUpdated(['inProgress2', 'inProgress3'])
+
+

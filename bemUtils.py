@@ -179,8 +179,8 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
             coll_points = []
             start_index = 0
 
-            for c in range(len(body.collocationPoints)):
-                coll_points.extend(body.collocationPoints[c].T)
+            
+            coll_points.extend(body.collocationPoints.T)
                  
 
             for i in range(body.vortexTABLE.shape[0]):
@@ -221,8 +221,15 @@ def twistGen(in_hub, in_tip, r, AoA):
     twist = k/r + m
     return twist
 
-def computeVelocityField(data, points, plane='YZ', shift=0, discretization=50, plotting=False):
+def computeVelocityField(data, points, gammas, plane='YZ', shift=0, discretization=50, plotting=False):
     vortexTable = data
+    for i in range(len(vortexTable)):
+        hsn = int(vortexTable[i,-2])
+        vortexTable[i,7] = gammas[hsn]
+
+    print('Gammas:', gammas)
+    print('Updated table:', vortexTable[:20, -1])
+
 
     # --- Decide the sampling mode ---
     if points is not None:
