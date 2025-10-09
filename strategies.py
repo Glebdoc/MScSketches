@@ -9,12 +9,13 @@ import json
 
 
 class DroneStrategy:
-    """Glue code for your 'main + small props' drone."""
-    def build_aircraft(self, config, main_RPM, small_RPM: Dict | str) -> Any:
+    def build_aircraft(self, config, main_RPM, small_RPM: dict | str) -> Any:
         return defineDrone(config, main_RPM=main_RPM, small_RPM=small_RPM)
 
-    def build_solver(self, aircraft: Any) -> Any:
-        return DroneSolver(aircraft)
+    def build_solver(self, aircraft: Any, output_dir: str = ".") -> Any:
+        if output_dir is None:
+            raise ValueError("output_dir must be specified for DroneSolver.")
+        return DroneSolver(aircraft, output_dir=output_dir)
 
     def apply_rpms(self, aircraft: Any, rpm_main: float, rpm_aux: float = 0.0) -> None:
         aircraft.main_prop.RPM = rpm_main

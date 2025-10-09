@@ -1,0 +1,19 @@
+Manufacturer,Model,MTOW [kg],Max Payload [kg],# Props,Prop Diameter [m],DL,Notes
+DJI,Matrice 350 RTK,9.2,2.7,4,0.431,15.7646166466098,4× DJI 1760 props; same as M300
+DJI,Matrice 300 RTK,9,2.7,4,0.431,15.4219075890748,4× DJI 1760 CW/CCW carbon props
+DJI,Matrice 210 V2,6.14,1.34,4,0.381,13.4638277579272,4× 1550 props; TB55 batteries
+DJI,Matrice 200 V2,6.14,1.45,4,0.381,13.4638277579272,Identical to 210 V2 except payload layout
+DJI,Matrice 210 RTK V2,6.14,1.23,4,0.381,13.4638277579272,Adds RTK antenna module
+Freefly,Astro Max,8.7,3,4,0.381,19.0774106667699,4× T-Motor props (folding carbon)
+Freefly,Astro,8.7,1.5,4,0.33,25.4297154251513,Cine mapping version
+DJI,Inspire 2,4,0.6,4,0.385,8.58991091067744,4× 3512 motors; 1550 props
+Quantum Systems,Trinity F90+ (eVTOL hover mode),8,1,4,0.305,27.3741369467382,Hybrid VTOL; hover rotors ~12 in
+AgEagle,eBee X VTOL,7.8,1,4,0.3,27.5868568025952,Mapping VTOL quadcopter; light payload
+JOUAV,CW-15 (quadcopter version),9,3,4,0.4,17.9049310978382,Industrial survey drone ≤ 10 kg
+Acecore,Zoe,8.2,2.5,4,0.39,17.1606907738796,Inspection / cinematography platform
+Foxtech,GAIA 160 Hybrid,9.5,4,4,0.4,18.8996494921626,Gas-electric hybrid; carbon arms
+Skyfront,Perimeter 8 Lite (quad variant),9.5,3.5,4,0.42,17.1425392219162,Heavy-lift variant under 10 kg
+MMC UAV,Griflion M10,9.8,3,4,0.38,21.6027485083182,Long-endurance Li-ion platform
+IdeaForge,RQ-35 Heidrun (Light Recon),7.2,1.2,4,0.33,21.0452817311597,Recon platform with EO/IR payload
+AeroVironment,Quantix Recon,5,0.45,4,0.3,17.6838825657661,eVTOL survey system (quad lift motors)
+DroneVolt,Hercules 20,9.5,3,4,0.4,18.8996494921626,Industrial inspection quad drone

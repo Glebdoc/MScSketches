@@ -13,7 +13,7 @@
             0
         ],
         "GEOMETRY": "__",
-        "airfoil": "eppler560",
+        "airfoil": "NACA_0012",
         "hub": 0.1,
         "diameter": 2.0,
         "NB": 3,
@@ -35,7 +35,7 @@
         "POSITIONING": "__",
         "angle": 90,
         "GEOMETRY": "__",
-        "diameter": 0.16,
+        "diameter": 0.15,
         "airfoil": "NACA_0012",
         "NB": 3,
         "chord_root": 0.005,
@@ -48,8 +48,8 @@
         "OPERATION": "__",
         "rpm": 10000,
         "REFINEMENT": "__",
-        "n": 20,
-        "wake_length": 4,
+        "n": 30,
+        "wake_length": 1,
         "INITIAL": "__",
         "uWake": 3,
         "distribution": "uniform"

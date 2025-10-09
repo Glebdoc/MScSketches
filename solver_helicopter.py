@@ -9,6 +9,7 @@ import json
 class HelicopterSolver(BaseSolver):
     def __init__(self, aircraft) -> None:
         super().__init__(aircraft)
+        self.main_RPM = None
     def compute_number_of_points(self):
         main_NB = self.aircraft.main_prop.NB
         main_n = self.aircraft.main_prop.n
@@ -128,6 +129,10 @@ class HelicopterSolver(BaseSolver):
         self.p_ideal = p_ideal
         self.power_loading = power_loading
         self.figure_of_merit = figure_of_merit
+    
+    def check_stall(self):
+        self.STALL_HIGH = np.sum(self.alpha>=15)/self.alpha.shape[0]
+        self.STALL_LOW = np.sum(self.alpha<=-5)/self.alpha.shape[0]
   
     def save_results(self, path):
         header_names = [
@@ -154,6 +159,10 @@ class HelicopterSolver(BaseSolver):
         np.savez_compressed(f"{path}/_res.npz", data=data)
         print(f"Saved structured results to {path}/_res.npz")
 
+        # compute disk area 
+        A = np.pi * (self.aircraft.main_prop.diameter / 2) ** 2
+        DL = self.thrust / A  # Disk Loading
+
         # Store performance metrics 
         performance = {
             "thrust": self.thrust,
@@ -163,7 +172,11 @@ class HelicopterSolver(BaseSolver):
             "p_total": self.p_total,
             "p_ideal": self.p_ideal,
             "power_loading": self.power_loading,
-            "figure_of_merit": self.figure_of_merit
+            "figure_of_merit": self.figure_of_merit,
+            "STALL_HIGH": self.STALL_HIGH,
+            "STALL_LOW": self.STALL_LOW,
+            "main_RPM": self.main_RPM,
+            "disk_loading": DL
         }
 
         with open(f"{path}/performance.json", "w") as f:

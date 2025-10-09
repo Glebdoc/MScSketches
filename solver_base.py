@@ -28,7 +28,7 @@ class BaseSolver:
         self.preloaded_data = preload_airfoil_data()
         self.REYNOLDS = aircraft.reynolds
         self.total_colloc_points = self.compute_collocation_points()
-        self.compute_influence_matrices(plot=True)
+        self.compute_influence_matrices(plot=False)
         self.compute_azimuth_and_origin()
         self.compute_twist()
         self.compute_omega()
@@ -72,11 +72,7 @@ class BaseSolver:
         self.v_influences = v_influences
         self.w_influences = w_influences
 
-        if plot:
-            plt.imshow(w_influences)
-            plt.show()
-    
-        
+
 
     def solve(self, weight=0.05, tolerance=1e-8, max_iterations=3_000):
         err = 1.0 
@@ -101,7 +97,7 @@ class BaseSolver:
         while (err > tolerance and iter<max_iterations):
             iter+=1
             if iter % 200 == 0:
-                print(f'Weight: {weight} Iter:{iter} Error:{err:.4f}')
+                #print(f'Weight: {weight} Iter:{iter} Error:{err:.4f}')
                 weight -= weight*0.01
                 weight = max(weight, 0.03)
             u = u_influences@self.gammas 
@@ -121,6 +117,7 @@ class BaseSolver:
             
             v_tangential = np.sum(vel_total * tan_direction, axis=1)
             v_mag = np.sqrt(v_axial**2 + v_tangential**2)
+            v_mag[v_mag > 300] = 300  # Cap velocity to avoid numerical issues
             Re = 1.225*v_mag.flatten()*chords.flatten()/1.81e-5
             inflowangle = np.arctan(-v_axial/v_tangential)
 
@@ -146,12 +143,16 @@ class BaseSolver:
             print(f"Warning: Maximum iterations reached ({max_iterations}) with error {err:.4f}")   
             #print(f'{self.name} Converged in {iter} iterations with error {err}')
         
-        np.savetxt('./auxx/v_axial.txt', v_axial)
+        #np.savetxt('./auxx/v_axial.txt', v_axial)
+        np.savetxt(f'{self.output_dir}/v_axial.txt', v_axial)
+        #print('Saved v_axial to', f'{self.output_dir}/v_axial.txt')
 
         Lift = 0.5 * 1.225 * Cl.flatten() * (v_mag.flatten()**2) * chords.flatten() * r_steps.flatten()
         Drag = 0.5 * 1.225 * Cd.flatten() * (v_mag.flatten()**2) * chords.flatten() * r_steps.flatten()
         _, Cd0 = xf.getPolar_batch(Re, np.zeros((alpha.shape[0], 1)), airfoil_array, preloaded_data)
+        _, alpha_cl32cd = xf.get_cl32cd_batch(Re, airfoil_array, preloaded_data)
         # save results
+        self.alpha_cl32cd = alpha_cl32cd
         self.gammas = gammas
         self.v_axial = v_axial
         self.v_tangential = v_tangential
@@ -167,6 +168,5 @@ class BaseSolver:
         self.drag = Drag
         self.omega = self.omega
         self.Cd0 = Cd0
-
         self.compute_forces() 
-        self.save_results(path='./')
+        self.check_stall()

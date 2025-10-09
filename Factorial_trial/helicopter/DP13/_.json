@@ -1,0 +1,72 @@
+{
+    "main_propeller": {
+        "AIRCRAFT": "helicopter",
+        "POSITIONING": "__",
+        "position": [
+            0,
+            0,
+            0
+        ],
+        "angles": [
+            0,
+            0,
+            0
+        ],
+        "GEOMETRY": "__",
+        "airfoil": "NACA_0012",
+        "hub": 0.1,
+        "diameter": 2.0,
+        "NB": 3,
+        "chord_root": 0.08377580409572782,
+        "chord_tip": 0.08377580409572782,
+        "pitch_root": 20.0,
+        "pitch_tip": 7,
+        "OPERATION": "__",
+        "rpm": 370,
+        "REFINEMENT": "__",
+        "n": 20,
+        "wake_length": 2,
+        "INITIAL": "__",
+        "uWake": 1.5,
+        "optimal_AoA": 5.0,
+        "distribution": "uniform"
+    },
+    "small_propellers": {
+        "POSITIONING": "__",
+        "angle": 90,
+        "GEOMETRY": "__",
+        "diameter": 0.15,
+        "NB": 3,
+        "chord_root": 0.03,
+        "chord_tip": 0.01,
+        "hub": 0.03,
+        "pitch_root": 85,
+        "pitch_tip": 60,
+        "AoA": 4.5,
+        "OPERATION": "__",
+        "rpm": 10000,
+        "REFINEMENT": "__",
+        "n": 15,
+        "wake_length": 5,
+        "INITIAL": "__",
+        "uWake": 30,
+        "distribution": "uniform"
+    },
+    "settings": {
+        "contraction": true,
+        "core_size": 1e-07,
+        "reynolds": true,
+        "wind_speed": 0,
+        "wind_angle": 0,
+        "blade1_angle": 15,
+        "downwash": 2,
+        "wake_bend": true,
+        "linear": true,
+        "pitch_incline_main": 0
+    },
+    "results": {
+        "Thrust": 6.228903687486652,
+        "Torque": 0.31099804935442443,
+        "FM": 0.718225414629708
+    }
+}

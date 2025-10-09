@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 class QuadSolver(BaseSolver):
     def __init__(self, aircraft) -> None:
         super().__init__(aircraft)
+        self.main_RPM = None
     
     def compute_number_of_points(self):
         self.main_NB = self.aircraft.props[0].NB 
@@ -21,15 +22,12 @@ class QuadSolver(BaseSolver):
         main_NB = self.main_NB
         main_n = self.main_n
 
-        mainCollocPoints = np.zeros((3, 4*npM))
+        mainCollocPoints = np.zeros((4*npM, 3))
         for j in range(4):
-            main_colloc = np.array(self.aircraft.props[j].collocationPoints)
-            mainCollocPoints[:, j*npM : (j+1)*npM] = main_colloc
-        total_colloc_points = mainCollocPoints.T
-
-        # plot them 
-        # plt.scatter(total_colloc_points[])
-
+            for i in range(main_NB):
+                main_colloc = np.array(self.aircraft.props[j].collocationPoints)
+                mainCollocPoints[j*npM + i * (main_n - 1): j*npM + (i + 1) * (main_n - 1)] = main_colloc[i].T
+        total_colloc_points = mainCollocPoints
         return total_colloc_points
 
     def compute_azimuth_and_origin(self):
@@ -59,7 +57,6 @@ class QuadSolver(BaseSolver):
         omega = np.zeros((collocN, 1))
         for i in range(4):
             omega[i*npM: (i+1)*npM] = drone.props[i].RPM*0.1047
-        print('Omega', omega)
         self.omega = omega
     
     def compute_chords(self):   
@@ -137,6 +134,11 @@ class QuadSolver(BaseSolver):
         self.power_loading = power_loading
         self.figure_of_merit = figure_of_merit
 
+    def check_stall(self):
+        self.STALL_HIGH = np.sum(self.alpha>=15)/self.alpha.shape[0]
+        self.STALL_LOW = np.sum(self.alpha<=-5)/self.alpha.shape[0]
+  
+
     def save_results(self, path):
         header_names = [
             "r", "v_axial", "v_tangential", "inflowangle", "alpha",
@@ -166,6 +168,9 @@ class QuadSolver(BaseSolver):
         np.savez_compressed(f"{path}/_res.npz", data=data)
         print(f"Saved structured results to {path}/_res.npz")
 
+        # compute disk area
+        A = np.pi * (self.aircraft.props[0].diameter / 2) ** 2 * 4  # total disk area for quadcopter
+
         # Store performance metrics 
         performance = {
             "thrust": self.thrust,
@@ -175,7 +180,11 @@ class QuadSolver(BaseSolver):
             "p_total": self.p_total,
             "p_ideal": self.p_ideal,
             "power_loading": self.power_loading,
-            "figure_of_merit": self.figure_of_merit
+            "figure_of_merit": self.figure_of_merit,
+            "STALL_HIGH": self.STALL_HIGH,
+            "STALL_LOW": self.STALL_LOW,
+            "main_RPM": self.main_RPM,
+            "disk_loading": self.thrust / A,
         }
 
         with open(f"{path}/performance.json", "w") as f:
@@ -309,15 +318,14 @@ class QuadSolver(BaseSolver):
         plt.show()
 
 if __name__ == "__main__":
-    drone = defineDrone('./base_quad.json',main_RPM=4_000)
+    drone = defineDrone('./configs/base_quad.json',main_RPM=6_000)
     solver = QuadSolver(drone)
     solver.solve()
-    print(solver.omega)
-    solver.aircraft.display()
-    solver.plot_azimuth()
-    solver.plot_twist()
+    #solver.aircraft.display()
+    # solver.plot_twist()
     solver.plot_gammas()
     solver.plot_v_axial()
-    solver.plot_v_tangential()
-    solver.plot_inflowangle()
-    solver.plot_alpha()
+    # solver.plot_v_tangential()
+    # solver.plot_inflowangle()
+    # solver.plot_alpha()
+    print(f'Thrust: {solver.thrust:.2f} N')

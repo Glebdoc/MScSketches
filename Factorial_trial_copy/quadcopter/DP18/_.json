@@ -1,0 +1,55 @@
+{
+    "main_propeller": {
+        "AIRCRAFT": "quadcopter",
+        "POSITIONING": "__",
+        "position": [
+            0,
+            0,
+            0
+        ],
+        "angles": [
+            0,
+            0,
+            0
+        ],
+        "GEOMETRY": "__",
+        "airfoil": "NACA_0012",
+        "hub": 0.04125,
+        "diameter": 0.55,
+        "NB": 2,
+        "chord_root": 0.04319689898685966,
+        "chord_tip": 0.04319689898685966,
+        "pitch_root": 15.0,
+        "pitch_tip": 5,
+        "OPERATION": "__",
+        "rpm": 8000,
+        "REFINEMENT": "__",
+        "n": 16,
+        "wake_length": 1,
+        "INITIAL": "__",
+        "uWake": 3,
+        "optimal_AoA": 5.0,
+        "distribution": "uniform",
+        "diagonal": 0.275
+    },
+    "settings": {
+        "contraction": true,
+        "core_size": 1e-07,
+        "linear": true,
+        "reynolds": true,
+        "wind_speed": 0,
+        "wind_angle": 0,
+        "blade1_angle": 0,
+        "downwash": -2,
+        "wake_bend": true,
+        "pitch_incline_small": 8000,
+        "pitch_incline_main": 10,
+        "small_chord_a": -4,
+        "main_chord_a": -0.5
+    },
+    "results": {
+        "Thrust": 6.228903687486652,
+        "Torque": 0.31099804935442443,
+        "FM": 0.718225414629708
+    }
+}

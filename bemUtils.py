@@ -179,8 +179,8 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
             coll_points = []
             start_index = 0
 
-            
-            coll_points.extend(body.collocationPoints.T)
+            for c in range(len(body.collocationPoints)):
+                coll_points.extend(body.collocationPoints[c].T)
                  
 
             for i in range(body.vortexTABLE.shape[0]):
@@ -414,3 +414,115 @@ def set_bw_design():
         "colors": ['black', '0.4', '0.7']  # black, dark gray, light gray
     }
     return design
+
+
+def update_config(design, aircraft_type, path):
+    
+    if aircraft_type == 'helicopter':
+        """
+        Incoming variables are : 
+            - R, NB, sigma, theta
+        Outgoing variables are :
+            well, everything else
+        Return a dictionary with all the parameters in .json format
+        """
+        #read vars from design
+        R, NB, sigma, theta = design
+        #load the base config file 
+        with open('./configs/base_helicopter.json', 'r') as f:
+            config = json.load(f)
+            config["main_propeller"]["diameter"] = 2*R
+            config["main_propeller"]["NB"] = int(NB) 
+            config["main_propeller"]["hub"] = 0.15 * R
+
+            # compute c 
+            c = sigma * np.pi * R / NB
+            config["main_propeller"]["chord_root"] = c
+            config["main_propeller"]["chord_tip"] = c
+            config["main_propeller"]["pitch_root"] = theta
+        
+        # save the new config file in the right folder
+        with open(f'{path}/_.json', 'w') as f:
+            json.dump(config, f, indent=4)
+        return f'{path}/_.json'
+
+    elif aircraft_type == 'quadcopter':
+        """
+        Incoming variables are : 
+            - R, diagonal, NB, sigma, theta
+        
+        Outgoing variables are :
+            well, everything else
+
+        """
+        #read vars from design
+        R, diagonal, NB, sigma, theta = design
+        #load the base config file 
+        with open('./configs/base_quad.json', 'r') as f:
+            config = json.load(f)
+            config["main_propeller"]["diameter"] = 2*R
+            config["main_propeller"]["NB"] = int(NB) 
+            config["main_propeller"]["hub"] = 0.15 * R
+
+            # compute c 
+            c = sigma * np.pi * R / NB
+            config["main_propeller"]["chord_root"] = c
+            config["main_propeller"]["chord_tip"] = c
+            config["main_propeller"]["pitch_root"] = theta
+
+            # compute diagonal
+            config["main_propeller"]["diagonal"] = diagonal * R
+
+        
+        # save the new config file in the right folder
+        with open(f'{path}/_.json', 'w') as f:
+            json.dump(config, f, indent=4)
+        return f'{path}/_.json'
+
+    elif aircraft_type == 'drone':
+        """
+        Incoming variables are :
+            - R, pitch, R_small, NB_small, sigma_small
+        Outgoing variables are :
+            well, everything else
+        """
+        #read vars from design
+        R, pitch, R_small, NB_small, sigma_small = design
+        #load the base config file 
+        print('Entered update_config for drone with design:', design)
+        with open('./configs/base_drone.json', 'r') as f:
+            config = json.load(f)
+            config["main_propeller"]["diameter"] = 2*R
+            config["main_propeller"]["NB"] = 3 
+            config["main_propeller"]["hub"] = 0.15 * R
+
+            # compute c 
+            # assumed sigma = 0.08, NB = 3
+            c = 0.08 * np.pi * R / 3
+            config["main_propeller"]["chord_root"] = c
+            config["main_propeller"]["chord_tip"] = c
+            config["main_propeller"]["pitch_root"] = pitch
+
+            # small propellers
+            R_small = R_small * R
+            print('Computed small diameter:', 2*R_small)
+            config["small_propellers"]["diameter"] = 2*R_small
+            config["small_propellers"]["NB"] = int(NB_small) 
+            config["small_propellers"]["hub"] = 0.15 * R_small
+
+            # compute c small
+            c_small = sigma_small * np.pi * R_small / NB_small
+            config["small_propellers"]["chord_root"] = c_small
+            config["small_propellers"]["chord_tip"] = c_small
+            config["settings"]["output_dir"] = path
+        
+        # save the new config file in the right folder
+        print('Saving updated config to path:', path)
+        with open(f'{path}/_.json', 'w') as f:
+            json.dump(config, f, indent=4)
+        return f'{path}/_.json'
+
+        print('Exited update_config for drone')
+
+    else:
+        raise ValueError(f'Invalid aircraft type:{aircraft_type}')

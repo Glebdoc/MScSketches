@@ -417,12 +417,12 @@ def solve(drone, updateConfig=True, case='main', save=False, savePath=False):
         alpha[alpha<-5] = -5
         #alpha[alpha>alpha_cl_max_main] = alpha_cl_max_main
 
-        if type=='drone':
-            alpha_small_temp = inflowangle[npM:]*180/np.pi - twist[npM:].flatten()# for small props, the alpha is shifted by 90 degrees
-            #alpha_small_temp[alpha_small_temp>alpha_cl_max_small] = alpha_cl_max_small
-            alpha_small_temp[alpha_small_temp>15] = 15
-            alpha_small_temp[alpha_small_temp<-5] = -5
-            alpha[npM:] = alpha_small_temp
+        # if type=='drone':
+        #     alpha_small_temp = inflowangle[npM:]*180/np.pi - twist[npM:].flatten()# for small props, the alpha is shifted by 90 degrees
+        #     #alpha_small_temp[alpha_small_temp>alpha_cl_max_small] = alpha_cl_max_small
+        #     alpha_small_temp[alpha_small_temp>15] = 15
+        #     alpha_small_temp[alpha_small_temp<-5] = -5
+        #     alpha[npM:] = alpha_small_temp
 
         alpha = np.reshape(alpha, (-1, 1))
 

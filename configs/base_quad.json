@@ -13,23 +13,25 @@
             0
         ],
         "GEOMETRY": "__",
-        "airfoil": "eppler560",
+        "airfoil": "NACA_0012",
         "hub": 0.02,
-        "diameter": 0.25,
+        "diameter": 0.5,
         "NB": 3,
         "chord_root": 0.02,
         "chord_tip": 0.01,
-        "pitch_root": 50,
-        "pitch_tip": 10,
+        "pitch_root": 15,
+        "pitch_tip": 5,
         "OPERATION": "__",
         "rpm": 8000,
         "REFINEMENT": "__",
-        "n": 30,
-        "wake_length": 0.5,
+        "n": 16,
+        "wake_length": 1,
         "INITIAL": "__",
         "uWake": 3,
         "optimal_AoA": 5.0,
-        "distribution": "uniform"
+        "distribution": "uniform",
+        "diagonal": 2
+
     },
     "settings": {
         "contraction": true,

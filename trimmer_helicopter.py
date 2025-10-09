@@ -1,6 +1,7 @@
 import numpy as np 
 from typing import Protocol, Any, Dict, Tuple, Optional
 from strategies import HelicopterStrategy
+import os
 
 class HelicopterTrimmer:
     def __init__(self, strategy, mtow: float,
@@ -53,13 +54,18 @@ class HelicopterTrimmer:
             solver, _, _ = self.trim_velocity(config, main_RPM=main_RPM)
             thrust = solver.thrust
             errThrust = np.abs(thrust - target_thrust)
+            if solver.STALL_HIGH > 0.1:
+                print("Warning: High blade stall detected (>10% elements). Results may be inaccurate.")
+            if solver.STALL_LOW > 0.1:
+                print("Warning: Low blade stall detected (>10% elements). Results may be inaccurate.")
             print(f"Iter {iter}: Thrust {thrust:.2f} N, Target {target_thrust:.2f} N, Error {errThrust:.2f} N")
             if errThrust < self.thrust_tol:
-                return solver, iter, errThrust
+                return solver, iter, errThrust, main_RPM
             # Bisection method to adjust RPM
             main_RPM, lo, hi = self._bisect(thrust, target_thrust, lo, hi, main_RPM)
             iter += 1
-        return solver, iter, errThrust
+        os.remove('./auxx/v_axial.txt')
+        return solver, iter, errThrust, main_RPM
     
     @staticmethod
     def _bisect(measured: float, target: float,

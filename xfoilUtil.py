@@ -328,6 +328,54 @@ def getCd0_batch(Re_array, airfoil_array, npz_dir="./airfoil/data/numpy"):
         # print(f"cd0_b: {cd0_b}, cd0_a: {cd0_a}")
     return cd0
 
+def get_cl32cd_batch(Re_array, airfoil_array, preloaded_data):
+    cl32cd = np.zeros_like(Re_array, dtype = float)
+    alphas = np.zeros_like(Re_array, dtype=float)
+    polar_cache = {}
+    unique_airfoils = np.unique(airfoil_array)
+
+    for airfoil in unique_airfoils:
+        data = preloaded_data[airfoil]
+        Re_vals, polar_vals = data['Re'], data['polar']
+        polar_cache[airfoil] = (Re_vals, polar_vals)
+
+    for i, (Re, af_name) in enumerate(zip(Re_array, airfoil_array)):
+        Re_vals, polar = polar_cache[af_name]
+        # find Re above and re below
+        if Re <= Re_vals[0]:
+            idx_below = idx_above = 0
+        elif Re >= Re_vals[-1]:
+            idx_below = idx_above = -1
+        else:
+            idx_above = np.searchsorted(Re_vals, Re)
+            idx_below = idx_above - 1
+        #find index that is closest to 0 in polar[idx_below, :, 1]
+        middle_idx = len(polar[idx_below, :, 1]) // 2
+        N =  90
+        start  = middle_idx - N
+        end = middle_idx + N
+
+        cl_32_cd_b = polar[idx_below, start:end, 1]**(3/2) / polar[idx_below,  start:end, 2]
+        #print(cl_32_cd_b)
+        alpha_b = np.argmax(cl_32_cd_b)
+        #print(alpha_b)
+        cl_32_cd_b = max(cl_32_cd_b)
+
+        cl_32_cd_a = polar[idx_above, start:end, 1]**(3/2) / polar[idx_above,  start:end, 2]
+        alpha_a = np.argmax(cl_32_cd_a)
+        #print(alpha_a)
+        cl_32_cd_a = max(cl_32_cd_a)
+
+        t = (Re - Re_vals[idx_below]) / (Re_vals[idx_above] - Re_vals[idx_below]) if idx_above != idx_below else 0
+        cl32cd[i] = (1 - t) * cl_32_cd_b + t * cl_32_cd_a
+        alphas[i] = (1 - t) * alpha_b + t * alpha_a
+
+
+
+        #cd0_b = np.interp(0, polar[idx_below, start:end, 1], polar[idx_below,  start:end, 2])
+
+    return cl32cd, alphas
+
 
 def getPolar_batch(Re_array, alpha_array, airfoil_array, preloaded_data):
     """

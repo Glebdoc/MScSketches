@@ -1,4 +1,5 @@
 import numpy as np 
+import os
 from typing import Protocol, Any, Dict, Tuple, Optional
 from strategies import QuadcopterStrategy
 
@@ -52,15 +53,30 @@ class QuadcopterTrimmer:
         while errThrust > self.thrust_tol and iter < self.thrust_itmax:
             solver, _, _ = self.trim_velocity(config, main_RPM=main_RPM)
             thrust = solver.thrust
+            if solver.STALL_HIGH > 0.05:
+                print("Warning: High stall detected, decreasing RPM")
+                hi = main_RPM
+                if thrust < target_thrust:
+                    os.remove('./auxx/v_axial.txt')
+                    return solver, iter, errThrust, main_RPM
+            if solver.STALL_LOW > 0.05:
+                print("Warning: Low stall detected, increasing RPM")
+                lo = main_RPM
+                if thrust > target_thrust:
+                    os.remove('./auxx/v_axial.txt')
+                    return solver, iter, errThrust, main_RPM
+                
             errThrust = np.abs(thrust - target_thrust)
             print(f"Iter {iter}: Thrust {thrust:.2f} N, Target {target_thrust:.2f} N, Error {errThrust:.2f} N")
             if errThrust < self.thrust_tol:
-                return solver, iter, errThrust
+                os.remove('./auxx/v_axial.txt')
+                return solver, iter, errThrust, main_RPM
             # Bisection method to adjust RPM
             main_RPM, lo, hi = self._bisect(thrust, target_thrust, lo, hi, main_RPM)
             iter += 1
-        
-        return solver, iter, errThrust
+        # delete the auxx velocity
+        os.remove('./auxx/v_axial.txt')
+        return solver, iter, errThrust, main_RPM
     
     @staticmethod
     def _bisect(measured: float, target: float,
@@ -74,7 +90,7 @@ class QuadcopterTrimmer:
 if __name__ == "__main__":
     strategy = QuadcopterStrategy()
     trimmer = QuadcopterTrimmer(strategy, mtow=60)
-    config = "base_quad.json"
+    config = "./configs/base_quad.json"
     rpm_initial = 7100
     bounds = (7000, 7200)
     solver, iterations, error = trimmer.trim_thrust(config, rpm_initial, trimmer.mtow, bounds)
