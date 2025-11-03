@@ -72,7 +72,7 @@ def set_bw_design():
     design = {
         "line_styles": ['-', '--', '-.'],
         "markers": ['o', 's', '^'],
-        "colors": ['black', '0.4', '0.7']  # black, dark gray, light gray
+        "colors": ['black', '0.4', '0.6']  # black, dark gray, light gray
     }
     return design
 def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, i):
@@ -117,7 +117,7 @@ def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 
     axs[1, 1].legend()
 
 def cumulative_to_differentiated(r, cumulative):
-    return np.gradient(cumulative, r)
+    return np.gradient(cumulative, r, edge_order=1)
 def plot(files, show=False, title=False, misc=True, helicopter=False, QBlade=False, path=None):
     plt.close()
     # Create figure and gridspec
@@ -331,6 +331,8 @@ def tipRotorForces(cfd_file, ll_files):
     ax0_err = axs[0].twinx()
     ax1_err = axs[1].twinx()
 
+    color1, color2, color3 = design['colors'][:3]
+
     # plot cfd data
     r_cfd = cfd_data[:, 4]
     r_plot = r_cfd/cfd_data[-3, 4]
@@ -343,13 +345,13 @@ def tipRotorForces(cfd_file, ll_files):
     f_tan_b2 = cfd_data[:, 10]/r_cfd
     f_tan_b3 = cfd_data[:, 11]/r_cfd
 
-    axs[0].plot(r_plot, f_axial_b1/area_cfd, label='CFD Blade 1', marker='o', color='blue')
-    axs[0].plot(r_plot, f_axial_b2/area_cfd, label='CFD Blade 2', marker='o', color='red')
-    axs[0].plot(r_plot, f_axial_b3/area_cfd, label='CFD Blade 3', marker='o', color='green')
+    axs[0].plot(r_plot, f_axial_b1/area_cfd, label='CFD Blade 1', marker='o', color=color1)
+    axs[0].plot(r_plot, f_axial_b2/area_cfd, label='CFD Blade 2', marker='o', color=color2)
+    axs[0].plot(r_plot, f_axial_b3/area_cfd, label='CFD Blade 3', marker='o', color=color3)
 
-    axs[1].plot(r_plot, f_tan_b1/area_cfd, label='CFD Blade 1', marker='o', color='blue')
-    axs[1].plot(r_plot, f_tan_b2/area_cfd, label='CFD Blade 2', marker='o', color='red')
-    axs[1].plot(r_plot, f_tan_b3/area_cfd, label='CFD Blade 3', marker='o', color='green')
+    axs[1].plot(r_plot, f_tan_b1/area_cfd, label='CFD Blade 1', marker='o', color=color1)
+    axs[1].plot(r_plot, f_tan_b2/area_cfd, label='CFD Blade 2', marker='o', color=color2)
+    axs[1].plot(r_plot, f_tan_b3/area_cfd, label='CFD Blade 3', marker='o', color=color3)
 
     # plot ll data
     data = ll_data
@@ -370,13 +372,13 @@ def tipRotorForces(cfd_file, ll_files):
     f_tan_b2_ll = data[npM + n_small :npM + n_small*2, 6]
     f_tan_b3_ll = data[npM + 2*n_small:npM + 3*n_small, 6]
 
-    axs[0].plot(r_plot, f_axial_b1_ll/area, label='LL Blade 1', marker='x', linestyle='--', color='blue')
-    axs[0].plot(r_plot, f_axial_b2_ll/area, label='LL Blade 2', marker='x', linestyle='--', color='red')
-    axs[0].plot(r_plot, f_axial_b3_ll/area, label='LL Blade 3', marker='x', linestyle='--', color='green')
+    axs[0].plot(r_plot, f_axial_b1_ll/area, label='LL Blade 1', marker='x', linestyle='--', color=color1)
+    axs[0].plot(r_plot, f_axial_b2_ll/area, label='LL Blade 2', marker='x', linestyle='--', color=color2)
+    axs[0].plot(r_plot, f_axial_b3_ll/area, label='LL Blade 3', marker='x', linestyle='--', color=color3)
 
-    axs[1].plot(r_plot, f_tan_b1_ll/area, label='LL Blade 1', marker='x', linestyle='--', color='blue')
-    axs[1].plot(r_plot, f_tan_b2_ll/area, label='LL Blade 2', marker='x', linestyle='--', color='red')
-    axs[1].plot(r_plot, f_tan_b3_ll/area, label='LL Blade 3', marker='x', linestyle='--', color='green')
+    axs[1].plot(r_plot, f_tan_b1_ll/area, label='LL Blade 1', marker='x', linestyle='--', color=color1)
+    axs[1].plot(r_plot, f_tan_b2_ll/area, label='LL Blade 2', marker='x', linestyle='--', color=color2)
+    axs[1].plot(r_plot, f_tan_b3_ll/area, label='LL Blade 3', marker='x', linestyle='--', color=color3)
 
 
 
@@ -405,13 +407,13 @@ def tipRotorForces(cfd_file, ll_files):
     rel_err_tan_b2 = np.abs((f_tan_b2_ll/area - f_tan_b2) / np.maximum(np.abs(f_tan_b2), 1e-12)) * 100
     rel_err_tan_b3 = np.abs((f_tan_b3_ll/area - f_tan_b3) / np.maximum(np.abs(f_tan_b3), 1e-12)) * 100
 
-    ax0_err.plot(r_plot, rel_err_axial_b1, '--', label='RelErr Blade 1', color='blue', alpha=0.3)
-    ax0_err.plot(r_plot, rel_err_axial_b2, '--', label='RelErr Blade 2', color='red', alpha=0.3)
-    ax0_err.plot(r_plot, rel_err_axial_b3, '--', label='RelErr Blade 3', color='green', alpha=0.3)
+    ax0_err.plot(r_plot, rel_err_axial_b1, '--', label='RelErr Blade 1', color=color1, alpha=0.3)
+    ax0_err.plot(r_plot, rel_err_axial_b2, '--', label='RelErr Blade 2', color=color2, alpha=0.3)
+    ax0_err.plot(r_plot, rel_err_axial_b3, '--', label='RelErr Blade 3', color=color3, alpha=0.3)
 
-    ax1_err.plot(r_plot, rel_err_tan_b1, '--', label='RelErr Blade 1', color='blue', alpha=0.3)
-    ax1_err.plot(r_plot, rel_err_tan_b2, '--', label='RelErr Blade 2', color='red', alpha=0.3)
-    ax1_err.plot(r_plot, rel_err_tan_b3, '--', label='RelErr Blade 3', color='green', alpha=0.3)
+    ax1_err.plot(r_plot, rel_err_tan_b1, '--', label='RelErr Blade 1', color=color1, alpha=0.3)
+    ax1_err.plot(r_plot, rel_err_tan_b2, '--', label='RelErr Blade 2', color=color2, alpha=0.3)
+    ax1_err.plot(r_plot, rel_err_tan_b3, '--', label='RelErr Blade 3', color=color3, alpha=0.3)
 
     # ax0_err.yaxis.set_major_formatter(mtick.PercentFormatter())
     # ax1_err.yaxis.set_major_formatter(mtick.PercentFormatter())
@@ -425,7 +427,9 @@ def tipRotorForces(cfd_file, ll_files):
     axs[0].set_ylabel("Axial Force / Area ")
     axs[1].set_ylabel("Tangential Force / Area ")
 
-    axs[1].set_xlabel("Radius [m]")
+    axs[1].set_xlabel("r/R")
+    axs[0].set_xlabel("r/R")
+    plt.tight_layout()
 
     plt.show()
 
@@ -541,8 +545,8 @@ def mainRotorForces(cfd_file, ll_files):
 
         # Add twin axes for error
         
-        ax0_err.plot(r_cfd, rel_err_axial, '--', label='RelErr Axial', color='blue', alpha=0.3)
-        ax1_err.plot(r_cfd, rel_err_tan, '--', label='RelErr Tangential', color='blue', alpha=0.3)
+        ax0_err.plot(r_cfd, rel_err_axial, '--', label='RelErr Axial', color=color1, alpha=0.3)
+        ax1_err.plot(r_cfd, rel_err_tan, '--', label='RelErr Tangential', color=color1, alpha=0.3)
 
         
         # compute the average relative error
@@ -843,18 +847,67 @@ def plot_AoA_perBlade(fig, axs, data, transparency, label, black=False):
 #plot(['./DesignSpace/main_simple/_res.csv'], show=True)
 
 def plot_axial_force():
+    #LLM data. load npz from DesignSpace/test/_res.npz
+    data_LLM = np.load(f'./DesignSpace/test/_res.npz')
+    data_LLM = data_LLM['data']
+    r = data_LLM['r']
+    c = data_LLM['chords']
+    r_steps = r[1]-r[0]
+    area =  r_steps
+    f_axial_LLM = data_LLM['f_axial'] / area
+    n = 50 -1
+
+
     # cfd data 
-    axial_cumulative = np.genfromtxt(f'./cfdResults/mainy_50.csv', skip_header=4, skip_footer=1)
+    axial_cumulative = np.genfromtxt(f'./cfdResults/results/mainy_50', skip_header=4, skip_footer=1)
     axial_cfd = cumulative_to_differentiated(axial_cumulative[:,0], axial_cumulative[:,1])
 
     plt.figure(figsize=(8,6))
     design = set_bw_design()
 
-    plt.plot(axial_cfd[:,0], axial_cfd[:,1], label='CFD', marker='o', color=design['colors'][0])
+    plt.plot(axial_cumulative[:, 0]+0.1, axial_cfd, label='CFD', marker='o', color=design['colors'][0])
+    plt.plot(r[:n], f_axial_LLM[:n], label='LLM', marker='x', linestyle='--', color=design['colors'][1])
     plt.xlabel('Radius [m]')
     plt.ylabel(r'$F_{axial}$')
 
-    pass
+    plt.legend()
+    plt.grid(True, linestyle='--', linewidth=0.5)
+    plt.tight_layout()
+    plt.show()
+
+def plot_tangential_force():
+    #LLM data. load npz from DesignSpace/test/_res.npz
+    data_LLM = np.load(f'./DesignSpace/test/_res.npz')
+    data_LLM = data_LLM['data']
+    r = data_LLM['r']
+    c = data_LLM['chords']
+    r_steps = r[1]-r[0]
+    area =  r_steps
+    f_axial_LLM = data_LLM['f_tan'] / area
+    n = 50 -1
+
+
+    # cfd data 
+    axial_cumulative = np.genfromtxt(f'./cfdResults/results/mainx_50', skip_header=4, skip_footer=1)
+    axial_cfd = cumulative_to_differentiated(axial_cumulative[:,0], axial_cumulative[:,1])
+
+    plt.figure(figsize=(8,6))
+    design = set_bw_design()
+
+    plt.plot(axial_cumulative[:, 0]+0.1, axial_cfd, label='CFD', marker='o', color=design['colors'][0])
+    plt.plot(r[:n], f_axial_LLM[:n], label='LLM', marker='x', linestyle='--', color=design['colors'][1])
+    plt.xlabel('Radius [m]')
+    plt.ylabel(r'$F_{tan}$')
+
+    plt.legend()
+    plt.grid(True, linestyle='--', linewidth=0.5)
+    plt.tight_layout()
+    plt.show()
+
+
+#plot_axial_force()
+plot_tangential_force()
+
 
 # def mainRotorForcesUpdated(ll_files):
 
@@ -1070,6 +1123,6 @@ def mainRotorForcesUpdated(ll_files, save_plots=False):
     print("Saved faxial_comparison.png and fta_comparison.png")
 
 #mainRotorForcesUpdated(['drone8040_mp_blade1_angle0'])
-#mainRotorForcesUpdated(['inProgress2', 'inProgress3'])
+# mainRotorForcesUpdated(['inProgress2', 'inProgress3'])
 
 

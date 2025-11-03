@@ -8,6 +8,21 @@ import ctypes
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import seaborn as sns
 
+def R_from_DL(DL, W=60):
+    return np.sqrt(W/(np.pi*DL))
+
+def solidity_from_re(NB, RE, mu, rho, RPM, R, span_position = 1.0):
+    return (NB*RE*mu)/(np.pi*rho*RPM*0.1047*R*R*span_position)
+
+def compute_max_RPM(R, R_small):
+    return np.sqrt((103**2 - (0.1047*400)**2 * (R**2))/(R_small**2))/0.1047
+
+
+def chords_from_average(chord, taper):
+    c_r = 2*chord/(1+ taper)
+    c_t = taper*c_r
+    return c_r, c_t
+
 def get_axis_vectors(length=1.5):
     """
     Generates axis vectors for visualization.
@@ -191,7 +206,7 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
         
             poly_data = pv.PolyData(np.array(all_points))
             poly_data.lines = np.array(all_lines)
-            plotter.add_mesh(poly_data, color=colors[j], line_width=2, opacity=0.5)
+            plotter.add_mesh(poly_data, color=colors[j], line_width=2, opacity=0.1)
             poly_data = pv.PolyData(np.array(coll_points))
             plotter.add_mesh(poly_data, color="red")
 
@@ -425,9 +440,24 @@ def update_config(design, aircraft_type, path):
         Outgoing variables are :
             well, everything else
         Return a dictionary with all the parameters in .json format
+
+        helicopter_factors = {
+            "disk loading": [0.9*DL_base, DL_base, 1.1*DL_base],
+            "sigma_main": [0.07, 0.09],
+            "taper": [0.9*taper_base, 1.1*taper_base]
+            }
         """
         #read vars from design
-        R, NB, sigma, theta = design
+        #R, NB, sigma, theta = design
+        print(design)
+        DL, sigma, taper = design 
+        R = R_from_DL(DL)
+        NB = 3 
+        c = sigma*np.pi*R/NB
+        c_r, c_t, = chords_from_average(c, taper)
+
+        print('chords computed')
+
         #load the base config file 
         with open('./configs/base_helicopter.json', 'r') as f:
             config = json.load(f)
@@ -437,9 +467,10 @@ def update_config(design, aircraft_type, path):
 
             # compute c 
             c = sigma * np.pi * R / NB
-            config["main_propeller"]["chord_root"] = c
-            config["main_propeller"]["chord_tip"] = c
-            config["main_propeller"]["pitch_root"] = theta
+            config["main_propeller"]["chord_root"] = c_r
+            config["main_propeller"]["chord_tip"] = c_t
+
+            config["settings"]["output_dir"] = path
         
         # save the new config file in the right folder
         with open(f'{path}/_.json', 'w') as f:
@@ -454,9 +485,21 @@ def update_config(design, aircraft_type, path):
         Outgoing variables are :
             well, everything else
 
+            quadcopter_factors = {
+    "disk_loading": [0.8*dji_disk_loading, dji_disk_loading, 1.2*dji_disk_loading],
+    "diagonal": [0.8*diagonal, 1.2*diagonal],
+    "taper": [0.8*taper, 1.2*taper],
+    "sigma": [0.06 , 0.08,  0.01]
+}   
+
         """
         #read vars from design
-        R, diagonal, NB, sigma, theta = design
+        #R, diagonal, NB, sigma, theta = design
+        DL, diagonal, taper, sigma = design 
+        R = 0.5*R_from_DL(DL)
+        NB =2
+        c = sigma*np.pi*R/NB
+        c_r, c_t = chords_from_average(c, taper)
         #load the base config file 
         with open('./configs/base_quad.json', 'r') as f:
             config = json.load(f)
@@ -466,12 +509,13 @@ def update_config(design, aircraft_type, path):
 
             # compute c 
             c = sigma * np.pi * R / NB
-            config["main_propeller"]["chord_root"] = c
-            config["main_propeller"]["chord_tip"] = c
-            config["main_propeller"]["pitch_root"] = theta
+            config["main_propeller"]["chord_root"] = c_r
+            config["main_propeller"]["chord_tip"] = c_t
 
             # compute diagonal
-            config["main_propeller"]["diagonal"] = diagonal * R
+            config["main_propeller"]["diagonal"] = diagonal
+
+            config["settings"]["output_dir"] = path
 
         
         # save the new config file in the right folder
@@ -485,36 +529,77 @@ def update_config(design, aircraft_type, path):
             - R, pitch, R_small, NB_small, sigma_small
         Outgoing variables are :
             well, everything else
+
+            drone_factors = {
+            "disk loading": [0.9*DL_base, DL_base, 1.1*DL_base],
+            "sigma_main": [0.07, 0.09],
+            "Re_min":[80_000, 120_000],
+            "lambda_p": [0.0675, 0.0825],
+            "pitch_small":[65, 69]
+}
+
         """
         #read vars from design
-        R, pitch, R_small, NB_small, sigma_small = design
+        DL, sigma_main, Re_min, lambda_p, pitch_small, taper = design
+        R = R_from_DL(DL)
+        R_small = R*lambda_p
+        NB = 3
+        hub = 0.15*R
+        chord_avg = sigma_main*np.pi*R/NB
+        c_r, c_t, = chords_from_average(chord_avg, taper)
+        MAX_RPM = compute_max_RPM(R,R_small)
+        print(MAX_RPM) # correct
+        sigma_min = solidity_from_re(NB, Re_min, 1.8e-5, 1.225, MAX_RPM, R_small, span_position = 1.0)
+        print(sigma_min)
+        chord_avg_small =  sigma_min*np.pi*R_small/NB
+        c_r_s, c_t_s = chords_from_average(chord_avg_small, taper)
+        
+        #R, pitch, R_small, NB_small, sigma_small = design
         #load the base config file 
         print('Entered update_config for drone with design:', design)
         with open('./configs/base_drone.json', 'r') as f:
+
             config = json.load(f)
             config["main_propeller"]["diameter"] = 2*R
-            config["main_propeller"]["NB"] = 3 
-            config["main_propeller"]["hub"] = 0.15 * R
+            config["main_propeller"]["hub"] = hub
 
-            # compute c 
-            # assumed sigma = 0.08, NB = 3
-            c = 0.08 * np.pi * R / 3
-            config["main_propeller"]["chord_root"] = c
-            config["main_propeller"]["chord_tip"] = c
-            config["main_propeller"]["pitch_root"] = pitch
+            config["main_propeller"]["chord_root"] = c_r
+            config["main_propeller"]["chord_tip"] = c_t
 
-            # small propellers
-            R_small = R_small * R
-            print('Computed small diameter:', 2*R_small)
             config["small_propellers"]["diameter"] = 2*R_small
-            config["small_propellers"]["NB"] = int(NB_small) 
             config["small_propellers"]["hub"] = 0.15 * R_small
 
-            # compute c small
-            c_small = sigma_small * np.pi * R_small / NB_small
-            config["small_propellers"]["chord_root"] = c_small
-            config["small_propellers"]["chord_tip"] = c_small
+            config["small_propellers"]["chord_root"] = c_r_s
+            config["small_propellers"]["chord_tip"] = c_t_s
+            config["small_propellers"]["pitch"] = pitch_small
+
             config["settings"]["output_dir"] = path
+
+            #############################
+            # config = json.load(f)
+            # config["main_propeller"]["diameter"] = 2*R
+            # config["main_propeller"]["NB"] = 3 
+            # config["main_propeller"]["hub"] = 0.15 * R
+
+            # # compute c 
+            # # assumed sigma = 0.08, NB = 3
+            # c = 0.08 * np.pi * R / 3
+            # config["main_propeller"]["chord_root"] = c
+            # config["main_propeller"]["chord_tip"] = c
+            # config["main_propeller"]["pitch_root"] = pitch
+
+            # # small propellers
+            # R_small = R_small * R
+            # print('Computed small diameter:', 2*R_small)
+            # config["small_propellers"]["diameter"] = 2*R_small
+            # config["small_propellers"]["NB"] = int(NB_small) 
+            # config["small_propellers"]["hub"] = 0.15 * R_small
+
+            # # compute c small
+            # c_small = sigma_small * np.pi * R_small / NB_small
+            # config["small_propellers"]["chord_root"] = c_small
+            # config["small_propellers"]["chord_tip"] = c_small
+            # config["settings"]["output_dir"] = path
         
         # save the new config file in the right folder
         print('Saving updated config to path:', path)
@@ -523,6 +608,20 @@ def update_config(design, aircraft_type, path):
         return f'{path}/_.json'
 
         print('Exited update_config for drone')
+
+    elif aircraft_type =='azimuth':
+        azimuth_angle = design
+        print('Entered update_config for drone with design:', design)
+        with open('./configs/base_drone.json', 'r') as f:
+
+            config = json.load(f)
+            config["settings"]["output_dir"] = path
+            config["settings"]["blade1_angle"] = azimuth_angle * 180/np.pi
+
+        print('Saving updated config to path:', path)
+        with open(f'{path}/_.json', 'w') as f:
+            json.dump(config, f, indent=4)
+        return f'{path}/_.json'
 
     else:
         raise ValueError(f'Invalid aircraft type:{aircraft_type}')

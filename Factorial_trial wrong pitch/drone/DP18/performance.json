@@ -1,0 +1,20 @@
+{
+    "thrust_main": 60.00996666185903,
+    "torque_main": 6.523486428223755,
+    "thrust_small": 5.710857757962404,
+    "torque_small": 0.3477480893809775,
+    "moment_created": 6.0197726361345945,
+    "power_required": 345.95290025153537,
+    "p_induced": 154.84790777311395,
+    "p_profile": 23.69512233559093,
+    "p_total": 178.54303010870487,
+    "p_ideal": 158.96384336731708,
+    "power_loading": 0.17346282288203682,
+    "figure_of_merit": 0.4594956228195737,
+    "STALL_MAIN_HIGH": 0.0,
+    "STALL_MAIN_LOW": 0.0,
+    "STALL_SMALL_HIGH": 1.0,
+    "STALL_SMALL_LOW": 0.0,
+    "disk_loading": 17.191589092226486,
+    "efficiency_small": 0.48116991044290397
+}

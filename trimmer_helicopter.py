@@ -5,8 +5,8 @@ import os
 
 class HelicopterTrimmer:
     def __init__(self, strategy, mtow: float,
-                 vel_tol: float = 1e-4, vel_itmax: int = 30, vel_blend: float = 0.7,
-                 thrust_tol: float = 1e-2, thrust_itmax: int = 20):
+                 vel_tol: float = 1e-6, vel_itmax: int = 30, vel_blend: float = 0.7,
+                 thrust_tol: float = 1e-2, thrust_itmax: int = 20, output_dir='.'):
         
         self.strategy = strategy
         self.mtow = mtow
@@ -15,6 +15,7 @@ class HelicopterTrimmer:
         self.vel_blend = vel_blend
         self.thrust_tol = thrust_tol
         self.thrust_itmax = thrust_itmax
+        self.output_dir = output_dir
 
     def trim_velocity(self,config, main_RPM: Dict | str,):
         """
@@ -25,7 +26,7 @@ class HelicopterTrimmer:
 
         while errVel > self.vel_tol and iter < self.vel_itmax:
             aircraft = self.strategy.build_aircraft(config, main_RPM)
-            solver = self.strategy.build_solver(aircraft)
+            solver = self.strategy.build_solver(aircraft, output_dir=self.output_dir)
             solver.solve() 
             if iter == 0:
                 v_main_old = solver.v_axial
@@ -77,6 +78,12 @@ class HelicopterTrimmer:
         return 0.5 * (lo + hi), lo, hi 
     
 if __name__ == "__main__":
-    trimmer = HelicopterTrimmer(HelicopterStrategy(), mtow=60)
-    #solver, iters, err = trimmer.trim_velocity('./base_helicopter.json', main_RPM=8000)
-    solver, iters, err = trimmer.trim_thrust('./base_helicopter.json', target_thrust=trimmer.mtow, main_RPM=400, bounds=(300, 500))
+    strategy = HelicopterStrategy()
+    
+    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/test_helicopter/"
+
+    trimmer = HelicopterTrimmer(strategy, mtow=60, output_dir=path)
+    solver, iters, err = trimmer.trim_velocity(path + '_.json', main_RPM=400)
+    #solver, iter, errThrust, main_RPM = trimmer.trim_thrust(path + '_.json', target_thrust=trimmer.mtow, main_RPM=400, bounds=(300, 500))
+    solver.save_results(path=path)
+    solver.plot_self()

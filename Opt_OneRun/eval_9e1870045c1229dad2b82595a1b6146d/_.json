@@ -1,0 +1,78 @@
+{
+    "main_propeller": {
+        "AIRCRAFT": "drone",
+        "POSITIONING": "__",
+        "position": [
+            0,
+            0,
+            0
+        ],
+        "angles": [
+            0,
+            0,
+            0
+        ],
+        "GEOMETRY": "__",
+        "airfoil": "eppler560",
+        "hub": 0.0907830759986503,
+        "diameter": 1.2104410133153374,
+        "NB": 3,
+        "chord_root": 0.055887619822431185,
+        "chord_tip": 0.05014202390882107,
+        "pitch_root": 15,
+        "pitch_tip": 7,
+        "OPERATION": "__",
+        "rpm": 370,
+        "REFINEMENT": "__",
+        "n": 15,
+        "wake_length": 1,
+        "INITIAL": "__",
+        "uWake": 1.5,
+        "optimal_AoA": 5.0,
+        "distribution": "uniform"
+    },
+    "small_propellers": {
+        "POSITIONING": "__",
+        "angle": 90,
+        "GEOMETRY": "__",
+        "diameter": 0.22983307566495262,
+        "airfoil": "NACA_0012",
+        "NB": 3,
+        "chord_root": 0.01764649848292431,
+        "chord_tip": 0.015832328369844578,
+        "hub": 0.017237480674871446,
+        "twist_root": 30,
+        "twist_tip": 15,
+        "pitch": 62.4831941504345,
+        "AoA": 4.5,
+        "OPERATION": "__",
+        "rpm": 10000,
+        "REFINEMENT": "__",
+        "n": 10,
+        "wake_length": 3,
+        "INITIAL": "__",
+        "uWake": 3,
+        "distribution": "uniform"
+    },
+    "settings": {
+        "contraction": true,
+        "core_size": 1e-07,
+        "reynolds": true,
+        "wind_speed": 0,
+        "wind_angle": 0,
+        "linear": false,
+        "blade1_angle": 54,
+        "downwash": -10,
+        "wake_bend": true,
+        "pitch_incline_small": 8000,
+        "pitch_incline_main": 10,
+        "small_chord_a": -4,
+        "main_chord_a": -0.5,
+        "output_dir": "./Opt_OneRun/eval_9e1870045c1229dad2b82595a1b6146d"
+    },
+    "results": {
+        "Thrust": 6.228903687486652,
+        "Torque": 0.31099804935442443,
+        "FM": 0.718225414629708
+    }
+}

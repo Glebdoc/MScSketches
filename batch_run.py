@@ -27,9 +27,11 @@ from strategies import HelicopterStrategy, QuadcopterStrategy, DroneStrategy
 
 MTOW = 60  # N
 BATCH_FOLDER = './Factorial_trial'
+#BATCH_FOLDER = './AzimuthStudy11000_linear'
 RUN_HELICOPTER = False
 RUN_QUADCOPTER = False
 RUN_DRONE = True
+RUN_AZIMUTH_STUDY = False
 
 
 def ensure_header(csv_path: str, header: str) -> None:
@@ -62,9 +64,9 @@ def helicopter_worker(i: int, design_row: np.ndarray, performance_summary_path: 
 
     path_json = update_config(design_row, aircraft_type='helicopter', path=path)
 
-    trimmer = HelicopterTrimmer(HelicopterStrategy(), mtow=MTOW)
+    trimmer = HelicopterTrimmer(HelicopterStrategy(), mtow=MTOW, output_dir=path)
     solver, iters, err, main_RPM = trimmer.trim_thrust(
-        path_json, target_thrust=trimmer.mtow, main_RPM=400, bounds=(300, 600)
+        path_json, target_thrust=trimmer.mtow, main_RPM=400, bounds=(300, 500)
     )
     solver.main_RPM = main_RPM
     solver.save_results(path)
@@ -73,7 +75,7 @@ def helicopter_worker(i: int, design_row: np.ndarray, performance_summary_path: 
         performance = json.load(f)
 
     csv_line = (
-        f"DP{i}, {design_row[0]}, {int(design_row[1])}, {design_row[2]}, {design_row[3]}, "
+        f"DP{i}, {design_row[0]}, {design_row[1]}, {design_row[2]}, "
         f"{performance['thrust']}, {performance['torque']}, {performance['p_induced']}, "
         f"{performance['p_profile']}, {performance['p_total']}, {performance['p_ideal']}, "
         f"{performance['power_loading']}, {performance['figure_of_merit']}, {performance['STALL_HIGH']}, "
@@ -88,7 +90,8 @@ def quadcopter_worker(i: int, design_row: np.ndarray, performance_summary_path: 
 
     path_json = update_config(design_row, aircraft_type='quadcopter', path=path)
 
-    trimmer = QuadcopterTrimmer(QuadcopterStrategy(), mtow=MTOW)
+
+    trimmer = QuadcopterTrimmer(QuadcopterStrategy(), mtow=MTOW, output_dir=path)
     solver, iters, err, main_RPM = trimmer.trim_thrust(
         path_json, main_RPM=4000, bounds=(3000, 6000), target_thrust=trimmer.mtow
     )
@@ -99,7 +102,7 @@ def quadcopter_worker(i: int, design_row: np.ndarray, performance_summary_path: 
         performance = json.load(f)
 
     csv_line = (
-        f"DP{i}, {design_row[0]}, {design_row[1]}, {int(design_row[2])}, {design_row[3]}, {design_row[4]}, "
+        f"DP{i}, {design_row[0]}, {design_row[1]}, {design_row[2]}, {design_row[3]}, "
         f"{performance['thrust']}, {performance['torque']}, {performance['p_induced']}, "
         f"{performance['p_profile']}, {performance['p_total']}, {performance['p_ideal']}, "
         f"{performance['power_loading']}, {performance['figure_of_merit']}, {performance['STALL_HIGH']}, "
@@ -116,7 +119,7 @@ def drone_worker(i: int, design_row: np.ndarray, performance_summary_path: str) 
 
     trimmer = DroneTrimmer(DroneStrategy(), mtow=MTOW, output_dir=path)
     rpm_main, rpm_small, solver = trimmer.trim_thrust(
-        main_RPM=340,
+        main_RPM=390,   
         config=path_json,
         rpm_small=13000.0,
         bounds_aux=(250.0, 500.0),
@@ -127,9 +130,9 @@ def drone_worker(i: int, design_row: np.ndarray, performance_summary_path: str) 
 
     with open(f'{path}/performance.json', 'r') as f:
         performance = json.load(f)
-
+    ##DL, sigma_main, Re_min, lambda_p, pitch_small, taper
     csv_line = (
-        f"DP{i}, {design_row[0]}, {design_row[1]}, {design_row[2]}, {int(design_row[3])}, {design_row[4]}, "
+        f"DP{i}, {design_row[0]}, {design_row[1]}, {design_row[2]}, {design_row[3]}, {design_row[4]}, "
         f"{performance['thrust_main']}, {performance['thrust_small']}, {performance['torque_main']}, {performance['torque_small']}, "
         f"{performance['moment_created']}, {performance['power_required']}, "
         f"{performance['p_induced']}, {performance['p_profile']}, {performance['p_total']}, {performance['p_ideal']}, "
@@ -139,6 +142,69 @@ def drone_worker(i: int, design_row: np.ndarray, performance_summary_path: str) 
         f"{rpm_main}, {rpm_small}, {performance['disk_loading']}\n"
     )
     return i, csv_line
+
+def drone_azimuth_worker(i: int, design_row: np.ndarray, performance_summary_path: str) -> Tuple[int, str]:
+    path = f'{BATCH_FOLDER}/drone/DP{i}'
+    os.makedirs(path, exist_ok=True)
+
+    path_json = update_config(design_row, aircraft_type='azimuth', path=path)
+
+    trimmer = DroneTrimmer(DroneStrategy(), mtow=MTOW, output_dir=path)
+    solver, iter, err = trimmer.trim_velocity(
+        config=path_json,
+        main_RPM=390,
+        small_RPM=11000,
+    )
+    solver.save_results(path)
+    solver.plot_self(save=True)
+
+    with open(f'{path}/performance.json', 'r') as f:
+        performance = json.load(f)
+    ##DL, sigma_main, Re_min, lambda_p, pitch_small, taper
+    csv_line = (
+        f"DP{i}, {design_row[0]}, "
+        f"{performance['thrust_main']}, {performance['thrust_small']}, {performance['torque_main']}, {performance['torque_small']}, "
+        f"{performance['moment_created']}, {performance['power_required']}, "
+        f"{performance['p_induced']}, {performance['p_profile']}, {performance['p_total']}, {performance['p_ideal']}, "
+        f"{performance['power_loading']}, {performance['figure_of_merit']}, "
+        f"{performance['STALL_MAIN_HIGH']}, {performance['STALL_MAIN_LOW']}, "
+        f"{performance['STALL_SMALL_HIGH']}, {performance['STALL_SMALL_LOW']}, "
+        f"{0}, {rpm_small}, {performance['disk_loading']}\n"
+    )
+    return i, csv_line
+
+
+def drone_sensitivity_worker(i: int, design_row: np.ndarray, performance_summary_path: str) -> Tuple[int, str]:
+    path = f'{BATCH_FOLDER}/drone/DP{i}'
+    os.makedirs(path, exist_ok=True)
+
+    path_json = update_config(design_row, aircraft_type='azimuth', path=path)
+
+    trimmer = DroneTrimmer(DroneStrategy(), mtow=MTOW, output_dir=path)
+    solver, iter, err = trimmer.trim_velocity(
+        config=path_json,
+        main_RPM=390,
+        small_RPM=11000,
+    )
+    solver.save_results(path)
+    solver.plot_self(save=True)
+
+    with open(f'{path}/performance.json', 'r') as f:
+        performance = json.load(f)
+    ##DL, sigma_main, Re_min, lambda_p, pitch_small, taper
+    csv_line = (
+        f"DP{i}, {design_row[0]}, "
+        f"{performance['thrust_main']}, {performance['thrust_small']}, {performance['torque_main']}, {performance['torque_small']}, "
+        f"{performance['moment_created']}, {performance['power_required']}, "
+        f"{performance['p_induced']}, {performance['p_profile']}, {performance['p_total']}, {performance['p_ideal']}, "
+        f"{performance['power_loading']}, {performance['figure_of_merit']}, "
+        f"{performance['STALL_MAIN_HIGH']}, {performance['STALL_MAIN_LOW']}, "
+        f"{performance['STALL_SMALL_HIGH']}, {performance['STALL_SMALL_LOW']}, "
+        f"{0}, {rpm_small}, {performance['disk_loading']}\n"
+    )
+    return i, csv_line
+
+
 
 
 # --------------------------
@@ -172,6 +238,7 @@ def run_block(
     futures = {}
     with ProcessPoolExecutor(max_workers=workers) as ex:
         for i in indices:
+            print('design[i]', designs[i])
             futures[ex.submit(worker, i, designs[i], os.path.dirname(csv_path))] = i
 
         results: List[Tuple[int, str]] = []
@@ -211,7 +278,7 @@ if __name__ == "__main__":
         helicopter_designs = np.loadtxt(f'{BATCH_FOLDER}/factorial_data/helicopter_factorial_design.csv',
                                         delimiter=',', skiprows=1)
         csv_path = f'{performance_summary_path}/performance_summary_helicopter.csv'
-        header = ('DP, R, NB, sigma, theta, thrust, torque, p_induced, p_profile, p_total, '
+        header = ('DP, DL, sigma_main, taper, thrust, torque, p_induced, p_profile, p_total, '
                   'p_ideal, power_loading, figure_of_merit, STALL_HIGH, STALL_LOW, main_RPM, disk_loading\n')
 
         if args.only:
@@ -226,7 +293,7 @@ if __name__ == "__main__":
         quadcopter_designs = np.loadtxt(f'{BATCH_FOLDER}/factorial_data/quadcopter_factorial_design.csv',
                                         delimiter=',', skiprows=1)
         csv_path = f'{performance_summary_path}/performance_summary_quadcopter.csv'
-        header = ('DP, R, diagonal, NB, sigma, theta, thrust, torque, p_induced, p_profile, '
+        header = ('DP, DL, diagonal, taper, sigma, thrust, torque, p_induced, p_profile, '
                   'p_total, p_ideal, power_loading, figure_of_merit, STALL_HIGH, STALL_LOW, main_RPM, disk_loading\n')
 
         if args.only:
@@ -241,7 +308,8 @@ if __name__ == "__main__":
         drone_designs = np.loadtxt(f'{BATCH_FOLDER}/factorial_data/drone_factorial_design.csv',
                                    delimiter=',', skiprows=1)
         csv_path = f'{performance_summary_path}/performance_summary_drone.csv'
-        header = ('DP, R, pitch, R_small, NB_small, sigma_small, thrust_main, thrust_small, torque_main, torque_small, '
+        #DL, sigma_main, Re_min, lambda_p, pitch_small, taper
+        header = ('DP, DL, sigma_main, Re_min, lambda_p, pitch_small, taper, thrust_main, thrust_small, torque_main, torque_small, '
                   'moment_created, power_required, '
                   'p_induced, p_profile, p_total, p_ideal, power_loading, figure_of_merit, '
                   'STALL_MAIN_HIGH, STALL_MAIN_LOW, STALL_SMALL_HIGH, STALL_SMALL_LOW, '
@@ -254,6 +322,29 @@ if __name__ == "__main__":
             indices = list(range(start, len(drone_designs)))
 
         run_block("DRONE", drone_designs, indices, header, csv_path, drone_worker, args.workers)
+
+    if RUN_AZIMUTH_STUDY:
+        drone_designs = np.loadtxt(f'{BATCH_FOLDER}/factorial_data/azimuth_factorial_design.csv',
+                                   delimiter=',', skiprows=1)
+
+        csv_path = f'{performance_summary_path}/performance_summary_azimuth_drone.csv'
+        #DL, sigma_main, Re_min, lambda_p, pitch_small, taper
+        header = ('DP, DL, sigma_main, Re_min, lambda_p, pitch_small, taper, thrust_main, thrust_small, torque_main, torque_small, '
+                  'moment_created, power_required, '
+                  'p_induced, p_profile, p_total, p_ideal, power_loading, figure_of_merit, '
+                  'STALL_MAIN_HIGH, STALL_MAIN_LOW, STALL_SMALL_HIGH, STALL_SMALL_LOW, '
+                  'main_RPM, small_RPM, disk_loading\n')
+
+        if args.only:
+            indices = parse_indices(args.only)
+            print('I\'m here')
+        else:
+            start = args.start if args.start is not None else 0
+            indices = list(range(start, len(drone_designs)))
+
+            print('I\'m here',start, indices)
+
+        run_block("DRONE", drone_designs, indices, header, csv_path, drone_azimuth_worker, args.workers)
 
     end_time = time.time()
     print(f"Batch run completed in {(end_time - start_time)/60:.2f} minutes.")

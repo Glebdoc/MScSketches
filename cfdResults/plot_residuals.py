@@ -95,7 +95,7 @@ def merge_by_label(series, labels):
 
 def main():
     # Usage: python plot_residuals.py residuals_3k
-    path = sys.argv[1] if len(sys.argv) > 1 else "./results/residuals_out"
+    path = sys.argv[1] if len(sys.argv) > 1 else "cfdResults/helicopter/output/my_deleted"
     if not os.path.isfile(path):
         sys.exit(f"File not found: {path}")
 
@@ -142,19 +142,21 @@ def main():
     plt.show()
 
 def plot_force_history():
-    axial = np.genfromtxt("results/thrust_main-rfile_1_1.out", skip_header=3)
-    tangential = np.genfromtxt("results/tangential_main-rfile_1_1.out", skip_header=3)
-    axial_small = np.genfromtxt("results/thrust_small-rfile_1_1.out", skip_header=3)
+    axial = np.genfromtxt("cfdResults/helicopter/output/axial-rfile_2_1.out", skip_header=3)
+    tangential = np.genfromtxt("cfdResults/helicopter/output/drag-rfile_2_1.out", skip_header=3)
+    #axial_small = np.genfromtxt("results/thrust_small-rfile_1_1.out", skip_header=3)
     plt.figure(figsize=(8,5))
     design = set_bw_design()
     # plt.plot(axial[:,0], axial[:,1], label="Axial Force", color='black', linestyle='-')
     # plt.semilogy(tangential[:,0], -tangential[:,1], label="Tangential Force", color='black', linestyle='--')
     plt.semilogy(axial[:-1,0], abs(axial[1:,1]-axial[:-1, 1]),  '--', label=r'error $F_{axial}$', color='black' )
     plt.semilogy(tangential[:-1,0], abs(tangential[1:,1]-tangential[:-1, 1]),  '-', label=r'error $F_{tan}$', color='black', alpha=0.7)
-    plt.semilogy(axial_small[:-1,0], abs(axial_small[1:,1]-axial_small[:-1, 1]),  ':', label=r'error $F_{axial, small}$', color='black', alpha=0.4)
+    #plt.semilogy(axial_small[:-1,0], abs(axial_small[1:,1]-axial_small[:-1, 1]),  ':', label=r'error $F_{axial, small}$', color='black', alpha=0.4)
     plt.xlabel("Iteration")
     plt.ylabel("Error in Force (N)")
     plt.legend()
     plt.show()
 if __name__ == "__main__":
-    plot_force_history()
+    #plot_force_history()
+    main()
+

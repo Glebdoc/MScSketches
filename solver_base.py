@@ -145,7 +145,7 @@ class BaseSolver:
         
         #np.savetxt('./auxx/v_axial.txt', v_axial)
         np.savetxt(f'{self.output_dir}/v_axial.txt', v_axial)
-        #print('Saved v_axial to', f'{self.output_dir}/v_axial.txt')
+        print('Saved v_axial to', f'{self.output_dir}/v_axial.txt')
 
         Lift = 0.5 * 1.225 * Cl.flatten() * (v_mag.flatten()**2) * chords.flatten() * r_steps.flatten()
         Drag = 0.5 * 1.225 * Cd.flatten() * (v_mag.flatten()**2) * chords.flatten() * r_steps.flatten()
@@ -157,6 +157,7 @@ class BaseSolver:
         self.v_axial = v_axial
         self.v_tangential = v_tangential
         self.vel_total = vel_total
+        self.v_rotational =  v_rotational 
         self.Cl = Cl
         self.Cd = Cd
         self.alpha = alpha

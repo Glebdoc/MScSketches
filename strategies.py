@@ -30,8 +30,8 @@ class HelicopterStrategy:
     def build_aircraft(self, config, main_RPM: Dict | str) -> Any:
         return defineDrone(config, main_RPM=main_RPM)
 
-    def build_solver(self, aircraft: Any) -> Any:
-        return HelicopterSolver(aircraft)
+    def build_solver(self, aircraft: Any, output_dir: str = ".") -> Any:
+        return HelicopterSolver(aircraft, output_dir=output_dir)
 
     def label(self) -> str:
         return "helicopter"
@@ -40,8 +40,8 @@ class QuadcopterStrategy:
     def build_aircraft(self, config, main_RPM: Dict | str) -> Any:
         return defineDrone(config, main_RPM=main_RPM)
 
-    def build_solver(self, aircraft: Any) -> Any:
-        return QuadSolver(aircraft)
+    def build_solver(self, aircraft: Any, output_dir: str = ".") -> Any:
+        return QuadSolver(aircraft, output_dir=output_dir)
 
     def label(self) -> str:
         return "quadcopter"

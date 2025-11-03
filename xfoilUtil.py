@@ -592,4 +592,10 @@ def smooth_npz(airfoil_name, plotting=False):
 #         airfoil = file.split(".npz")[0]
 #         print(f"Smoothing {airfoil}...")
 #         smooth_npz(airfoil, plotting=True)
-#         #plot_npz_data(airfoil)
+#         plot_npz_data(airfoil)
+
+#         # print number of Re in the smoothed npz
+#         data = np.load(f"./airfoil/data/numpy_smoothed/{airfoil}.npz")
+#         Re_smoothed = data["Re"]
+#         print(f"Number of Re in smoothed npz: {len(Re_smoothed)}")
+#         print('Res:', Re_smoothed)

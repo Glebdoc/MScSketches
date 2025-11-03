@@ -6,7 +6,7 @@ from strategies import QuadcopterStrategy
 class QuadcopterTrimmer:
     def __init__(self, strategy, mtow: float,
                  vel_tol: float = 1e-4, vel_itmax: int = 10, vel_blend: float = 0.7,
-                 thrust_tol: float = 1e-2, thrust_itmax: int = 10):
+                 thrust_tol: float = 1e-2, thrust_itmax: int = 10, output_dir='.'):
         
         self.strategy = strategy
         self.mtow = mtow
@@ -15,8 +15,9 @@ class QuadcopterTrimmer:
         self.vel_blend = vel_blend
         self.thrust_tol = thrust_tol
         self.thrust_itmax = thrust_itmax
+        self.output_dir = output_dir
 
-    def trim_velocity(self,config, main_RPM: Dict | str,):
+    def trim_velocity(self,config, main_RPM):
         """
         Trim wake
         """
@@ -25,7 +26,7 @@ class QuadcopterTrimmer:
 
         while errVel > self.vel_tol and iter < self.vel_itmax:
             aircraft = self.strategy.build_aircraft(config, main_RPM)
-            solver = self.strategy.build_solver(aircraft)
+            solver = self.strategy.build_solver(aircraft, output_dir=self.output_dir)
             solver.solve() 
             if iter == 0:
                 v_main_old = solver.v_axial
@@ -88,11 +89,12 @@ class QuadcopterTrimmer:
         return 0.5 * (lo + hi), lo, hi 
     
 if __name__ == "__main__":
-    strategy = QuadcopterStrategy()
-    trimmer = QuadcopterTrimmer(strategy, mtow=60)
-    config = "./configs/base_quad.json"
-    rpm_initial = 7100
-    bounds = (7000, 7200)
-    solver, iterations, error = trimmer.trim_thrust(config, rpm_initial, trimmer.mtow, bounds)
-    print(f"Trimmed in {iterations} iterations with final thrust error {error:.4f} N")
-   # solver.save_results("./results/quadcopter_trimmed")
+    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/baseline_quad_converged/"
+    trimmer  = QuadcopterTrimmer(QuadcopterStrategy(), mtow=60.0, output_dir=path)
+    solver, iters, err, main_RPM = trimmer.trim_thrust(
+        path+'_.json', main_RPM=4000, bounds=(3000, 6000), target_thrust=trimmer.mtow
+    )
+    print(f'Thrust: {solver.thrust:.2f} N', main_RPM)
+    solver.save_results(path=path)
+    solver.plot_self()
+    solver.aircraft.display()

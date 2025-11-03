@@ -33,6 +33,8 @@ class DroneSolver(BaseSolver):
         self.small_NB = small_NB
         self.main_n = main_n
         self.small_n = small_n
+        self.main_RPM =None 
+        self.small_RPM =None 
     
     def compute_collocation_points(self):
         main_NB = self.main_NB
@@ -189,18 +191,27 @@ class DroneSolver(BaseSolver):
         # Ideal power
         p_ideal = thrust_main * np.sqrt(abs(thrust_main)/(2*(self.aircraft.main_prop.diameter**2)*np.pi*1.225/4))
         
-        # Figure of merit
-        figure_of_merit = p_ideal/p_total
+        
         # thrust_small
         thrust_small = np.sum(f_axial[self.npM:])
         # torque_small
-        torque_small = np.sum(f_tan[self.npM:]*self.r_steps[self.npM:])
+        torque_small = np.sum(f_tan[self.npM:]*self.r[self.npM:])
         # created moment 
         moment_created = thrust_small*self.aircraft.main_prop.diameter/2
         # power required 
-        power_required = torque_small*self.aircraft.small_props[0].RPM*2*np.pi/60*4
+        print('RPM used for calculations:',self.aircraft.small_props[0].RPM)
+        power_required = torque_small*self.aircraft.small_props[0].RPM*0.1047197551197
         # Power loading 
         power_loading = thrust_main/power_required
+        # Figure of merit
+        figure_of_merit = p_ideal/power_required
+
+        # small_prop efficiency: 
+        thrust_small_1 = np.sum(f_axial[self.npM: self.npM + self.npS])
+        v = self.aircraft.main_prop.RPM*0.1047197551197*self.aircraft.main_prop.diameter/2
+        power_samll_1  = 1/3*power_required
+        efficiency_small = thrust_small_1*v/power_samll_1
+
 
 
 
@@ -222,6 +233,7 @@ class DroneSolver(BaseSolver):
         self.torque_small = torque_small
         self.moment_created = moment_created
         self.power_required = power_required
+        self.efficiency_small= efficiency_small
 
     def check_stall(self):
         self.STALL_MAIN_HIGH = np.sum(self.alpha[:self.npM]>=15)/self.npM
@@ -250,7 +262,8 @@ class DroneSolver(BaseSolver):
             self.Cl.flatten(),
             self.Cd.flatten(),
             self.chords.flatten(),
-            self.twist.flatten()
+            self.twist.flatten(),
+            self.Re.flatten()
         ], names=",".join(header_names))
 
         np.savez_compressed(f"{path}/_res.npz", data=data)
@@ -277,6 +290,9 @@ class DroneSolver(BaseSolver):
             "STALL_SMALL_HIGH": self.STALL_SMALL_HIGH,
             "STALL_SMALL_LOW": self.STALL_SMALL_LOW,
             "disk_loading": self.thrust_main/A,
+            "efficiency_small": self.efficiency_small, 
+            "RPM_main": self.main_RPM,
+            "RPM_small": self.small_RPM
         }
 
         with open(f"{path}/performance.json", "w") as f:
@@ -288,7 +304,7 @@ class DroneSolver(BaseSolver):
         res = (r - r.min()) / (r.max() - r.min())
         return res
 
-    def plot_self(self):
+    def plot_self(self, save=False):
         alpha =  self.alpha 
         r = self.r 
         chords = self.chords
@@ -335,21 +351,78 @@ class DroneSolver(BaseSolver):
         axs[1, 0].plot(r_main, v_axial[:main_n -1])
         for i in range(self.small_NB):
             axs[1, 0].plot(r_small, v_axial[npM + i*(small_n-1): npM + (i+1)*(small_n-1)], linestyle='--', label=f'Small blade {i+1}')
+        axs[1,0].set_ylabel(r'$v_{\text{axial}}$')
 
         # plot Re 
+        axs[1,1].plot(r_main, Re[:main_n -1])
+        for i in range(self.small_NB):
+            axs[1, 1].plot(r_small, Re[npM + i*(small_n-1): npM + (i+1)*(small_n-1)], linestyle='--', label=f'Small blade {i+1}')
+        axs[1,1].legend()
+
+        # plot Mach number 
+        a = 340 # m/s
+        V_infty = np.sqrt(v_axial**2 + v_tangential**2)
+        M = np.array(V_infty)/a
+        axs[1, 2].plot(r_main, M[:main_n -1])
+        for i in range(self.small_NB):
+            axs[1, 2].plot(r_small, M[npM + i*(small_n-1): npM + (i+1)*(small_n-1)], linestyle='--', label=f'Small blade {i+1}')
+        axs[1,2].legend()
+
+        # plot v rotational 
+        axs[2,0].plot(r_main, v_tangential[:main_n -1])
+        for i in range(self.small_NB):
+            axs[2,0].plot(r_small, v_tangential[npM + i*(small_n-1): npM + (i+1)*(small_n-1)], linestyle='--', label=f'Small blade {i+1}')
+        axs[2,0].legend()
+
+        # plot Cl 
+        axs[2,1].plot(r_main, Cl[:main_n -1])
+        for i in range(self.small_NB):
+            axs[2,1].plot(r_small, Cl[npM + i*(small_n-1): npM + (i+1)*(small_n-1)], linestyle='--', label=f'Small blade {i+1}')
+        axs[2,1].legend()
+
+        # plot Cd
+        axs[2,2].plot(r_main, Cd[:main_n -1])
+        for i in range(self.small_NB):
+            axs[2,2].plot(r_small, Cd[npM + i*(small_n-1): npM + (i+1)*(small_n-1)], linestyle='--', label=f'Small blade {i+1}')
+        axs[2,2].legend()
+
+
+
+
+
+        if save:
+            plt.savefig(f'{self.output_dir}/plot.png')
+        else:
+            plt.show()
         
-
-
-
+    def plot_Re(self):
+        r = self.r
+        Re = self.Re
+        main_n = self.main_n
+        npM = self.npM
+        main_NB = self.main_NB
+        small_n = self.small_n
+        r_small = r[npM: npM + small_n-1]
+        r_small = self.normalize(r_small)
+        plt.plot(r[:main_n-1], Re[:main_n-1], label='Main rotor', color='black')
+        for i in range(main_NB):
+            plt.plot(r_small, Re[npM + i*(small_n-1):npM+(i+1)*(small_n-1)], label=f'Prop blade {i+1}', linestyle='--')
+        plt.xlabel('r/R')
+        plt.ylabel('Re')
+        plt.legend(fancybox=False, shadow=True)
+        plt.grid(alpha=0.5) 
         plt.show()
 
 if __name__ == "__main__":
 
     #path = './Factorial_trial/drone/DP0'
-    path = './Factorial_trial/drone/DP0'
+    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/real_size_test/"
+
     #path = "./configs/base.json"
-    drone = defineDrone(path + '/_.json' ,main_RPM=300, small_RPM=6_000)
+    drone = defineDrone(path + '/_.json' ,main_RPM=390, small_RPM=11_000)
     solver = DroneSolver(drone, output_dir=path)
+    #drone.display()
     solver.solve()
-    solver.plot_self()
-    os.remove('./auxx/v_axial.txt')
+    solver.save_results(path=path)
+    solver.plot_self(save=True)
+    print(solver.thrust_main, solver.moment_created, solver.torque_main)

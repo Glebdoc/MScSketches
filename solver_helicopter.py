@@ -7,8 +7,9 @@ import json
 
 
 class HelicopterSolver(BaseSolver):
-    def __init__(self, aircraft) -> None:
+    def __init__(self, aircraft, output_dir) -> None:
         super().__init__(aircraft)
+        self.output_dir = output_dir
         self.main_RPM = None
     def compute_number_of_points(self):
         main_NB = self.aircraft.main_prop.NB
@@ -182,17 +183,79 @@ class HelicopterSolver(BaseSolver):
         with open(f"{path}/performance.json", "w") as f:
             json.dump(performance, f, indent=4)
 
-    def plot(self):
-        data = np.load('_res.npz')
-        data = data['data']
-        r = data['r']
-        alpha = data['alpha']
-        main_n = self.main_n
+    def normalize(self, r):
+        r = r.flatten()
+        res = (r - r.min()) / (r.max() - r.min())
+        return res
+    
+    def plot_self(self):
 
-        plt.plot(r[:main_n-1], alpha[:main_n-1], label='Main prop')
+        r            = self.r
+        alpha        = self.alpha
+        inflowangle  = self.inflowangle * 180/np.pi
+        twist        = self.twist
+        v_axial      = self.v_axial
+        v_tangential = self.v_tangential
+        Re           = self.Re
+        Cl           = self.Cl
+        Cd           = self.Cd
+        gamma        = self.gammas  # circulation
+
+        main_n = self.main_n
+        # one-blade span of main rotor, like [0,0]
+        r_main = self.normalize(r[:main_n-1])
+
+        # derived
+        a = 340.0
+        V_infty = np.sqrt(v_axial**2 + v_tangential**2)
+        M = np.asarray(V_infty) / a
+
+        fig, axs = plt.subplots(3, 3, figsize=(15, 12))
+
+        # Row 0
+        axs[0, 0].plot(r_main, alpha[:main_n-1])
+        axs[0, 0].set_title('Angle of Attack (Main Rotor)')
+        axs[0, 0].set_xlabel('Radius (norm.)'); axs[0, 0].set_ylabel('Alpha (deg)'); axs[0, 0].grid(True)
+
+        axs[0, 1].plot(r_main, inflowangle[:main_n-1])
+        axs[0, 1].set_title('Inflow Angle (Main Rotor)')
+        axs[0, 1].set_xlabel('Radius (norm.)'); axs[0, 1].set_ylabel('Phi (deg)'); axs[0, 1].grid(True)
+
+        axs[0, 2].plot(r_main, twist[:main_n-1])
+        axs[0, 2].set_title('Twist (Main Rotor)')
+        axs[0, 2].set_xlabel('Radius (norm.)'); axs[0, 2].set_ylabel('Twist (deg)'); axs[0, 2].grid(True)
+
+        # Row 1
+        axs[1, 0].plot(r_main, v_axial[:main_n-1])
+        axs[1, 0].set_title('Axial Velocity (Main Rotor)')
+        axs[1, 0].set_xlabel('Radius (norm.)'); axs[1, 0].set_ylabel('v_axial (m/s)'); axs[1, 0].grid(True)
+
+        axs[1, 1].plot(r_main, Re[:main_n-1])
+        axs[1, 1].set_title('Reynolds Number (Main Rotor)')
+        axs[1, 1].set_xlabel('Radius (norm.)'); axs[1, 1].set_ylabel('Re [-]'); axs[1, 1].grid(True)
+
+        axs[1, 2].plot(r_main, M[:main_n-1])
+        axs[1, 2].set_title('Mach Number (Main Rotor)')
+        axs[1, 2].set_xlabel('Radius (norm.)'); axs[1, 2].set_ylabel('M [-]'); axs[1, 2].grid(True)
+
+        # Row 2 — requested additions
+        axs[2, 0].plot(r_main, Cl[:main_n-1])
+        axs[2, 0].set_title('Lift Coefficient $C_l$ (Main Rotor)')
+        axs[2, 0].set_xlabel('Radius (norm.)'); axs[2, 0].set_ylabel('$C_l$'); axs[2, 0].grid(True)
+
+        axs[2, 1].plot(r_main, Cd[:main_n-1])
+        axs[2, 1].set_title('Drag Coefficient $C_d$ (Main Rotor)')
+        axs[2, 1].set_xlabel('Radius (norm.)'); axs[2, 1].set_ylabel('$C_d$'); axs[2, 1].grid(True)
+
+        axs[2, 2].plot(r_main, gamma[:main_n-1])
+        axs[2, 2].set_title('Circulation $\\Gamma$ (Main Rotor)')
+        axs[2, 2].set_xlabel('Radius (norm.)'); axs[2, 2].set_ylabel('$\\Gamma$'); axs[2, 2].grid(True)
+
+        plt.tight_layout()
         plt.show()
-# if __name__ == "__main__":
-#     drone = defineDrone('./base_helicopter.json',main_RPM=400)
-#     solver = HelicopterSolver(drone)
-#     solver.solve()
-#     solver.plot()
+
+    # if __name__ == "__main__":
+    #     drone = defineDrone('./base_helicopter.json',main_RPM=400)
+    #     solver = HelicopterSolver(drone)
+    #     solver.solve()
+    #     solver.plot()

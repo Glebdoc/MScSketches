@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 
 class DroneTrimmer:
     def __init__(self, strategy, mtow: float,
-                 vel_tol: float = 1e-4, vel_itmax: int = 30, vel_blend: float = 0.7,
-                 thrust_tol: float = 1e-1, thrust_itmax: int = 10,
-                 moment_tol: float = 1e-1, moment_itmax: int = 10,
+                 vel_tol: float = 1e-5, vel_itmax: int = 20, vel_blend: float = 0.7,
+                 thrust_tol: float = 1e-1, thrust_itmax: int = 7,
+                 moment_tol: float = 1e-2, moment_itmax: int = 7,
                  has_aux_rotors: bool = True, output_dir: str = "."):
         
         self.strategy = strategy
@@ -100,7 +100,9 @@ class DroneTrimmer:
         while moment_err > self.moment_tol and iter < self.moment_itmax:
             solver, _, _ = self.trim_velocity(config, main_RPM, rpm_small)
             # read generated moment and torque 
-            created_moment = abs(solver.moment_created)
+            created_moment = solver.moment_created
+            if created_moment < 0:
+                created_moment = 0
             torque_main = abs(solver.torque_main)
 
             if solver.STALL_SMALL_HIGH > STALL_THRESHLOD:
@@ -112,6 +114,7 @@ class DroneTrimmer:
                     except:
                         print('No such file')
                     print('Moment error:', moment_err, '| RPM small:', rpm_small, '| created moment:', created_moment, '| torque main:', torque_main)
+                    solver.small_RPM = rpm_small
                     return rpm_small, solver
                 
                 hi = rpm_small
@@ -130,6 +133,7 @@ class DroneTrimmer:
                     except:
                         print('No such file')
                     print('Moment error:', moment_err, '| RPM small:', rpm_small, '| created moment:', created_moment, '| torque main:', torque_main)
+                    solver.small_RPM = rpm_small
                     return rpm_small, solver
                 lo = rpm_small
                 rpm_small, lo, hi = self._bisect(measured=created_moment, target=torque_main,
@@ -142,6 +146,7 @@ class DroneTrimmer:
             moment_err = abs(created_moment - torque_main)
             if moment_err < self.moment_tol:
                 print('Moment error:', moment_err, '| RPM small:', rpm_small, '| created moment:', created_moment, '| torque main:', torque_main)
+                solver.small_RPM = rpm_small
                 return rpm_small, solver
             # bisection step
             
@@ -153,6 +158,7 @@ class DroneTrimmer:
             os.remove('./auxx/v_axial.txt')
         except:
             print('No such file')
+        solver.small_RPM = rpm_small
         return rpm_small, solver
             
     def trim_thrust(self,
@@ -179,8 +185,11 @@ class DroneTrimmer:
                     try:
                         os.remove('./auxx/v_axial.txt')
                     except:
-                        print('No such file')
+                        print('No such file')  
+                    solver.small_RPM = rpm_small
+                    solver.main_RPM = rpm_main
                     return rpm_main, rpm_small, solver
+                    
                 hi = rpm_main
                 rpm_main, lo, hi = self._bisect(measured=created_thrust, target=self.mtow,
                                       lo=lo, hi=hi, current=rpm_main)
@@ -193,6 +202,8 @@ class DroneTrimmer:
                         os.remove('./auxx/v_axial.txt')
                     except:
                         print('No such file')
+                    solver.small_RPM = rpm_small
+                    solver.main_RPM = rpm_main
                     return rpm_main, rpm_small, solver
                 lo = rpm_main
                 rpm_main, lo, hi = self._bisect(measured=created_thrust, target=self.mtow,
@@ -205,6 +216,8 @@ class DroneTrimmer:
                     os.remove('./auxx/v_axial.txt')
                 except:
                     print('No such file')
+                solver.small_RPM = rpm_small
+                solver.main_RPM = rpm_main
                 return rpm_main, rpm_small, solver
             # bisection step
             print('Bisection step for thrust trim')
@@ -214,6 +227,8 @@ class DroneTrimmer:
             print('Thrust error:', thrust_err, '| RPM main:', rpm_main, '| created thrust:', created_thrust)
             iter += 1
         #os.remove('./auxx/v_axial.txt')
+        solver.small_RPM = rpm_small
+        solver.main_RPM = rpm_main
         return rpm_main, rpm_small, solver
     # ---------- Helper: single bisection step ----------
     @staticmethod
@@ -235,35 +250,42 @@ if __name__ == "__main__":
     
 
     #path = "/home/glebdoc/PythonProjects/MScSketches/Factorial_trial/drone/DP0/_.json"
-    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/real_size_test/_.json"
+    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/the_very_best/"
 
-    trimmer  = DroneTrimmer(strategy, mtow=60.0, output_dir="/home/glebdoc/PythonProjects/MScSketches/DesignSpace/real_size_test")
+    trimmer  = DroneTrimmer(strategy, mtow=60.0, output_dir=path)
 
     #test: velocity trim at fixed RPMs
-    # solver, n_it, err = trimmer.trim_velocity( main_RPM=370, small_RPM=7745,
-    #     config="configs/base.json"
-    # )
-    # solver.plot_self()
+    
+    solver, n_it, err = trimmer.trim_velocity( main_RPM=367.265625, small_RPM=9800,
+        config=path+'_.json'
+    )
     # solver.aircraft.display()
 
-    # test: moment trim at fixed main RPM
-    rpm_small, solver = trimmer.trim_moment( main_RPM=390,
-        config=path,
-        rpm_small=8000.0,
-        bounds_aux=(7000.0, 18000.0)
-    )
-    print(solver.thrust_main, solver.power_required, solver.p_total)    
 
-    solver.plot_self()
-    solver.aircraft.display()   
+    #solver.aircraft.display()
+
+    # test: moment trim at fixed main RPM
+    # rpm_small, solver = trimmer.trim_moment( main_RPM=370,
+    #     config=path+'_.json',
+    #     rpm_small=11000.0,
+    #     bounds_aux=(4000.0, 13000.0)
+    # )
+
+
+    #solver.aircraft.display()   
     # test: thrust trim
-    # _, solver = trimmer.trim_thrust( main_RPM=340,
-    #     config="./configs/base.json",
+    # rpm_main, rpm_small, solver = trimmer.trim_thrust( main_RPM=370,
+    #      config=path+'_.json',
     #     rpm_small=13000.0,
-    #     bounds_aux=(300.0, 500.0),
-    #     bounds_moment=(5000.0, 15000.0),
+    #     bounds_aux=(300.0, 420.0),
+    #     bounds_moment=(8000.0, 20000.0),
     #     mtow=60.0
     # )
+    # print(solver.thrust_main, solver.power_required, solver.p_total)    
+    #solver.plot_Re()
+    solver.plot_self(save=True)
+    solver.save_results(path= path)
+    #solver.save_results(path="/home/glebdoc/PythonProjects/MScSketches/DesignSpace/one_to_one/drone/")
 
     # print("Done. iters:", n_it, "err:", f"{err:.3e}",
     #       "| thrust:", getattr(solver, "thrust_main", None),

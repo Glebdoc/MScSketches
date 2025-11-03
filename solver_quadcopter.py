@@ -7,8 +7,9 @@ from matplotlib import pyplot as plt
 
 
 class QuadSolver(BaseSolver):
-    def __init__(self, aircraft) -> None:
+    def __init__(self, aircraft, output_dir) -> None:
         super().__init__(aircraft)
+        self.output_dir = output_dir
         self.main_RPM = None
     
     def compute_number_of_points(self):
@@ -98,7 +99,9 @@ class QuadSolver(BaseSolver):
         r_main = 0.5*(r_main[1:] + r_main[:-1])
         r_main = np.tile(r_main, (main_NB))
         r = np.tile(r_main, 4)
+        print(r)
         self.r = r
+        print(r)
 
     def compute_forces(self):
         #F axial 
@@ -116,7 +119,8 @@ class QuadSolver(BaseSolver):
         # Total power
         p_total = p_induced + p_profile
         # Ideal power
-        p_ideal = thrust* np.sqrt(abs(thrust)/(2*(self.aircraft.props[0].diameter**2)*np.pi*1.225/4))
+        A = 4*np.pi*(self.aircraft.props[0].diameter*0.5)**2
+        p_ideal = thrust* np.sqrt(abs(thrust)/(2*1.225*A))
         # Power loading 
         power_loading = thrust/p_total
         # Figure of merit
@@ -138,7 +142,11 @@ class QuadSolver(BaseSolver):
         self.STALL_HIGH = np.sum(self.alpha>=15)/self.alpha.shape[0]
         self.STALL_LOW = np.sum(self.alpha<=-5)/self.alpha.shape[0]
   
-
+    def normalize(self, r):
+        r = r.flatten()
+        res = (r - r.min()) / (r.max() - r.min())
+        return res
+    
     def save_results(self, path):
         header_names = [
             "r", "v_axial", "v_tangential", "inflowangle", "alpha",
@@ -317,6 +325,144 @@ class QuadSolver(BaseSolver):
         plt.legend()
         plt.show()
 
+    def plot_self(self):
+        alpha = self.alpha 
+        r = self.r 
+        chords = self.chords
+        Cl = self.Cl
+        Cd = self.Cd
+        Re = self.Re
+        f_axial = self.f_axial
+        f_tan = self.f_tan
+        inflowangle = self.inflowangle * 180 / np.pi
+        twist = self.twist
+        v_axial = self.v_axial
+        v_tangential = self.v_tangential
+        vel_total = self.vel_total
+        gamma = self.gammas
+        alpha_ideal = self.alpha_cl32cd
+        main_n = self.main_n
+        npM = self.npM
+        
+        r_main = r[:main_n - 1]
+        r_main = self.normalize(r_main)
+        
+        fig, axs = plt.subplots(3, 3, figsize=(15, 12))
+        
+        # Plot angle of attack (Main Rotor)
+        # for i in range(4):
+        #     axs[0, 0].plot(r_main, alpha[i*npM:(i)*npM + (main_n-1)], 
+        #                 linestyle='--', label=f'rotor {i+1}')
+        # axs[0, 0].set_title('Angle of Attack (Main Rotor)')
+        # axs[0, 0].set_xlabel('Radius (m)')
+        # axs[0, 0].set_ylabel('Alpha (deg)')
+        # axs[0, 0].legend()
+        # axs[0, 0].grid()
+        for i in range(4):
+            axs[0, 0].plot(r_main, f_axial[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[0, 0].set_title('Angle of Attack (Main Rotor)')
+        axs[0, 0].set_xlabel('Radius (m)')
+        axs[0, 0].set_ylabel('Alpha (deg)')
+        axs[0, 0].legend()
+        axs[0, 0].grid()
+
+        for i in range(4):
+            axs[0, 1].plot(r_main, f_tan[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[0, 1].set_title('Inflow Angle')
+        axs[0, 1].set_xlabel('Radius (m)')
+        axs[0, 1].set_ylabel('Inflow Angle (deg)')
+        axs[0, 1].legend()
+        axs[0, 1].grid()
+        
+        # Plot inflow angle
+        # for i in range(4):
+        #     axs[0, 1].plot(r_main, inflowangle[i*npM:(i)*npM + (main_n-1)], 
+        #                 linestyle='--', label=f'rotor {i+1}')
+        # axs[0, 1].set_title('Inflow Angle')
+        # axs[0, 1].set_xlabel('Radius (m)')
+        # axs[0, 1].set_ylabel('Inflow Angle (deg)')
+        # axs[0, 1].legend()
+        # axs[0, 1].grid()
+        
+        # Plot twist
+        for i in range(4):
+            axs[0, 2].plot(r_main, twist[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[0, 2].set_title('Twist')
+        axs[0, 2].set_xlabel('Radius (m)')
+        axs[0, 2].set_ylabel('Twist (deg)')
+        axs[0, 2].legend()
+        axs[0, 2].grid()
+        
+        # Plot axial velocity
+        for i in range(4):
+            axs[1, 0].plot(r_main, v_axial[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[1, 0].set_title('Axial Velocity')
+        axs[1, 0].set_xlabel('Radius (m)')
+        axs[1, 0].set_ylabel('v_axial (m/s)')
+        axs[1, 0].legend()
+        axs[1, 0].grid()
+        
+        # Plot Reynolds number
+        for i in range(4):
+            axs[1, 1].plot(r_main, Re[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[1, 1].set_title('Reynolds Number')
+        axs[1, 1].set_xlabel('Radius (m)')
+        axs[1, 1].set_ylabel('Re')
+        axs[1, 1].legend()
+        axs[1, 1].grid()
+        
+        # Plot Mach number
+        a = 340  # m/s
+        V_infty = np.sqrt(v_axial**2 + v_tangential**2)
+        M = np.array(V_infty) / a
+        for i in range(4):
+            axs[1, 2].plot(r_main, M[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[1, 2].set_title('Mach Number')
+        axs[1, 2].set_xlabel('Radius (m)')
+        axs[1, 2].set_ylabel('Mach')
+        axs[1, 2].legend()
+        axs[1, 2].grid()
+        
+        # Plot Cl
+        for i in range(4):
+            axs[2, 0].plot(r_main, Cl[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[2, 0].set_title('Lift Coefficient')
+        axs[2, 0].set_xlabel('Radius (m)')
+        axs[2, 0].set_ylabel('Cl')
+        axs[2, 0].legend()
+        axs[2, 0].grid()
+        
+        # Plot Cd
+        for i in range(4):
+            axs[2, 1].plot(r_main, Cd[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[2, 1].set_title('Drag Coefficient')
+        axs[2, 1].set_xlabel('Radius (m)')
+        axs[2, 1].set_ylabel('Cd')
+        axs[2, 1].legend()
+        axs[2, 1].grid()
+        
+        # Plot circulation (gamma)
+        for i in range(4):
+            axs[2, 2].plot(r_main, gamma[i*npM:(i)*npM + (main_n-1)], 
+                        linestyle='--', label=f'rotor {i+1}')
+        axs[2, 2].set_title('Circulation')
+        axs[2, 2].set_xlabel('Radius (m)')
+        axs[2, 2].set_ylabel('Gamma (m²/s)')
+        axs[2, 2].legend()
+        axs[2, 2].grid()
+        
+        plt.tight_layout()
+        plt.show()
+
+    
 if __name__ == "__main__":
     drone = defineDrone('./configs/base_quad.json',main_RPM=6_000)
     solver = QuadSolver(drone)
@@ -328,4 +474,4 @@ if __name__ == "__main__":
     # solver.plot_v_tangential()
     # solver.plot_inflowangle()
     # solver.plot_alpha()
-    print(f'Thrust: {solver.thrust:.2f} N')
+    

@@ -117,7 +117,7 @@ def median_filter(data, kernel_size=5, startFromTheEnd=True, times=1):
 
 class Propeller():
     def __init__(self, position, angles, hub, diameter, NB, pitch, RPM, chord, n, U=2, wake_length=5, distribution='cosine', bodyIndex=0, small=False, main_rotor=None, 
-                 contraction=True, blade1_angle=0, downwash=None, wake_bend = False, output_dir=None):
+                 contraction=True, blade1_angle=0, downwash=None, wake_bend = False, output_dir=None, ppr=30):
         
         """
         This is the initialization of a propeller object. For both main and small rotors.
@@ -133,7 +133,7 @@ class Propeller():
         self.n = n
         self.U = U
         self.wake_length = wake_length
-        self.ppr=30                         # number of points per revolution in the wake
+        self.ppr=ppr                         # number of points per revolution in the wake
         self.chord = chord
         self.v_axial = None
         self.Ct = None
@@ -202,7 +202,7 @@ class Propeller():
         a = R
         #b = self.angles[1]  # pitch of the helix (rise per radian)
         #b= -a*omega*np.tan(np.pi/2 - self.angles[1]) - np.tan(downwash/(omega*R))
-        b =  a*omega*np.tan(downwash/(omega*R))
+        b =  a*omega*np.tan(downwash/(omega*R)) + a*omega*np.tan(np.pi/2 + self.angles[1])
 
         #print("Helix pitch b: ", b)
 
@@ -660,7 +660,7 @@ class Drone:
                  mainWakeLength, smallWakeLength, main_U, small_U, main_distribution, 
                  small_distribution, type,
                  helicopter=False, contraction=True, wind=None, reynolds=False, core_size = 1e-5, 
-                 blade1_angle=0, downwash=None, wake_bend=False, output_dir=None):
+                 blade1_angle=0, downwash=None, wake_bend=False, output_dir=None, ppr=30):
         # Main propeller
 
         self.main_prop = Propeller(main_position, 
@@ -676,7 +676,8 @@ class Drone:
                                    wake_length=mainWakeLength,
                                    distribution=main_distribution, 
                                    contraction=contraction,
-                                   output_dir=output_dir
+                                   output_dir=output_dir,
+                                   ppr=ppr
                                    )
         
         # Small propellers
@@ -848,7 +849,7 @@ class QuadCopter:
     def __init__(self, R, prop_hub, prop_diameter, 
                  prop_NB, prop_pitch, prop_RPM, 
                  prop_chord, prop_n, wake_length, 
-                 distribution, contraction, downwash, reynolds, main_airfoil, core_size=1e-5):
+                 distribution, contraction, downwash, reynolds, main_airfoil, core_size=1e-5, output_dir=None):
         self.R = R
         self.type= 'quadcopter'
         self.props = []
@@ -884,7 +885,8 @@ class QuadCopter:
                                 distribution=distribution,
                                 bodyIndex=0,
                                 contraction=contraction,
-                                downwash=downwash, )
+                                downwash=downwash,
+                                output_dir=output_dir)
             table = prop.vortexTABLE
             
             
@@ -958,18 +960,21 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         main_wake_length = config['main_propeller']['wake_length']
         main_r = np.linspace(main_hub, main_diameter/2, main_n)
 
-        if LINEAR:
-            main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) #+ main_optimal_AoA
-            main_pitch = np.concatenate([main_pitch]*main_NB)
-            main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
-        else:
-        # Pitch distribution
-            pitch_incline = config['settings']['pitch_incline_main']
-            main_pitch = parabolic_distribution(main_pitch_root, main_pitch_tip, main_r, pitch_incline)
-            main_pitch = np.tile((main_pitch[0:-1] + main_pitch[1:])*0.5, main_NB)
-            main_chord_a = config['settings']['main_chord_a']
-            main_chord = parabolic_distribution(main_chord_root, main_chord_tip, main_r, main_chord_a)
-            main_chord = middle(main_chord)
+        # if LINEAR:
+        #     main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) #+ main_optimal_AoA
+        #     main_pitch = np.concatenate([main_pitch]*main_NB)
+        #     main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
+        # else:
+
+        #     pitch_incline = config['settings']['pitch_incline_main']
+        #     main_pitch = parabolic_distribution(main_pitch_root, main_pitch_tip, main_r, pitch_incline)
+        #     main_pitch = np.tile((main_pitch[0:-1] + main_pitch[1:])*0.5, main_NB)
+        #     main_chord_a = config['settings']['main_chord_a']
+        #     main_chord = parabolic_distribution(main_chord_root, main_chord_tip, main_r, main_chord_a)
+        #     main_chord = middle(main_chord)
+        main_pitch = np.linspace(main_pitch_root, main_pitch_tip, main_n-1) #+ main_optimal_AoA
+        main_pitch = np.concatenate([main_pitch]*main_NB)
+        main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
 
 
         #main_chord = np.linspace(main_chord_root, main_chord_tip, main_n)
@@ -1012,16 +1017,31 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
             small_wake_length = config['small_propellers']['wake_length']
 
             small_r = np.linspace(small_props_hub, small_props_diameter/2, small_props_n)
+            
 
-            # Pitch distribution
-            pitch_incline = config['settings']['pitch_incline_small']
-            #small_props_twist = parabolic_distribution(small_twist_root, small_twist_tip, small_r, pitch_incline)
-            small_props_twist = synthetic_twist_curve(small_r/small_r[-1], beta_root=small_twist_root, beta_tip=small_twist_tip,
-                                                    bump_pos=0.2, bump_height=15, noise=0, seed=None)
-            small_props_pitch = middle(small_props_twist)  + small_pitch
-            # cmall chord distribution
-            small_chord_a = config['settings']['small_chord_a']
-            small_props_chord = parabolic_distribution(small_chord_root, small_chord_tip, small_r, small_chord_a)
+            if LINEAR:
+                small_props_chord = np.linspace(small_chord_root, small_chord_tip, small_props_n)
+                small_props_twist = np.linspace(small_twist_root, small_twist_tip, small_props_n -1)
+                small_props_pitch = small_props_twist + small_pitch
+            else:
+                # Pitch distribution
+                pitch_incline = config['settings']['pitch_incline_small']
+                #small_props_twist = parabolic_distribution(small_twist_root, small_twist_tip, small_r, pitch_incline)
+                small_props_twist = synthetic_twist_curve(small_r/small_r[-1], beta_root=small_twist_root, beta_tip=small_twist_tip,
+                                                        bump_pos=0.2, bump_height=15, noise=0, seed=None)
+                small_props_pitch = middle(small_props_twist)  + small_pitch
+                # cmall chord distribution
+                small_chord_a = config['settings']['small_chord_a']
+                small_props_chord = parabolic_distribution(small_chord_root, small_chord_tip, small_r, small_chord_a)
+
+            # pitch_incline = config['settings']['pitch_incline_small']
+            # #small_props_twist = parabolic_distribution(small_twist_root, small_twist_tip, small_r, pitch_incline)
+            # small_props_twist = synthetic_twist_curve(small_r/small_r[-1], beta_root=small_twist_root, beta_tip=small_twist_tip,
+            #                                         bump_pos=0.2, bump_height=15, noise=0, seed=None)
+            # small_props_pitch = middle(small_props_twist)  + small_pitch
+            # # cmall chord distribution
+            # small_chord_a = config['settings']['small_chord_a']
+            # small_props_chord = parabolic_distribution(small_chord_root, small_chord_tip, small_r, small_chord_a)
 
             small_distribution = config['small_propellers']['distribution']
             blade1_angle = config['settings']['blade1_angle']
@@ -1047,6 +1067,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
         wind_angle = config['settings']['wind_angle']
         wake_bend = config['settings']['wake_bend']
         output_dir = config['settings']['output_dir']
+        ppr = config['settings']['ppr']
         #print("Output directory:", output_dir)
 
         wind = np.array([wind_speed*np.cos(wind_angle*np.pi/180),
@@ -1064,7 +1085,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
                                 prop_NB=main_NB, prop_pitch=main_pitch, prop_RPM=main_RPM,
                                 prop_chord=main_chord, prop_n=main_n, wake_length=main_wake_length,
                                 distribution=main_distribution, contraction=contraction, downwash=downwash,
-                                reynolds=reynolds, main_airfoil=main_airfoil, core_size=core_size)   
+                                reynolds=reynolds, main_airfoil=main_airfoil, core_size=core_size, output_dir=output_dir)   
                                
         
         else:
@@ -1075,7 +1096,7 @@ def defineDrone(filename, main_U=None, small_U=None, main_RPM=None, small_RPM=No
                                     mainWakeLength=main_wake_length, smallWakeLength=small_wake_length, main_U=main_U, small_U = small_U, 
                                     main_distribution=main_distribution, small_distribution=small_distribution,
                                     contraction=contraction, wind=wind, reynolds=reynolds, core_size=core_size, helicopter=helicopter, blade1_angle=blade1_angle, 
-                                    downwash=downwash, wake_bend=wake_bend, type= aircraft_type, output_dir=output_dir)
+                                    downwash=downwash, wake_bend=wake_bend, type= aircraft_type, output_dir=output_dir, ppr=ppr)
 
         return drone
     
