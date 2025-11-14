@@ -16,7 +16,7 @@
         "airfoil": "a18sm",
         "hub": 0.1,
         "diameter": 2.0,
-        "NB": 3,
+        "NB": 2,
         "chord_root": 0.1,
         "chord_tip": 0.1,
         "pitch_root": 15,
@@ -69,7 +69,7 @@
         "small_chord_a":-4,
         "ppr":60,
         "main_chord_a":-0.5,
-        "output_dir": "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/test"
+        "output_dir": "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/plot_heli_geo"
     },
     "results": {
         "Thrust": 6.228903687486652,

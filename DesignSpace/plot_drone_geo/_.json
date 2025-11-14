@@ -1,6 +1,6 @@
 {
     "main_propeller": {
-        "AIRCRAFT": "helicopter",
+        "AIRCRAFT": "drone",
         "POSITIONING": "__",
         "position": [
             0,
@@ -16,7 +16,7 @@
         "airfoil": "a18sm",
         "hub": 0.1,
         "diameter": 2.0,
-        "NB": 3,
+        "NB": 2,
         "chord_root": 0.1,
         "chord_tip": 0.1,
         "pitch_root": 15,
@@ -49,13 +49,13 @@
         "rpm": 10000,
         "REFINEMENT": "__",
         "n": 40,
-        "wake_length": 10,
+        "wake_length": 1,
         "INITIAL": "__",
         "uWake": 3,
         "distribution": "uniform"
     },
     "settings": {
-        "contraction": false,
+        "contraction": true,
         "core_size": 1e-07,
         "reynolds": true,
         "wind_speed": 0,
@@ -69,7 +69,7 @@
         "small_chord_a":-4,
         "ppr":60,
         "main_chord_a":-0.5,
-        "output_dir": "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/test"
+        "output_dir": "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/plot_drone_geo"
     },
     "results": {
         "Thrust": 6.228903687486652,

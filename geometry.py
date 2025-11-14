@@ -467,8 +467,10 @@ class Propeller():
                 A = 0.78
                 lmbda = 4.0 *(Ct**0.5)
                 mult = A + (1-A)*np.exp(-lmbda*contTheta)
+                #print(min(mult), max(mult))
             else:
                 mult = np.ones(len(zw))
+                
         else:
             mult = np.ones(len(zw))
         

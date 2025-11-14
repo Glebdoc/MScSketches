@@ -149,10 +149,13 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
         plotter.set_background("white") 
 
         camera = pv.Camera()
-        camera.position = (-5, -5, 3)
-        camera.focal_point = (0, 0, 0)
+        #camera.position = (-5, -5, 3)
+        camera.position = (30, 0, 0)
+        camera.focal_point = (0, 0, -0.8)
         camera.up = (0, 0, 1)
+        camera.parallel_projection = True   # <-- Disable perspective
         plotter.camera = camera
+        
 
 
         if total_velocity_vectors is not None:
@@ -219,9 +222,12 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
                 mag=0.1
         )
 
-        plotter.show()
-        # if display:
-        #     plotter.save_graphic("scene.png")
+        #plotter.show()
+        display = False
+        if display:
+            plotter.save_graphic("wake.pdf")
+        else:
+            plotter.show()
 
 def twistGen(in_hub, in_tip, r, AoA):
     in_hub = in_hub + AoA

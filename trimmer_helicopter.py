@@ -80,10 +80,10 @@ class HelicopterTrimmer:
 if __name__ == "__main__":
     strategy = HelicopterStrategy()
     
-    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/test_helicopter/"
+    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/plot_heli_geo/"
 
     trimmer = HelicopterTrimmer(strategy, mtow=60, output_dir=path)
     solver, iters, err = trimmer.trim_velocity(path + '_.json', main_RPM=400)
     #solver, iter, errThrust, main_RPM = trimmer.trim_thrust(path + '_.json', target_thrust=trimmer.mtow, main_RPM=400, bounds=(300, 500))
-    solver.save_results(path=path)
-    solver.plot_self()
+    solver.aircraft.display()
+    # solver.plot_self()
