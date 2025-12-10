@@ -888,7 +888,7 @@ def plot_tangential_force():
 
 
     # cfd data 
-    axial_cumulative = np.genfromtxt(f'./cfdResults/results/mainx_50', skip_header=4, skip_footer=1)
+    axial_cumulative = np.genfromtxt(f'./cfdResults/results/mainx_100', skip_header=4, skip_footer=1)
     axial_cfd = cumulative_to_differentiated(axial_cumulative[:,0], axial_cumulative[:,1])
 
     plt.figure(figsize=(8,6))
@@ -905,8 +905,8 @@ def plot_tangential_force():
     plt.show()
 
 
-#plot_axial_force()
-plot_tangential_force()
+# plot_axial_force()
+# plot_tangential_force()
 
 
 # def mainRotorForcesUpdated(ll_files):

@@ -89,12 +89,10 @@ class QuadcopterTrimmer:
         return 0.5 * (lo + hi), lo, hi 
     
 if __name__ == "__main__":
-    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/baseline_quad_converged/"
+    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/quad_plot/"
     trimmer  = QuadcopterTrimmer(QuadcopterStrategy(), mtow=60.0, output_dir=path)
-    solver, iters, err, main_RPM = trimmer.trim_thrust(
-        path+'_.json', main_RPM=4000, bounds=(3000, 6000), target_thrust=trimmer.mtow
-    )
-    print(f'Thrust: {solver.thrust:.2f} N', main_RPM)
+    solver, iters, err = trimmer.trim_velocity(
+        path+'_.json', main_RPM=4000)
     solver.save_results(path=path)
     solver.plot_self()
     solver.aircraft.display()

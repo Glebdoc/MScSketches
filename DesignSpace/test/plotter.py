@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as mtick
 import seaborn as sns
+from scipy.interpolate import UnivariateSpline
 
         # results = np.column_stack((r.flatten(),              0
         #                         v_axial.flatten(),           1
@@ -116,8 +117,21 @@ def plot_per_blade(axs, data, file, r_main, r_small, n_main, n_small, npM, npS, 
     axs[1, 1].set_title('r vs v_rot_small')
     axs[1, 1].legend()
 
-def cumulative_to_differentiated(r, cumulative):
-    return np.gradient(cumulative, r)
+# def cumulative_to_differentiated(r, cumulative):
+#     return np.gradient(cumulative, r)
+
+def smooth_cumulative_to_distribution(r, F, smooth=0.0):
+    r = np.asarray(r)
+    F = np.asarray(F)
+
+    spline = UnivariateSpline(r, F, s=smooth)   # tune s if needed
+    q = spline.derivative(1)(r)                 # analytical derivative
+
+    # optional: enforce physically expected BCs
+    # q[-1] = 0.0
+    return q
+
+
 def plot(files, show=False, title=False, misc=True, helicopter=False, QBlade=False, path=None):
     plt.close()
     # Create figure and gridspec

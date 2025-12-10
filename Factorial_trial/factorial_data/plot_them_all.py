@@ -99,8 +99,8 @@ def plot_parallel_coordinates(df, dims, MTOW):
 
     plt.tight_layout()
     #plt.savefig('./Factorial_trial/factorial_data/helicopter_factorial_parallel_coordinates.png', dpi=300)
-    #plt.savefig('./Factorial_trial/factorial_data/drone_factorial_parallel_coordinates.png', dpi=300)
-    plt.savefig('./Factorial_trial/factorial_data/quadcopter_factorial_parallel_coordinates.png', dpi=300)
+    plt.savefig('./Factorial_trial/factorial_data/drone_factorial_parallel_coordinates.png', dpi=300)
+    #plt.savefig('./Factorial_trial/factorial_data/quadcopter_factorial_parallel_coordinates.png', dpi=300)
     print('Saved in')
 
 def plot_DL_PL(MTOW):

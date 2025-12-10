@@ -110,6 +110,7 @@ class BaseSolver:
 
             vel_total  = np.column_stack((vel_total_x, vel_total_y, vel_total_z))
             v_axial = np.sum(vel_total * n_azimuth, axis=1)
+            n = self.main_n 
 
             tan_direction = np.cross(total_colloc_points - n_origin, n_azimuth)
             tan_direction = tan_direction / np.linalg.norm(tan_direction, axis=1)[:, np.newaxis]
@@ -130,6 +131,27 @@ class BaseSolver:
                 cl, cd = xf.getPolar_batch(Re, alpha, airfoil_array, preloaded_data)
                 Cl[:] = cl.reshape(-1, 1)
                 Cd[:] = cd.reshape(-1, 1)
+
+                # n_root = 0    # strictly non-lifting panels
+                # n_ramp = 6    # panels where we smoothly ramp up
+
+                # for b in range(self.main_NB):
+                #     start = b * (n - 1)
+                #     end   = start + (n - 1)
+
+                #     # 1) hard-zero innermost root panels
+                #     Cl[start : start + n_root, 0] = 0.0
+
+                #     # 2) smooth ramp on the next n_ramp panels
+                #     i0 = start + n_root
+                #     i1 = min(start + n_root + n_ramp, end)
+                #     m  = i1 - i0
+                #     if m > 0:
+                #         # s in [0,1)
+                #         s = np.linspace(0.0, 1.0, m, endpoint=False)
+                #         # cosine ramp: 0 -> 1 with zero slope at both ends
+                #         w = 0.5 * (1 - np.cos(np.pi * s))
+                #         Cl[i0:i1, 0] *= w
 
             else:
                 raise NotImplementedError("XFOIL polar calculation without preloaded Reynolds number is not implemented yet.")

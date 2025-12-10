@@ -211,6 +211,7 @@ class Propeller():
         phi0 = self.angles[2] + np.pi/2  + angle_addition      # phase shift (radians)
 
         t = self.dt
+        #t = abs(self.zw/(np.sqrt((a*omega)**2 + b**2)))  # time parameter along the helix
         t = np.concatenate([[0], t])  # tile for both sides of the wake
         theta = omega*t + phi0 
         
@@ -868,7 +869,7 @@ class QuadCopter:
         addHSN = 0
 
         for i in range(4):
-            # sign = (-1)**i
+            sign = (-1)**i
             shift = i*(2*np.pi/4)
             position = Point(self.R*np.cos(shift), self.R*np.sin(shift), 0.0)
 
@@ -880,7 +881,7 @@ class QuadCopter:
                                 prop_diameter, 
                                 prop_NB,
                                 prop_pitch, 
-                                prop_RPM, 
+                                prop_RPM*sign, 
                                 prop_chord, 
                                 prop_n,
                                 wake_length=wake_length,

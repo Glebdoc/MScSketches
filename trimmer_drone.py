@@ -250,19 +250,23 @@ if __name__ == "__main__":
     
 
     #path = "/home/glebdoc/PythonProjects/MScSketches/Factorial_trial/drone/DP0/_.json"
-    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/plot_drone_geo/"
+    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/drone_plotting/"
 
     trimmer  = DroneTrimmer(strategy, mtow=60.0, output_dir=path)
 
     #test: velocity trim at fixed RPMs
     
-    solver, n_it, err = trimmer.trim_velocity( main_RPM=367.265625, small_RPM=9800,
+    # solver, n_it, err = trimmer.trim_velocity( main_RPM=367.265625, small_RPM=9800,
+    #     config=path+'_.json'
+    # )
+    # solver.aircraft.display()
+
+    solver, n_it, err = trimmer.trim_velocity( main_RPM=367, small_RPM=9757,
         config=path+'_.json'
     )
+
+
     solver.aircraft.display()
-
-
-    #solver.aircraft.display()
 
     # test: moment trim at fixed main RPM
     # rpm_small, solver = trimmer.trim_moment( main_RPM=370,
@@ -283,8 +287,8 @@ if __name__ == "__main__":
     # )
     # print(solver.thrust_main, solver.power_required, solver.p_total)    
     #solver.plot_Re()
-    # solver.plot_self(save=True)
-    # solver.save_results(path= path)
+    solver.plot_self(save=True)
+    solver.save_results(path= path)
     #solver.save_results(path="/home/glebdoc/PythonProjects/MScSketches/DesignSpace/one_to_one/drone/")
 
     # print("Done. iters:", n_it, "err:", f"{err:.3e}",

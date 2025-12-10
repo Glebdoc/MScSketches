@@ -149,8 +149,8 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
         plotter.set_background("white") 
 
         camera = pv.Camera()
-        #camera.position = (-5, -5, 3)
-        camera.position = (30, 0, 0)
+        camera.position = (-10, -10, 5)
+        #camera.position = (30, 0, 0)
         camera.focal_point = (0, 0, -0.8)
         camera.up = (0, 0, 1)
         camera.parallel_projection = True   # <-- Disable perspective
@@ -225,7 +225,7 @@ def scene(bodies, colors, collocation_points, total_velocity_vectors, axial_velo
         #plotter.show()
         display = False
         if display:
-            plotter.save_graphic("wake.pdf")
+            plotter.save_graphic("full.pdf")
         else:
             plotter.show()
 
@@ -618,7 +618,8 @@ def update_config(design, aircraft_type, path):
     elif aircraft_type =='azimuth':
         azimuth_angle = design
         print('Entered update_config for drone with design:', design)
-        with open('./configs/base_drone.json', 'r') as f:
+        #with open('./configs/base_drone.json', 'r') as f:
+        with open('./configs/clean_propeller.json', 'r') as f:
 
             config = json.load(f)
             config["settings"]["output_dir"] = path

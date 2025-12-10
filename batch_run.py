@@ -26,12 +26,12 @@ from trimmer_drone import DroneTrimmer
 from strategies import HelicopterStrategy, QuadcopterStrategy, DroneStrategy
 
 MTOW = 60  # N
-BATCH_FOLDER = './Factorial_trial'
-#BATCH_FOLDER = './AzimuthStudy11000_linear'
+#BATCH_FOLDER = './Factorial_trial'
+BATCH_FOLDER = './AzimuthStudy11000Clean'
 RUN_HELICOPTER = False
 RUN_QUADCOPTER = False
-RUN_DRONE = True
-RUN_AZIMUTH_STUDY = False
+RUN_DRONE = False
+RUN_AZIMUTH_STUDY = True
 
 
 def ensure_header(csv_path: str, header: str) -> None:
@@ -148,14 +148,18 @@ def drone_azimuth_worker(i: int, design_row: np.ndarray, performance_summary_pat
     os.makedirs(path, exist_ok=True)
 
     path_json = update_config(design_row, aircraft_type='azimuth', path=path)
-
-    trimmer = DroneTrimmer(DroneStrategy(), mtow=MTOW, output_dir=path)
+    print('File path json:', path_json)
+    #trimmer = DroneTrimmer(DroneStrategy(), mtow=MTOW, output_dir=path)
+    trimmer = HelicopterTrimmer(HelicopterStrategy(), mtow=MTOW, output_dir=path)
+    print('Trimmer created')
     solver, iter, err = trimmer.trim_velocity(
         config=path_json,
-        main_RPM=390,
-        small_RPM=11000,
+        main_RPM=11000,
+        # small_RPM=11000,
     )
+    print('Trimmer trimmed')
     solver.save_results(path)
+    print('After trim velocity')
     solver.plot_self(save=True)
 
     with open(f'{path}/performance.json', 'r') as f:

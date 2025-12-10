@@ -203,7 +203,8 @@ class HelicopterSolver(BaseSolver):
 
         main_n = self.main_n
         # one-blade span of main rotor, like [0,0]
-        r_main = self.normalize(r[:main_n-1])
+        #r_main = self.normalize(r[:main_n-1])
+        r_main = r[:main_n-1]/np.max(r[:main_n-1])
 
         # derived
         a = 340.0
