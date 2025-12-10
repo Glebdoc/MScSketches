@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 
 # Function to get .dat files from a website
 def download_dat_files(url, save_folder='dat_files'):
-    # Ensure the save folder exists
+    
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
 

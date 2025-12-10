@@ -247,37 +247,28 @@ class DroneTrimmer:
 
 if __name__ == "__main__":
     strategy = DroneStrategy()
-    
-
-    #path = "/home/glebdoc/PythonProjects/MScSketches/Factorial_trial/drone/DP0/_.json"
-    path = "/home/glebdoc/PythonProjects/MScSketches/DesignSpace/drone_plotting/"
-
+    path = "/home/glebdoc/PythonProjects/MScSketches/test_for_docs"
     trimmer  = DroneTrimmer(strategy, mtow=60.0, output_dir=path)
 
-    #test: velocity trim at fixed RPMs
-    
-    # solver, n_it, err = trimmer.trim_velocity( main_RPM=367.265625, small_RPM=9800,
-    #     config=path+'_.json'
-    # )
-    # solver.aircraft.display()
-
-    solver, n_it, err = trimmer.trim_velocity( main_RPM=367, small_RPM=9757,
-        config=path+'_.json'
+    #Trimming for velocity only (no moment or thrust trim)
+    solver, n_it, err = trimmer.trim_velocity( main_RPM=367.265625, small_RPM=9800,
+        config=path+'/_.json'
     )
-
-
+    solver.save_results(path= path)
     solver.aircraft.display()
 
-    # test: moment trim at fixed main RPM
+
+    # Trimming for moment at fixed main RPM
     # rpm_small, solver = trimmer.trim_moment( main_RPM=370,
-    #     config=path+'_.json',
+    #     config=path+'/_.json',
     #     rpm_small=11000.0,
     #     bounds_aux=(4000.0, 13000.0)
     # )
+    # solver.save_results(path= path)
+    # solver.aircraft.display()
 
 
-    #solver.aircraft.display()   
-    # test: thrust trim
+    # # Trimming for thrust at fixed main RPM
     # rpm_main, rpm_small, solver = trimmer.trim_thrust( main_RPM=370,
     #      config=path+'_.json',
     #     rpm_small=13000.0,
@@ -285,12 +276,6 @@ if __name__ == "__main__":
     #     bounds_moment=(8000.0, 20000.0),
     #     mtow=60.0
     # )
-    # print(solver.thrust_main, solver.power_required, solver.p_total)    
-    #solver.plot_Re()
-    solver.plot_self(save=True)
-    solver.save_results(path= path)
-    #solver.save_results(path="/home/glebdoc/PythonProjects/MScSketches/DesignSpace/one_to_one/drone/")
 
-    # print("Done. iters:", n_it, "err:", f"{err:.3e}",
-    #       "| thrust:", getattr(solver, "thrust_main", None),
-    #       "| power:", getattr(solver, "p_total", None))
+
+  
